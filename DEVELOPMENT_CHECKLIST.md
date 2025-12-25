@@ -10,17 +10,17 @@
 - [ ] Git workflow (feature branches, PR templates)
 
 ### 1.2 Database Design & Setup
-- [ ] **Datamodell design**:
-  - [ ] Users (id, username, created_at, last_active)
-  - [ ] Rooms (id, code, name, settings, created_by, created_at)
-  - [ ] Games (id, room_id, state, current_turn, board, created_at)
-  - [ ] Players (game_id, user_id, board_state, score, position)
-- [ ] SQLite för utveckling, PostgreSQL för produktion
-- [ ] Database migrations system
-- [ ] Seed data för testing
+- [x] **Datamodell design**:
+  - [x] Users (id, username, created_at, last_active)
+  - [x] Rooms (id, code, name, settings, created_by, created_at)
+  - [x] Games (id, room_id, state, current_turn, board, created_at)
+  - [x] Players (game_id, user_id, board_state, score, position)
+- [x] SQLite för utveckling, PostgreSQL för produktion
+- [x] Database migrations system
+- [x] Seed data för testing
 
 ### 1.3 Development Environment
-- [ ] Environment variables setup (.env.example)
+- [x] Environment variables setup (.env.example)
 - [ ] Docker setup för databas
 - [ ] VS Code workspace konfiguration
 - [ ] README med setup instruktioner
@@ -336,17 +336,24 @@
 ## 📝 Progress Tracking
 
 **Startdatum**: 25 December 2025  
-**Nuvarande fas**: Fas 1 - Projektuppsättning  
-**Nästa milestone**: Database Design & Initial Setup  
+**Nuvarande fas**: Fas 1 → Fas 2 Transition - Database Complete, Starting Backend Foundation  
+**Senaste commit**: feat: Complete database design and setup (Phase 1.2)  
+**Nästa milestone**: Core Server Setup & Authentication Service  
+
+**Senast slutfört**:
+- ✅ **Fas 1.2**: Komplett database system med migrations, models och scripts
+- ✅ **Development Environment**: Database setup och scripts klara  
 
 **Anteckningar**:
 - [x] Skapat repo och grundstruktur
-- [ ] Database design dokument
-- [ ] TypeScript setup
+- [x] Database design och migrations system implementerat
+- [x] TypeScript setup
+- [x] SQLite databas med alla tabeller och models
+- [x] Database scripts (migrate, seed, rollback)
 
-**Blockers**:
-- [ ] Beslut om database (SQLite vs PostgreSQL för dev)
-- [ ] PWA template val (Vite vs Create React App)
+**Beslut som fattats**:
+- [x] SQLite för utveckling (better-sqlite3)
+- [x] Vite + React för PWA
 
 **Beslut som behöver tas**:
 - [ ] Hosting provider (Railway vs Render vs Vercel)
