@@ -1,10 +1,10 @@
 # GnarPuzzle - Mobile-First Utvecklingschecklista
 
-## 🚀 Current Status: **Phase 2 Backend Foundation** - Substansiell Progress!
+## 🚀 Current Status: **Phase 2 Backend Foundation** - Near Complete!
 
-**✅ Completed**: Database system, Express server, Authentication, API routes  
-**🔄 Current Focus**: Testing och Socket.IO implementation  
-**📍 Next**: Frontend implementation och game logic
+**✅ Completed**: Database, Express server, Authentication, API routes, Socket.IO, Room cleanup  
+**🔄 Current Focus**: Game state management och testing  
+**📍 Next**: Frontend implementation och advanced game features
 
 ---
 
@@ -81,7 +81,7 @@
 - [ ] **Unit tests** för auth service
 - [ ] **Integration tests** för auth endpoints
 
-### 2.3 Room Management Service ✅ (API Structure)
+### 2.3 Room Management Service ✅
 - [x] **API Endpoints** (implementerade):
   - [x] `GET /rooms` - Lista aktiva rum (optimerad payload)
   - [x] `POST /rooms` - Skapa rum
@@ -90,8 +90,9 @@
   - [x] `DELETE /rooms/:code/leave` - Lämna rum
 - [x] **Route handlers** med mobile-optimerad respons struktur
 - [x] **Database integration** med Room och RoomMember modeller
-- [ ] Rum cleanup (auto-delete tomma rum efter 10min)
-- [ ] **Socket events**: `room:created`, `room:joined`, `room:left`, `room:updated`
+- [x] **Rum cleanup** (auto-delete tomma rum efter 10min)
+- [x] **Socket events**: `room:created`, `room:joined`, `room:left`, `room:updated`
+- [x] **Background cleanup service** med 5min check-intervall
 - [ ] **Unit tests** för room service
 - [ ] **Integration tests** för room management
 

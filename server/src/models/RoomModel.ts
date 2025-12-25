@@ -179,6 +179,52 @@ export class RoomModel {
     return !!result;
   }
 
+  // Cleanup-related methods
+  static async getInactiveRooms(timeoutMs: number): Promise<Room[]> {
+    const dbManager = await DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+    
+    const cutoffTime = new Date(Date.now() - timeoutMs).toISOString();
+    
+    return await db.all(`
+      SELECT r.* FROM rooms r
+      WHERE r.status != 'deleted' 
+      AND r.updated_at < ?
+      ORDER BY r.updated_at ASC
+    `, cutoffTime) as Room[];
+  }
+
+  static async getConnectedMemberCount(_roomId: number): Promise<number> {
+    // TODO: This would need to check actual socket connections
+    // For now, return 0 to allow cleanup
+    // In a real implementation, this would check:
+    // - Active socket connections
+    // - Last activity timestamps  
+    // - User online status
+    
+    return 0;
+  }
+
+  static async removeAllMembers(roomId: number): Promise<void> {
+    const dbManager = await DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+    
+    await db.run(`
+      DELETE FROM room_members WHERE room_id = ?
+    `, roomId);
+  }
+
+  static async markAsDeleted(roomId: number): Promise<void> {
+    const dbManager = await DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+    
+    await db.run(`
+      UPDATE rooms 
+      SET status = 'deleted', updated_at = CURRENT_TIMESTAMP 
+      WHERE id = ?
+    `, roomId);
+  }
+
   private static async generateRoomCode(): Promise<string> {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';

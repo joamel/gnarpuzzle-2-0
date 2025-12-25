@@ -1,7 +1,7 @@
 import express from 'express';
 import { RoomModel } from '../models';
 import { AuthService, AuthenticatedRequest } from '../services/AuthService';
-import { logger } from '../index';
+import { logger, getSocketService } from '../index';
 
 const router = express.Router();
 
@@ -94,6 +94,21 @@ router.post('/', AuthService.authenticateToken, async (req, res) => {
     });
 
     logger.info(`Room created: ${room.code} by ${authReq.user!.username}`);
+
+    // Emit room created event via Socket.IO
+    const socketService = getSocketService();
+    if (socketService) {
+      socketService.emitToRoom('lobby', 'room:created', {
+        roomCode: room.code,
+        roomName: room.name,
+        memberCount: 1,
+        maxPlayers: room.max_players,
+        createdBy: {
+          id: authReq.user!.id,
+          username: authReq.user!.username
+        }
+      });
+    }
 
     res.status(201).json({
       success: true,
@@ -239,6 +254,19 @@ router.post('/:code/join', AuthService.authenticateToken, async (req, res) => {
     }
 
     logger.info(`User ${authReq.user!.username} joined room ${code}`);
+
+    // Emit room joined event via Socket.IO
+    const socketService = getSocketService();
+    if (socketService) {
+      socketService.emitToRoom(code, 'room:member_joined', {
+        user: {
+          id: authReq.user!.id,
+          username: authReq.user!.username
+        },
+        roomCode: code,
+        memberCount: socketService.getRoomMemberCount(code) + 1
+      });
+    }
 
     res.status(200).json({
       success: true,

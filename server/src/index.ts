@@ -7,6 +7,8 @@ import { Server } from 'socket.io';
 import winston from 'winston';
 import dotenv from 'dotenv';
 import { DatabaseManager } from './config/database';
+import { SocketService } from './services/SocketService';
+import { RoomCleanupService } from './services/RoomCleanupService';
 
 // Load environment variables
 dotenv.config();
@@ -137,18 +139,12 @@ app.use('*', (req, res) => {
 });
 
 // Socket.IO connection handling
+// Socket.IO connection handling - now delegated to SocketService
+let socketService: SocketService;
+let roomCleanupService: RoomCleanupService;
+
 io.on('connection', (socket) => {
   logger.info(`Client connected: ${socket.id}`);
-
-  socket.on('disconnect', (reason) => {
-    logger.info(`Client disconnected: ${socket.id}, reason: ${reason}`);
-  });
-
-  // Placeholder event handlers
-  socket.on('join-room', (data) => {
-    logger.info(`Join room request from ${socket.id}:`, data);
-    socket.emit('join-room-response', { status: 'coming-soon' });
-  });
 });
 
 // Database connection and server startup
@@ -158,6 +154,15 @@ async function startServer() {
     logger.info('Initializing database...');
     await DatabaseManager.getInstance();
     logger.info('Database connected successfully');
+
+    // Initialize Socket.IO service
+    socketService = new SocketService(io);
+    logger.info('Socket.IO service initialized');
+
+    // Initialize and start room cleanup service
+    roomCleanupService = new RoomCleanupService();
+    roomCleanupService.start();
+    logger.info('Room cleanup service started');
 
     // Start server
     server.listen(PORT, () => {
@@ -171,14 +176,18 @@ async function startServer() {
     logger.error('Failed to start server:', error);
     process.exit(1);
   }
-}
-
-// Graceful shutdown
+}// Graceful shutdown
 process.on('SIGTERM', async () => {
   logger.info('Received SIGTERM, shutting down gracefully');
   
   server.close(async () => {
     try {
+      // Stop room cleanup service
+      if (roomCleanupService) {
+        roomCleanupService.stop();
+        logger.info('Room cleanup service stopped');
+      }
+
       const dbManager = await DatabaseManager.getInstance();
       await dbManager.close();
       logger.info('Database connection closed');
@@ -195,6 +204,12 @@ process.on('SIGINT', async () => {
   
   server.close(async () => {
     try {
+      // Stop room cleanup service
+      if (roomCleanupService) {
+        roomCleanupService.stop();
+        logger.info('Room cleanup service stopped');
+      }
+
       const dbManager = await DatabaseManager.getInstance();
       await dbManager.close();
       logger.info('Database connection closed');
@@ -210,3 +225,9 @@ process.on('SIGINT', async () => {
 startServer();
 
 export { app, io, logger };
+export function getSocketService(): SocketService | null {
+  return socketService || null;
+}
+export function getRoomCleanupService(): RoomCleanupService | null {
+  return roomCleanupService || null;
+}
