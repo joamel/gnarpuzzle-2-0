@@ -1,18 +1,35 @@
 # GnarPuzzle - Mobile-First Utvecklingschecklista
 
-## 📋 Fas 1: Projektuppsättning & Database Design
+## 🚀 Current Status: **Phase 2 Backend Foundation** - Substansiell Progress!
 
-### 1.1 Initial Setup
+**✅ Completed**: Database system, Express server, Authentication, API routes  
+**🔄 Current Focus**: Testing och Socket.IO implementation  
+**📍 Next**: Frontend implementation och game logic
+
+---
+
+## 📋 Fas 1: Projektuppsättning & Database Design ✅
+
+### 1.1 Initial Setup ✅
 - [x] Skapa ny repo med struktur (`/server`, `/client`, `/shared`, `/docs`)
 - [x] Setup package.json för server och client (PWA-optimerad)
 - [x] Konfigurera TypeScript för båda sidor
 - [x] Setup ESLint, Prettier, Husky (pre-commit hooks)
+- [x] **Development Environment**: Workspace scripts för smidig utveckling
 - [ ] Git workflow (feature branches, PR templates)
 
-### 1.2 Database Design & Setup
+### 1.2 Database Design & Setup ✅
 - [x] **Datamodell design**:
   - [x] Users (id, username, created_at, last_active)
   - [x] Rooms (id, code, name, settings, created_by, created_at)
+  - [x] Games (id, room_id, state, current_turn, timer, created_at)
+  - [x] Players (id, user_id, game_id, position, letters, connected)
+  - [x] RoomMembers (room_id, user_id, role, joined_at)
+- [x] **SQLite setup** med migration system (development-friendly)
+- [x] **DatabaseManager** med transaction support
+- [x] **Models**: Async User, Room, Game, Player classes
+- [x] Migration scripts (up/down for varje schema ändring)
+- [x] Seed data för testing
   - [x] Games (id, room_id, state, current_turn, board, created_at)
   - [x] Players (game_id, user_id, board_state, score, position)
 - [x] SQLite för utveckling, PostgreSQL för produktion
@@ -21,6 +38,9 @@
 
 ### 1.3 Development Environment
 - [x] Environment variables setup (.env.example)
+- [x] **Development scripts** (npm scripts för enkla kommandon från root)
+- [x] **Hot reloading setup** (både server och client)
+- [x] **Workspace management** (concurrently för parallel utveckling)
 - [ ] Docker setup för databas
 - [ ] VS Code workspace konfiguration
 - [ ] README med setup instruktioner
@@ -29,15 +49,29 @@
 
 ## 🔧 Fas 2: Backend Foundation (Mobile-Optimized API)
 
-### 2.1 Core Server Setup
-- [ ] Express server med mobile-optimerad CORS
-- [ ] Socket.IO server (komprimering aktiverat för mobil)
-- [ ] Request compression middleware
-- [ ] Rate limiting (mobilanpassade gränser)
-- [ ] Error handling & logging (Winston)
-- [ ] Health check endpoint
+### 2.1 Core Server Setup ✅
+- [x] Express server med mobile-optimerad CORS
+- [x] Socket.IO server (mobile-optimized configuration)
+- [x] Request compression middleware
+- [x] Rate limiting (mobilanpassade gränser)
+- [x] Error handling & logging (Winston)
+- [x] Health check endpoint (`/health` och `/api/health`)
+- [x] **Development server** med TypeScript hot reloading
+- [x] **Production build** pipeline fungerande
+- [x] **Environment configuration** för development/production
 
-### 2.2 Authentication Service
+### 2.2 Authentication Service ✅
+- [x] **API Endpoints**:
+  - [x] `POST /auth/login` - Snabb användarregistrering (bara username)
+  - [x] `POST /auth/refresh` - Session förnyelse
+  - [x] `DELETE /auth/logout` - Utloggning
+  - [x] `GET /auth/me` - Nuvarande användarinfo
+- [x] JWT med mobile-optimerad token hantering
+- [x] Middleware för autentisering av protected routes
+- [x] **Mobile-first design** (bara username behövs för registrering)
+- [ ] Session persistence i databas
+- [ ] **Unit tests** för auth service
+- [ ] **Integration tests** för auth endpoints
 - [ ] **API Endpoints**:
   - [ ] `POST /auth/login` - Snabb användarregistrering (bara username)
   - [ ] `POST /auth/refresh` - Session förnyelse
@@ -47,20 +81,32 @@
 - [ ] **Unit tests** för auth service
 - [ ] **Integration tests** för auth endpoints
 
-### 2.3 Room Management Service
-- [ ] **API Endpoints**:
-  - [ ] `GET /rooms` - Lista aktiva rum (optimerad payload)
-  - [ ] `POST /rooms` - Skapa rum
-  - [ ] `GET /rooms/:code` - Rum detaljer
-  - [ ] `POST /rooms/:code/join` - Gå med i rum
-  - [ ] `DELETE /rooms/:code/leave` - Lämna rum
+### 2.3 Room Management Service ✅ (API Structure)
+- [x] **API Endpoints** (implementerade):
+  - [x] `GET /rooms` - Lista aktiva rum (optimerad payload)
+  - [x] `POST /rooms` - Skapa rum
+  - [x] `GET /rooms/:code` - Rum detaljer
+  - [x] `POST /rooms/:code/join` - Gå med i rum
+  - [x] `DELETE /rooms/:code/leave` - Lämna rum
+- [x] **Route handlers** med mobile-optimerad respons struktur
+- [x] **Database integration** med Room och RoomMember modeller
 - [ ] Rum cleanup (auto-delete tomma rum efter 10min)
 - [ ] **Socket events**: `room:created`, `room:joined`, `room:left`, `room:updated`
 - [ ] **Unit tests** för room service
 - [ ] **Integration tests** för room management
 
-### 2.4 Game Logic Service
-- [ ] **Game State Management**:
+### 2.4 Game Logic Service ✅ (API Structure)
+- [x] **API Endpoints** (implementerade):
+  - [x] `POST /games` - Skapa nytt spel
+  - [x] `GET /games/:id` - Spel status och state
+  - [x] `POST /games/:id/start` - Starta spel
+  - [x] `POST /games/:id/leave` - Lämna spel
+  - [x] `POST /games/:id/select-letter` - Välj bokstav
+  - [x] `POST /games/:id/place-letter` - Placera bokstav
+  - [x] `POST /games/:id/next-turn` - Nästa spelare
+- [x] **Route handlers** med game state management struktur
+- [x] **Database integration** med Game och Player modeller
+- [ ] **Game State Management** (logik implementation):
   - [ ] Spelinitiering (turnorder baserat på join-ordning)
   - [ ] Turn rotation logic
   - [ ] Timer system (15s letter selection, 15s placement)

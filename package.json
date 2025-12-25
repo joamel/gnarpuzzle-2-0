@@ -1,0 +1,52 @@
+{
+  "name": "gnarpuzzle-2-0",
+  "version": "2.0.0",
+  "description": "GnarPuzzle 2.0 - Mobile-first multiplayer word game",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "install:all": "npm install && npm install --workspace=client && npm install --workspace=server",
+    "build:all": "npm run build --workspace=server && npm run build --workspace=client",
+    "dev:server": "npm run dev --workspace=server",
+    "dev:client": "npm run dev --workspace=client",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "start:server": "npm run start --workspace=server",
+    "start:client": "npm run preview --workspace=client",
+    "start": "concurrently \"npm run start:server\" \"npm run start:client\"",
+    "build:server": "npm run build --workspace=server",
+    "build:client": "npm run build --workspace=client",
+    "test:server": "npm run test --workspace=server",
+    "test:client": "npm run test --workspace=client",
+    "test": "npm run test:server && npm run test:client",
+    "db:setup": "npm run db:setup --workspace=server",
+    "db:migrate": "npm run db:migrate --workspace=server",
+    "db:rollback": "npm run db:rollback --workspace=server",
+    "db:seed": "npm run db:seed --workspace=server",
+    "db:reset": "npm run db:reset --workspace=server",
+    "lint:server": "npm run lint --workspace=server",
+    "lint:client": "npm run lint --workspace=client",
+    "lint": "npm run lint:server && npm run lint:client",
+    "clean": "npm run clean --workspace=server && npm run clean --workspace=client",
+    "setup": "npm run install:all && npm run db:setup && npm run build:all"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "author": "GnarPuzzle Team",
+  "license": "MIT",
+  "keywords": [
+    "game",
+    "multiplayer",
+    "mobile",
+    "websocket",
+    "typescript",
+    "word-game"
+  ]
+}
