@@ -1,6 +1,7 @@
 import { Server as SocketServer, Socket } from 'socket.io';
 import { logger } from '../utils/logger';
 import { GameStateService } from './GameStateService';
+import { AuthService } from './AuthService';
 
 // Types for Socket.IO events
 export interface RoomEventData {
@@ -55,15 +56,21 @@ export class SocketService {
   }
 
   private setupSocketHandlers(): void {
-    this.io.on('connection', (socket: Socket) => {
+    this.io.on('connection', async (socket: Socket) => {
       logger.info(`Client connected: ${socket.id}`, {
         service: 'gnarpuzzle-server',
         socketId: socket.id,
         timestamp: new Date().toISOString()
       });
 
-      // Initialize user data
-      this.connectedUsers.set(socket.id, {});
+      // Auto-authenticate using token from auth
+      const token = socket.handshake.auth.token;
+      if (token) {
+        await this.handleAuthentication(socket, { token });
+      } else {
+        // Initialize anonymous user data
+        this.connectedUsers.set(socket.id, {});
+      }
 
       // Authentication
       socket.on('authenticate', (data: { token: string }) => {
@@ -129,26 +136,54 @@ export class SocketService {
     });
   }
 
-  private async handleAuthentication(socket: Socket, _data: { token: string }): Promise<void> {
+  private async handleAuthentication(socket: Socket, data: { token: string }): Promise<void> {
     try {
-      // TODO: Validate JWT token and get user info
-      // For now, mock authentication
-      const userId = 1; // From JWT payload
-      const username = 'TestUser'; // From JWT payload
+      // Validate JWT token
+      const decoded = AuthService.verifyToken(data.token);
+      if (!decoded) {
+        socket.emit('authentication_error', {
+          error: 'Invalid token'
+        });
+        logger.warn(`Authentication failed: Invalid token for socket: ${socket.id}`, {
+          service: 'gnarpuzzle-server'
+        });
+        return;
+      }
 
-      const userData = { userId, username };
+      console.log('JWT decoded payload:', decoded);
+
+      const userData = {
+        userId: decoded.userId,
+        username: decoded.username
+      };
+
+      // Validate required fields
+      if (!userData.userId || !userData.username) {
+        socket.emit('authentication_error', {
+          error: 'Invalid user data in token'
+        });
+        logger.warn(`Authentication failed for socket: ${socket.id}`, {
+          error: 'username is not defined',
+          service: 'gnarpuzzle-server'
+        });
+        return;
+      }
+
       this.connectedUsers.set(socket.id, userData);
+
+      // Auto-join to lobby for room updates
+      socket.join('lobby');
 
       socket.emit('authenticated', {
         success: true,
         user: userData
       });
 
-      logger.info(`User authenticated: ${username} (${userId})`, {
+      logger.info(`User authenticated: ${userData.username} (${userData.userId})`, {
         service: 'gnarpuzzle-server',
         socketId: socket.id,
-        userId,
-        username
+        userId: userData.userId,
+        username: userData.username
       });
     } catch (error) {
       socket.emit('authentication:error', {
@@ -554,6 +589,25 @@ export class SocketService {
 
   public emitToUser(socketId: string, event: string, data: any): void {
     this.io.to(socketId).emit(event, data);
+  }
+
+  public joinRoom(userId: string, roomCode: string): void {
+    // Find socket by user ID and join room
+    for (const [socketId, userData] of this.connectedUsers.entries()) {
+      if (userData.userId?.toString() === userId) {
+        const socket = this.io.sockets.sockets.get(socketId);
+        if (socket) {
+          socket.join(`room:${roomCode}`);
+          this.connectedUsers.set(socketId, { ...userData, roomCode });
+          logger.info(`User ${userData.username} joined room ${roomCode} via API`, {
+            service: 'gnarpuzzle-server',
+            userId: userData.userId,
+            roomCode
+          });
+        }
+        break;
+      }
+    }
   }
 
   public getRoomMemberCount(roomCode: string): number {

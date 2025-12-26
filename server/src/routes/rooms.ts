@@ -100,13 +100,20 @@ router.post('/', AuthService.authenticateToken, async (req, res) => {
 
     logger.info(`Room created: ${room.code} by ${authReq.user!.username}`);
 
+    // Get room members for response (creator is already added by RoomModel.create)
+    const members = await RoomModel.getRoomMembers(room.id);
+
     // Emit room created event via Socket.IO
     const socketService = getSocketService();
     if (socketService) {
+      // Join creator to the Socket.IO room
+      socketService.joinRoom(authReq.user!.id.toString(), room.code);
+      
+      // Emit to lobby about new room
       socketService.emitToRoom('lobby', 'room:created', {
         roomCode: room.code,
         roomName: room.name,
-        memberCount: 1,
+        memberCount: members.length,
         maxPlayers: room.max_players,
         createdBy: {
           id: authReq.user!.id,
@@ -125,7 +132,9 @@ router.post('/', AuthService.authenticateToken, async (req, res) => {
         board_size: room.board_size,
         turn_duration: room.turn_duration,
         status: room.status,
-        created_at: room.created_at
+        created_at: room.created_at,
+        createdBy: authReq.user!.id,
+        members: members
       }
     });
 
@@ -258,18 +267,31 @@ router.post('/:code/join', AuthService.authenticateToken, async (req, res) => {
       return;
     }
 
+    // Get updated room with members
+    const updatedRoom = await RoomModel.findByCode(code);
+    const members = await RoomModel.getRoomMembers(room.id);
+
     logger.info(`User ${authReq.user!.username} joined room ${code}`);
 
     // Emit room joined event via Socket.IO
     const socketService = getSocketService();
     if (socketService) {
+      // Join the user to the Socket.IO room
+      socketService.joinRoom(authReq.user!.id.toString(), code);
+      
+      // Emit to all room members about the new member
       socketService.emitToRoom(code, 'room:member_joined', {
         user: {
           id: authReq.user!.id,
           username: authReq.user!.username
         },
-        roomCode: code,
-        memberCount: socketService.getRoomMemberCount(code) + 1
+        room: {
+          id: room.id,
+          code: code,
+          name: room.name,
+          members: members
+        },
+        memberCount: members.length
       });
     }
 
@@ -279,7 +301,14 @@ router.post('/:code/join', AuthService.authenticateToken, async (req, res) => {
       room: {
         id: room.id,
         code: room.code,
-        name: room.name
+        name: room.name,
+        max_players: room.max_players,
+        board_size: room.board_size,
+        turn_duration: room.turn_duration,
+        status: room.status,
+        created_at: room.created_at,
+        createdBy: room.created_by,
+        members: members
       }
     });
 
