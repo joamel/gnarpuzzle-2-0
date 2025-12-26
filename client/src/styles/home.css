@@ -1,0 +1,248 @@
+/* Home Page Styles */
+.home-page {
+  min-height: 100vh;
+  background: #f8f9fa;
+}
+
+.home-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 20px 0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.home-header h1 {
+  font-size: 24px;
+  margin: 0;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.logout-button {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  min-height: auto;
+}
+
+.logout-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: none;
+}
+
+.home-content {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+/* Room Actions Section */
+.room-actions {
+  margin-bottom: 32px;
+}
+
+.room-actions h2 {
+  margin-bottom: 20px;
+  color: #333;
+  font-size: 20px;
+}
+
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.create-room-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px;
+  font-weight: 600;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+}
+
+.join-form {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.join-form input {
+  flex: 1;
+  font-family: monospace;
+  font-weight: bold;
+  text-align: center;
+  font-size: 18px;
+  letter-spacing: 2px;
+}
+
+.join-button {
+  background: #2ed573;
+  color: white;
+  border-radius: 8px;
+  font-weight: 600;
+  min-width: 100px;
+}
+
+/* Available Rooms Section */
+.available-rooms h3 {
+  margin-bottom: 16px;
+  color: #333;
+  font-size: 18px;
+}
+
+.no-rooms {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.no-rooms p {
+  margin-bottom: 8px;
+}
+
+.no-rooms p:last-child {
+  margin-bottom: 0;
+  font-weight: 600;
+  color: #667eea;
+}
+
+/* Room Cards */
+.rooms-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.room-card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.room-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.room-info h4 {
+  margin: 0 0 4px 0;
+  color: #333;
+  font-size: 16px;
+}
+
+.room-info p {
+  margin: 0 0 2px 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.room-info p strong {
+  color: #667eea;
+  font-family: monospace;
+  font-size: 15px;
+}
+
+.join-room-button {
+  background: #667eea;
+  color: white;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  min-height: auto;
+  min-width: 80px;
+}
+
+.join-room-button:disabled {
+  background: #ccc;
+  color: #999;
+}
+
+/* Mobile optimizations */
+@media (max-width: 480px) {
+  .home-content {
+    padding: 20px 12px;
+  }
+  
+  .header-content {
+    padding: 0 12px;
+  }
+  
+  .user-info {
+    font-size: 13px;
+  }
+  
+  .user-info span {
+    display: none;
+  }
+  
+  .room-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .room-info {
+    text-align: center;
+  }
+  
+  .join-room-button {
+    width: 100%;
+  }
+  
+  .join-form {
+    flex-direction: column;
+  }
+  
+  .action-buttons {
+    gap: 12px;
+  }
+}
+
+/* Loading states */
+.loading-overlay {
+  position: relative;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.loading-overlay::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  transform: translate(-50%, -50%);
+}
