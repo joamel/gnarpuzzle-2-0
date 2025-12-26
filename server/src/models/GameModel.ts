@@ -98,6 +98,11 @@ export class GameModel {
       words_found: JSON.parse(row.words_found),
       ready_to_start: row.ready_to_start,
       joined_at: row.joined_at,
+      // New game logic fields with defaults
+      current_letter: row.current_letter || null,
+      grid_state: row.grid_state ? JSON.parse(row.grid_state) : [],
+      placement_confirmed: row.placement_confirmed || false,
+      final_score: row.final_score || 0,
       username: row.username,
       created_at: row.user_created_at,
       last_active: row.last_active

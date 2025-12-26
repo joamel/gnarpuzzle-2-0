@@ -14,7 +14,17 @@ export interface Room {
   board_size: number;
   turn_duration: number;
   status: 'waiting' | 'playing' | 'finished' | 'abandoned';
+  settings: RoomSettings;
   created_at: string;
+}
+
+export interface RoomSettings {
+  grid_size: number;
+  max_players: number;
+  letter_timer: number;
+  placement_timer: number;
+  is_private: boolean;
+  password?: string;
 }
 
 export interface Game {
@@ -28,7 +38,14 @@ export interface Game {
   turn_started_at: string | null;
   created_at: string;
   finished_at: string | null;
+  // New game logic fields
+  current_phase: GamePhase;
+  phase_timer_end: number | null;
+  letter_pool: string[];
+  current_letter: string | null;
 }
+
+export type GamePhase = 'waiting' | 'letter_selection' | 'letter_placement' | 'finished';
 
 export interface Player {
   id: number;
@@ -40,6 +57,17 @@ export interface Player {
   words_found: string[]; // JSON array
   ready_to_start: boolean;
   joined_at: string;
+  // New game state fields
+  current_letter: string | null;
+  grid_state: GridCell[][];
+  placement_confirmed: boolean;
+  final_score: number;
+}
+
+export interface GridCell {
+  letter: string | null;
+  x: number;
+  y: number;
 }
 
 export interface RoomMember {

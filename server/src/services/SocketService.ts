@@ -1,5 +1,6 @@
 import { Server as SocketServer, Socket } from 'socket.io';
 import { logger } from '../index';
+import { GameStateService } from './GameStateService';
 
 // Types for Socket.IO events
 export interface RoomEventData {
@@ -45,9 +46,11 @@ export interface PlayerEventData {
 export class SocketService {
   private io: SocketServer;
   private connectedUsers: Map<string, { userId?: number; username?: string; roomCode?: string }> = new Map();
+  private gameStateService: GameStateService;
 
   constructor(io: SocketServer) {
     this.io = io;
+    this.gameStateService = GameStateService.getInstance(this);
     this.setupSocketHandlers();
   }
 
@@ -83,6 +86,23 @@ export class SocketService {
 
       socket.on('game:ready', (data: { gameId: number }) => {
         this.handleGameReady(socket, data);
+      });
+
+      socket.on('game:start', (data: { gameId: number }) => {
+        this.handleGameStart(socket, data);
+      });
+
+      // New game logic events
+      socket.on('letter:select', (data: { gameId: number; letter: string }) => {
+        this.handleLetterSelect(socket, data);
+      });
+
+      socket.on('letter:place', (data: { gameId: number; x: number; y: number }) => {
+        this.handleLetterPlace(socket, data);
+      });
+
+      socket.on('letter:confirm', (data: { gameId: number }) => {
+        this.handleLetterConfirm(socket, data);
       });
 
       socket.on('game:action', (data: PlayerEventData) => {
@@ -316,6 +336,116 @@ export class SocketService {
     }
   }
 
+  private async handleGameStart(socket: Socket, data: { gameId: number }): Promise<void> {
+    const { gameId } = data;
+    const userData = this.connectedUsers.get(socket.id);
+
+    if (!userData?.userId) {
+      return;
+    }
+
+    try {
+      await this.gameStateService.startGame(gameId);
+      
+      logger.info(`Game started: ${gameId} by ${userData.username}`, {
+        service: 'gnarpuzzle-server',
+        userId: userData.userId,
+        gameId
+      });
+    } catch (error) {
+      socket.emit('game:start_error', {
+        error: (error as Error).message
+      });
+      logger.error(`Game start failed: ${gameId}`, {
+        service: 'gnarpuzzle-server',
+        error: (error as Error).message
+      });
+    }
+  }
+
+  private async handleLetterSelect(socket: Socket, data: { gameId: number; letter: string }): Promise<void> {
+    const { gameId, letter } = data;
+    const userData = this.connectedUsers.get(socket.id);
+
+    if (!userData?.userId) {
+      return;
+    }
+
+    try {
+      await this.gameStateService.selectLetter(gameId, userData.userId, letter);
+      
+      logger.info(`Letter selected: ${letter} by ${userData.username} in game ${gameId}`, {
+        service: 'gnarpuzzle-server',
+        userId: userData.userId,
+        gameId,
+        letter
+      });
+    } catch (error) {
+      socket.emit('letter:select_error', {
+        error: (error as Error).message
+      });
+      logger.error(`Letter select failed: ${gameId}`, {
+        service: 'gnarpuzzle-server',
+        error: (error as Error).message
+      });
+    }
+  }
+
+  private async handleLetterPlace(socket: Socket, data: { gameId: number; x: number; y: number }): Promise<void> {
+    const { gameId, x, y } = data;
+    const userData = this.connectedUsers.get(socket.id);
+
+    if (!userData?.userId) {
+      return;
+    }
+
+    try {
+      await this.gameStateService.placeLetter(gameId, userData.userId, x, y);
+      
+      logger.info(`Letter placed: (${x}, ${y}) by ${userData.username} in game ${gameId}`, {
+        service: 'gnarpuzzle-server',
+        userId: userData.userId,
+        gameId,
+        position: { x, y }
+      });
+    } catch (error) {
+      socket.emit('letter:place_error', {
+        error: (error as Error).message
+      });
+      logger.error(`Letter place failed: ${gameId}`, {
+        service: 'gnarpuzzle-server',
+        error: (error as Error).message
+      });
+    }
+  }
+
+  private async handleLetterConfirm(socket: Socket, data: { gameId: number }): Promise<void> {
+    const { gameId } = data;
+    const userData = this.connectedUsers.get(socket.id);
+
+    if (!userData?.userId) {
+      return;
+    }
+
+    try {
+      await this.gameStateService.confirmPlacement(gameId, userData.userId);
+      
+      logger.info(`Letter confirmed by ${userData.username} in game ${gameId}`, {
+        service: 'gnarpuzzle-server',
+        userId: userData.userId,
+        gameId
+      });
+    } catch (error) {
+      socket.emit('letter:confirm_error', {
+        error: (error as Error).message
+      });
+      logger.error(`Letter confirm failed: ${gameId}`, {
+        service: 'gnarpuzzle-server',
+        error: (error as Error).message
+      });
+    }
+  }
+
   private async handleGameAction(socket: Socket, data: PlayerEventData): Promise<void> {
     const userData = this.connectedUsers.get(socket.id);
 
@@ -416,6 +546,10 @@ export class SocketService {
 
   public emitToGame(gameId: number, event: string, data: any): void {
     this.io.to(`game:${gameId}`).emit(event, data);
+  }
+
+  public broadcastToRoom(room: string, event: string, data: any): void {
+    this.io.to(room).emit(event, data);
   }
 
   public emitToUser(socketId: string, event: string, data: any): void {

@@ -88,9 +88,13 @@ router.post('/', AuthService.authenticateToken, async (req, res) => {
     const room = await RoomModel.create({
       name,
       created_by: authReq.user!.id,
-      max_players,
-      board_size,
-      turn_duration
+      settings: {
+        max_players,
+        grid_size: board_size,
+        placement_timer: turn_duration,
+        letter_timer: 10,
+        is_private: false
+      }
     });
 
     logger.info(`Room created: ${room.code} by ${authReq.user!.username}`);

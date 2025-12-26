@@ -1,29 +1,39 @@
 import { DatabaseManager } from '../config/database';
-import { Room, RoomWithMembers, User } from './types';
+import { Room, RoomWithMembers, User, RoomSettings } from './types';
 
 export class RoomModel {
   static async create(data: {
     name: string;
     created_by: number;
-    max_players?: number;
-    board_size?: number;
-    turn_duration?: number;
+    settings?: Partial<RoomSettings>;
   }): Promise<Room> {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
     
     const code = await this.generateRoomCode();
     
+    // Default room settings
+    const defaultSettings: RoomSettings = {
+      grid_size: 5,
+      max_players: 6,
+      letter_timer: 10,
+      placement_timer: 15,
+      is_private: false
+    };
+    
+    const finalSettings = { ...defaultSettings, ...data.settings };
+    
     const result = await db.run(`
-      INSERT INTO rooms (code, name, created_by, max_players, board_size, turn_duration) 
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO rooms (code, name, created_by, max_players, board_size, turn_duration, settings) 
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `, 
       code,
       data.name,
       data.created_by,
-      data.max_players || 4,
-      data.board_size || 5,
-      data.turn_duration || 15
+      finalSettings.max_players,
+      finalSettings.grid_size,
+      finalSettings.placement_timer,
+      JSON.stringify(finalSettings)
     );
     
     const room = await this.findById(result.lastInsertRowid as number) as Room;
@@ -38,18 +48,22 @@ export class RoomModel {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
     
-    return await db.get(`
+    const room = await db.get(`
       SELECT * FROM rooms WHERE id = ?
     `, id) as Room | null;
+    
+    return room ? this.parseRoomSettings(room) : null;
   }
 
   static async findByCode(code: string): Promise<Room | null> {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
     
-    return await db.get(`
+    const room = await db.get(`
       SELECT * FROM rooms WHERE code = ?
     `, code) as Room | null;
+    
+    return room ? this.parseRoomSettings(room) : null;
   }
 
   static async getActiveRooms(): Promise<RoomWithMembers[]> {
@@ -237,5 +251,32 @@ export class RoomModel {
     } while (await this.findByCode(result)); // Ensure uniqueness
     
     return result;
+  }
+
+  private static parseRoomSettings(room: any): Room {
+    try {
+      const settings = typeof room.settings === 'string' 
+        ? JSON.parse(room.settings) 
+        : room.settings;
+      
+      return {
+        ...room,
+        settings
+      } as Room;
+    } catch (error) {
+      // Fallback to default settings if parsing fails
+      const defaultSettings: RoomSettings = {
+        grid_size: room.board_size || 5,
+        max_players: room.max_players || 6,
+        letter_timer: 10,
+        placement_timer: room.turn_duration || 15,
+        is_private: false
+      };
+      
+      return {
+        ...room,
+        settings: defaultSettings
+      } as Room;
+    }
   }
 }

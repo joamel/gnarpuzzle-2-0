@@ -1,10 +1,10 @@
 # GnarPuzzle - Mobile-First Utvecklingschecklista
 
-## 🚀 Current Status: **Phase 2 Backend Foundation** - Near Complete!
+## 🚀 Current Status: **Phase 2 Backend Foundation** - Complete! Ready for Game Logic
 
-**✅ Completed**: Database, Express server, Authentication, API routes, Socket.IO, Room cleanup  
-**🔄 Current Focus**: Game state management och testing  
-**📍 Next**: Frontend implementation och advanced game features
+**✅ Completed**: Database, Express server, Authentication, API routes, Socket.IO, Room cleanup, Game rules specification  
+**🔄 Current Focus**: Game state management implementation  
+**📍 Next**: Database schema updates och game logic services
 
 ---
 
@@ -107,18 +107,43 @@
   - [x] `POST /games/:id/next-turn` - Nästa spelare
 - [x] **Route handlers** med game state management struktur
 - [x] **Database integration** med Game och Player modeller
-- [ ] **Game State Management** (logik implementation):
-  - [ ] Spelinitiering (turnorder baserat på join-ordning)
-  - [ ] Turn rotation logic
-  - [ ] Timer system (15s letter selection, 15s placement)
-  - [ ] Auto-advance vid timeout
+- [x] **Game State Management** (logik implementation):
+  - [x] ✅ **Spelregler analys komplett** (GnarPuzzle 2.0 specifikation)
+  - [x] ✅ **Implementation plan skapad** (database schema, services, timers)
+  - [x] ✅ **Rumtyper definierade** (publika 4x4/5x5/6x6, privata konfigurerbara)
+  - [x] ✅ **Timer-värden fastställda** (10s val, 15s placering)
+  - [x] ✅ **Poängsystem specificerat** (1p/bokstav + 2p helrad bonus)
+  - [x] ✅ **Database schema uppdatering** för utökad game state (migration 006)
+  - [x] ✅ **GameStateService implementation** (fas-hantering, turn-based system)
+  - [x] ✅ **Timer logic** för automatiska övergångar (phase timers)
+  - [x] ✅ **Spelinitiering** (player creation från room members)
+  - [x] ✅ **Turn rotation logic** (position-based turns)
+  - [x] ✅ **Auto-advance vid timeout** (phase transitions)
   - [ ] Spelslut detection
 - [ ] **Word Validation**:
-  - [ ] Svenska ordlista integration
-  - [ ] Poängsystem (ordlängd × multipliers)
-  - [ ] Ordvalidering API
-- [ ] **Socket events**: `game:start`, `turn:start`, `turn:timeout`, `letter:selected`, `board:updated`, `game:end`
-- [ ] **Comprehensive tests** för hela spellogiken
+  - [x] ✅ **Ordvalidering strategi beslutad** (svensk ordlista-fil, 2+ bokstäver minimum)
+  - [ ] WordValidationService implementation
+  - [ ] Svenska ordlista integration (lokal fil först)
+  - [ ] Poängsystem implementation (1p/bokstav + bonus)
+  - [ ] Grid scoring algorithm
+  - [ ] Ordvalidering API endpoints
+- [x] ✅ **Socket events**: 
+  - [x] ✅ **Grundläggande events implementerade** (game lifecycle)
+  - [x] ✅ **`game:phase_changed`** - övergång letter_selection → letter_placement
+  - [ ] `game:timer_update` - countdown updates (varje sekund)
+  - [ ] `game:timer_warning` - 5s varning med vibration
+  - [x] ✅ **`letter:selected`** - spelare valde bokstav
+  - [x] ✅ **`letter:placed`** - spelare placerade bokstav  
+  - [ ] `letter:confirmed` - spelare bekräftade placering
+  - [ ] `game:ended` - spelet avslutades
+  - [ ] `game:scores` - slutresultat med ordlista
+- [x] ✅ **Unit tests** för GameStateService:
+  - [x] ✅ **Letter generation tests** (Swedish alphabet validation)
+  - [x] ✅ **Service initialization tests** (singleton pattern, socket integration)
+  - [x] ✅ **Helper method tests** (game phases, constants)
+  - [x] ✅ **Jest setup** med TypeScript och mock database
+  - [ ] **Integration tests** för full game flow (DB + sockets)
+  - [ ] **Error handling tests** (invalid inputs, state transitions)
 
 ---
 
@@ -383,20 +408,24 @@
 ## 📝 Progress Tracking
 
 **Startdatum**: 25 December 2025  
-**Nuvarande fas**: Fas 1 → Fas 2 Transition - Database Complete, Starting Backend Foundation  
-**Senaste commit**: feat: Complete database design and setup (Phase 1.2)  
-**Nästa milestone**: Core Server Setup & Authentication Service  
+**Nuvarande fas**: Fas 2.4 - Game Logic Implementation (Backend Foundation slutfört)  
+**Senaste commit**: docs: Complete game rules specification and implementation plan  
+**Nästa milestone**: Game State Management Service & Database Schema Update  
 
 **Senast slutfört**:
-- ✅ **Fas 1.2**: Komplett database system med migrations, models och scripts
-- ✅ **Development Environment**: Database setup och scripts klara  
+- ✅ **Fas 1**: Komplett database system med migrations, models och scripts
+- ✅ **Fas 2.1-2.3**: Express server, authentication, room management, Socket.IO
+- ✅ **Spelregler analys**: GnarPuzzle 2.0 komplett specifikation med timer, scoring och rumtyper
+- ✅ **Implementation planning**: Database schema design och service arkitektur
 
 **Anteckningar**:
-- [x] Skapat repo och grundstruktur
+- [x] Skapat repo och grundstruktur  
 - [x] Database design och migrations system implementerat
-- [x] TypeScript setup
+- [x] TypeScript setup med hot reloading
 - [x] SQLite databas med alla tabeller och models
-- [x] Database scripts (migrate, seed, rollback)
+- [x] Express server med Socket.IO och room cleanup
+- [x] GnarPuzzle spelregler analyserade och dokumenterade
+- [x] Implementation plan för game state management klar
 
 **Beslut som fattats**:
 - [x] SQLite för utveckling (better-sqlite3)

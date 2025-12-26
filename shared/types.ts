@@ -18,11 +18,12 @@ export interface Room {
 }
 
 export interface RoomSettings {
-  maxPlayers: number;
-  boardSize: 'small' | 'medium' | 'large'; // 4x4, 5x5, 6x6
-  timePerTurn: number; // seconds
-  language: 'swedish' | 'english';
-  isPrivate: boolean;
+  grid_size: number; // 4x4, 5x5, 6x6
+  max_players: number;
+  letter_timer: number; // seconds for letter selection
+  placement_timer: number; // seconds for placement
+  is_private: boolean;
+  password?: string;
 }
 
 export interface Player {
@@ -45,9 +46,11 @@ export interface Game {
 }
 
 export interface GameState {
-  phase: 'waiting' | 'letter-selection' | 'placement' | 'validation' | 'ended';
-  turnStartTime?: Date;
-  selectedLetter?: string;
+  phase: 'waiting' | 'letter_selection' | 'letter_placement' | 'finished';
+  phase_timer_end?: number; // timestamp when current phase ends
+  current_letter?: string;
+  turn_number: number;
+}
   timeRemaining?: number;
 }
 
