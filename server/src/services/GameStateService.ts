@@ -1,13 +1,17 @@
 import { DatabaseManager } from '../config/database';
 import { Game, Player, GridCell, RoomSettings } from '../models/types';
 import { SocketService } from './SocketService';
+import { WordValidationService, GridScore } from './WordValidationService';
 
 export class GameStateService {
   private static instance: GameStateService;
   private socketService: SocketService;
+  private wordValidationService: WordValidationService;
 
   private constructor(socketService: SocketService) {
     this.socketService = socketService;
+    this.wordValidationService = WordValidationService.getInstance();
+    this.initializeWordService();
   }
 
   public static getInstance(socketService: SocketService): GameStateService {
@@ -15,6 +19,18 @@ export class GameStateService {
       GameStateService.instance = new GameStateService(socketService);
     }
     return GameStateService.instance;
+  }
+
+  /**
+   * Initialize word validation service
+   */
+  private async initializeWordService(): Promise<void> {
+    try {
+      await this.wordValidationService.loadDictionary();
+      console.log('📖 Word validation service initialized');
+    } catch (error) {
+      console.error('Failed to initialize word validation service:', error);
+    }
   }
 
   /**
@@ -226,7 +242,7 @@ export class GameStateService {
   }
 
   /**
-   * Confirm letter placement
+   * Confirm letter placement and calculate score
    */
   async confirmPlacement(gameId: number, playerId: number): Promise<void> {
     const dbManager = await DatabaseManager.getInstance();
@@ -237,6 +253,9 @@ export class GameStateService {
       SET placement_confirmed = 1
       WHERE game_id = ? AND user_id = ?
     `, gameId, playerId);
+
+    // Calculate current score for this player
+    await this.calculatePlayerScore(gameId, playerId);
 
     // Check if all players confirmed
     const confirmedCount = await db.get(`
@@ -249,7 +268,11 @@ export class GameStateService {
     `, gameId) as { count: number };
 
     if (confirmedCount.count === totalPlayers.count) {
-      await this.advanceToNextTurn(gameId);
+      // Check if this ends the game or advances turn
+      const gameEnded = await this.checkGameEnd(gameId);
+      if (!gameEnded) {
+        await this.advanceToNextTurn(gameId);
+      }
     }
   }
 
@@ -477,13 +500,127 @@ export class GameStateService {
       WHERE id = ?
     `, gameId);
 
-    // Calculate final scores (will implement scoring logic later)
-    // TODO: Implement word validation and scoring
+    // Calculate and broadcast final scores
+    await this.endGame(gameId);
+  }
 
+  /**
+   * Calculate and update player score
+   */
+  async calculatePlayerScore(gameId: number, userId: number): Promise<GridScore | null> {
+    if (!this.wordValidationService.isReady()) {
+      console.warn('Word validation service not ready, skipping score calculation');
+      return null;
+    }
+
+    const dbManager = await DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+
+    // Get player's grid state
+    const player = await db.get(`
+      SELECT grid_state FROM players 
+      WHERE game_id = ? AND user_id = ?
+    `, gameId, userId);
+
+    if (!player) return null;
+
+    const grid: GridCell[][] = JSON.parse(player.grid_state);
+    const gridScore = this.wordValidationService.calculateGridScore(grid);
+
+    // Update player's score in database
+    await db.run(`
+      UPDATE players 
+      SET final_score = ? 
+      WHERE game_id = ? AND user_id = ?
+    `, gridScore.totalPoints, gameId, userId);
+
+    console.log(`🎯 Player ${userId} score: ${gridScore.totalPoints} (${gridScore.words.length} words)`);
+    
+    return gridScore;
+  }
+
+  /**
+   * Calculate scores for all players in game
+   */
+  async calculateAllPlayerScores(gameId: number): Promise<{ [userId: number]: GridScore }> {
+    const dbManager = await DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+
+    const players = await db.all(`
+      SELECT user_id, grid_state FROM players WHERE game_id = ?
+    `, gameId);
+
+    const scores: { [userId: number]: GridScore } = {};
+
+    for (const player of players) {
+      const gridScore = await this.calculatePlayerScore(gameId, player.user_id);
+      if (gridScore) {
+        scores[player.user_id] = gridScore;
+      }
+    }
+
+    return scores;
+  }
+
+  /**
+   * Check if game should end (all players finished or timeout)
+   */
+  async checkGameEnd(gameId: number): Promise<boolean> {
+    const dbManager = await DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+
+    // Check if all players have confirmed their placement
+    const players = await db.all(`
+      SELECT placement_confirmed FROM players WHERE game_id = ?
+    `, gameId);
+
+    const allConfirmed = players.every(p => p.placement_confirmed === 1);
+    
+    if (allConfirmed) {
+      await this.endGame(gameId);
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * End game and broadcast final scores
+   */
+  async endGame(gameId: number): Promise<void> {
+    const dbManager = await DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+
+    // Update game status
+    await db.run(`
+      UPDATE games SET status = 'completed' WHERE id = ?
+    `, gameId);
+
+    // Calculate final scores
+    const scores = await this.calculateAllPlayerScores(gameId);
+
+    // Get player details for leaderboard
+    const players = await db.all(`
+      SELECT p.user_id, u.username, p.final_score, p.grid_state
+      FROM players p
+      JOIN users u ON p.user_id = u.id
+      WHERE p.game_id = ?
+      ORDER BY p.final_score DESC
+    `, gameId);
+
+    // Broadcast game end with scores
     this.socketService.broadcastToRoom(`game:${gameId}`, 'game:ended', {
       gameId,
-      // scores: finalScores
+      leaderboard: players.map(p => ({
+        userId: p.user_id,
+        username: p.username,
+        score: p.final_score,
+        words: scores[p.user_id]?.words || []
+      })),
+      finalScores: scores
     });
+
+    console.log(`🏁 Game ${gameId} ended. Winner: ${players[0]?.username} (${players[0]?.final_score} pts)`);
   }
 
   private generateSwedishLetters(): string[] {
@@ -493,6 +630,24 @@ export class GameStateService {
       'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
       'Å', 'Ä', 'Ö'
     ];
+  }
+
+  /**
+   * Get current score for a player
+   */
+  async getPlayerScore(gameId: number, userId: number): Promise<{ score: number; words: any[] } | null> {
+    if (!this.wordValidationService.isReady()) {
+      const dbManager = await DatabaseManager.getInstance();
+      const db = dbManager.getDatabase();
+      const player = await db.get(`
+        SELECT final_score FROM players WHERE game_id = ? AND user_id = ?
+      `, gameId, userId);
+      
+      return player ? { score: player.final_score || 0, words: [] } : null;
+    }
+
+    const gridScore = await this.calculatePlayerScore(gameId, userId);
+    return gridScore ? { score: gridScore.totalPoints, words: gridScore.words } : null;
   }
 
   // Public method for testing
