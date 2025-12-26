@@ -1,0 +1,44 @@
+{
+  "name": "GnarPuzzle",
+  "short_name": "GnarPuzzle", 
+  "description": "Multiplayer Swedish word puzzle game",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a1a",
+  "theme_color": "#4CAF50",
+  "orientation": "portrait",
+  "lang": "sv",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png", 
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["games", "entertainment"],
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Skapa nytt rum",
+      "short_name": "Nytt rum",
+      "description": "Skapa ett nytt spelrum",
+      "url": "/?action=create",
+      "icons": [{"src": "/icon-192.png", "sizes": "192x192"}]
+    },
+    {
+      "name": "Gå med i rum",
+      "short_name": "Gå med",
+      "description": "Gå med i ett befintligt rum", 
+      "url": "/?action=join",
+      "icons": [{"src": "/icon-192.png", "sizes": "192x192"}]
+    }
+  ]
+}

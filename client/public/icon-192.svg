@@ -1,0 +1,33 @@
+<svg width="192" height="192" viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="192" height="192" rx="32" fill="url(#gradient)"/>
+  
+  <!-- Game grid icon -->
+  <rect x="48" y="48" width="96" height="96" rx="8" fill="white" opacity="0.9"/>
+  
+  <!-- Grid lines -->
+  <line x1="72" y1="48" x2="72" y2="144" stroke="#4CAF50" stroke-width="2"/>
+  <line x1="96" y1="48" x2="96" y2="144" stroke="#4CAF50" stroke-width="2"/>
+  <line x1="120" y1="48" x2="120" y2="144" stroke="#4CAF50" stroke-width="2"/>
+  
+  <line x1="48" y1="72" x2="144" y2="72" stroke="#4CAF50" stroke-width="2"/>
+  <line x1="48" y1="96" x2="144" y2="96" stroke="#4CAF50" stroke-width="2"/>
+  <line x1="48" y1="120" x2="144" y2="120" stroke="#4CAF50" stroke-width="2"/>
+  
+  <!-- Letters -->
+  <text x="60" y="68" font-family="Arial Black" font-size="16" font-weight="bold" fill="#333">G</text>
+  <text x="84" y="68" font-family="Arial Black" font-size="16" font-weight="bold" fill="#333">N</text>
+  <text x="108" y="68" font-family="Arial Black" font-size="16" font-weight="bold" fill="#333">A</text>
+  <text x="132" y="68" font-family="Arial Black" font-size="16" font-weight="bold" fill="#333">R</text>
+  
+  <text x="60" y="92" font-family="Arial Black" font-size="16" font-weight="bold" fill="#333">P</text>
+  <text x="84" y="116" font-family="Arial Black" font-size="16" font-weight="bold" fill="#333">U</text>
+  <text x="108" y="140" font-family="Arial Black" font-size="16" font-weight="bold" fill="#333">Z</text>
+  
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#667eea"/>
+      <stop offset="100%" stop-color="#764ba2"/>
+    </linearGradient>
+  </defs>
+</svg>

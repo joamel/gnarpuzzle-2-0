@@ -6,6 +6,8 @@ import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
 import GamePage from './pages/GamePage';
 import './styles/global.css';
+import './styles/mobile.css';
+import './styles/pwa.css';
 import './styles/login.css';
 import './styles/home.css';
 import './styles/lobby.css';
@@ -69,37 +71,44 @@ function App() {
     return <>{children}</>;
   };
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>
-          <Route 
-            path="/login" 
-            element={
-              <PublicRoute>
-                <LoginPage />
-              </PublicRoute>
-            } 
-          />
-          <Route 
-            path="/" 
-            element={
-              <ProtectedRoute>
-                <HomePage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/game" 
-            element={
-              <ProtectedRoute>
-                <GamePage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Router>
-    </AuthProvider>
+    <div className="app-container">
+      <AuthProvider>
+        <Router>
+          <Routes>
+            <Route 
+              path="/login" 
+              element={
+                <PublicRoute>
+                  <LoginPage />
+                </PublicRoute>
+              } 
+            />
+            <Route 
+              path="/" 
+              element={
+                <ProtectedRoute>
+                  <HomePage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/game" 
+              element={
+                <ProtectedRoute>
+                  <GamePage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Router>
+      </AuthProvider>
+      
+      {/* Offline Indicator */}
+      <div className="offline-indicator">
+        📱 Du är offline - Vissa funktioner är begränsade
+      </div>
+    </div>
   );
 }
 

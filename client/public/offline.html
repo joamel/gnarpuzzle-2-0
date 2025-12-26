@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GnarPuzzle - Offline</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      text-align: center;
+    }
+    
+    .offline-container {
+      max-width: 400px;
+      padding: 2rem;
+    }
+    
+    .offline-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+      opacity: 0.8;
+    }
+    
+    h1 {
+      margin: 0 0 1rem 0;
+      font-size: 2rem;
+    }
+    
+    p {
+      margin: 0 0 2rem 0;
+      font-size: 1.1rem;
+      opacity: 0.9;
+      line-height: 1.5;
+    }
+    
+    .retry-button {
+      background: rgba(255, 255, 255, 0.2);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      padding: 0.8rem 2rem;
+      border-radius: 25px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .retry-button:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
+    }
+    
+    .features {
+      margin-top: 2rem;
+      padding-top: 2rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .features h3 {
+      margin: 0 0 1rem 0;
+      font-size: 1.2rem;
+    }
+    
+    .features ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    
+    .features li {
+      margin: 0.5rem 0;
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+    
+    @media (max-width: 480px) {
+      .offline-container {
+        padding: 1rem;
+      }
+      
+      .offline-icon {
+        font-size: 3rem;
+      }
+      
+      h1 {
+        font-size: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="offline-container">
+    <div class="offline-icon">📱</div>
+    <h1>Ingen internetanslutning</h1>
+    <p>
+      Du är offline just nu. GnarPuzzle behöver en internetanslutning för multiplayer-funktioner.
+    </p>
+    
+    <button class="retry-button" onclick="window.location.reload()">
+      Försök igen
+    </button>
+    
+    <div class="features">
+      <h3>När du är online kan du:</h3>
+      <ul>
+        <li>🎮 Spela multiplayer med vänner</li>
+        <li>🏆 Tävla på leaderboards</li>
+        <li>💬 Chatta i spelrum</li>
+        <li>📊 Se dina spelstatistik</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    // Auto-retry when connection is restored
+    window.addEventListener('online', () => {
+      console.log('Connection restored, reloading...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    });
+    
+    // Show connection status
+    if (!navigator.onLine) {
+      console.log('Currently offline');
+    }
+  </script>
+</body>
+</html>

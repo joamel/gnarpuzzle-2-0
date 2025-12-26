@@ -1,0 +1,214 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { useGame } from '../contexts/GameContext';
+import { apiService } from '../services/apiService';
+import { socketService } from '../services/socketService';
+import { Room } from '../types/game';
+
+const HomePage: React.FC = () => {
+  const { user, logout } = useAuth();
+  const { joinRoom, currentRoom } = useGame();
+  const navigate = useNavigate();
+  
+  const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
+  const [roomCode, setRoomCode] = useState('');
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+  const [isJoiningRoom, setIsJoiningRoom] = useState(false);
+  const [error, setError] = useState('');
+  const [roomName, setRoomName] = useState('');
+  const [maxPlayers, setMaxPlayers] = useState(4);
+  const [boardSize, setBoardSize] = useState(4);
+
+  // Load available rooms
+  useEffect(() => {
+    const loadRooms = async () => {
+      try {
+        const rooms = await apiService.getRooms();
+        // Ensure rooms is an array
+        setAvailableRooms(Array.isArray(rooms) ? rooms : []);
+      } catch (err) {
+        console.error('Failed to load rooms:', err);
+        setAvailableRooms([]); // Set to empty array on error
+      }
+    };
+
+    loadRooms();
+    const interval = setInterval(loadRooms, 10000); // Refresh every 10s
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Socket.IO lobby events for real-time room updates
+  useEffect(() => {
+    if (!socketService.isConnected()) return;
+
+    const handleRoomCreated = (data: any) => {
+      console.log('Room created via Socket.IO:', data);
+      // Refresh room list
+      apiService.getRooms().then(rooms => {
+        setAvailableRooms(Array.isArray(rooms) ? rooms : []);
+      });
+    };
+
+    const handleRoomUpdated = (data: any) => {
+      console.log('Room updated via Socket.IO:', data);
+      // Refresh room list
+      apiService.getRooms().then(rooms => {
+        setAvailableRooms(Array.isArray(rooms) ? rooms : []);
+      });
+    };
+
+    socketService.on('room:created', handleRoomCreated);
+    socketService.on('room:updated', handleRoomUpdated);
+
+    return () => {
+      socketService.off('room:created', handleRoomCreated);
+      socketService.off('room:updated', handleRoomUpdated);
+    };
+  }, []);
+
+  const handleCreateRoom = async () => {
+    try {
+      setIsCreatingRoom(true);
+      setError('');
+      
+      const room = await apiService.createRoom(`${user?.username}'s rum`, {
+        grid_size: 4,
+        max_players: 4,
+        letter_timer: 10,
+        placement_timer: 15,
+        private: false,
+      });
+      
+      await joinRoom(room.code);
+      navigate('/game');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Kunde inte skapa rum');
+    } finally {
+      setIsCreatingRoom(false);
+    }
+  };
+
+  const handleJoinRoom = async (code: string) => {
+    try {
+      setIsJoiningRoom(true);
+      setError('');
+      await joinRoom(code);
+      navigate('/game');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Kunde inte gå med i rum');
+    } finally {
+      setIsJoiningRoom(false);
+    }
+  };
+
+  const handleJoinByCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!roomCode.trim()) return;
+    
+    await handleJoinRoom(roomCode.trim().toUpperCase());
+  };
+
+  if (currentRoom) {
+    // Redirect to game page if already in a room
+    navigate('/game');
+    return <div>Redirecting to game...</div>;
+  }
+
+  return (
+    <div className="home-page">
+      <header className="home-header">
+        <div className="header-content">
+          <h1>🧩 GnarPuzzle</h1>
+          <div className="user-info">
+            <span>Hej {user?.username}!</span>
+            <button 
+              onClick={async () => {
+                localStorage.clear();
+                await logout();
+                window.location.reload();
+              }} 
+              className="logout-button"
+            >
+              Logga ut & Rensa
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="home-content">
+        <section className="room-actions">
+          <h2>Välj rum</h2>
+          
+          {error && (
+            <div className="error-message">
+              {error}
+            </div>
+          )}
+
+          <div className="action-buttons">
+            <button 
+              onClick={handleCreateRoom}
+              disabled={isCreatingRoom}
+              className="create-room-button"
+            >
+              {isCreatingRoom ? 'Skapar rum...' : '+ Skapa nytt rum'}
+            </button>
+
+            <form onSubmit={handleJoinByCode} className="join-form">
+              <input
+                type="text"
+                value={roomCode}
+                onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                placeholder="RUMKOD"
+                maxLength={6}
+                disabled={isJoiningRoom}
+              />
+              <button 
+                type="submit"
+                disabled={isJoiningRoom || !roomCode.trim()}
+                className="join-button"
+              >
+                {isJoiningRoom ? 'Går med...' : 'Gå med'}
+              </button>
+            </form>
+          </div>
+        </section>
+
+        <section className="available-rooms">
+          <h3>Tillgängliga rum</h3>
+          
+          {availableRooms.length === 0 ? (
+            <div className="no-rooms">
+              <p>Inga aktiva rum just nu</p>
+              <p>Skapa ett nytt rum för att börja!</p>
+            </div>
+          ) : (
+            <div className="rooms-list">
+              {availableRooms.map(room => (
+                <div key={room.id} className="room-card">
+                  <div className="room-info">
+                    <h4>{room.name}</h4>
+                    <p>Kod: <strong>{room.code}</strong></p>
+                    <p>{room.member_count || 0}/{room.max_players || 4} spelare</p>
+                    <p>Rutstorlek: {room.board_size || 4}x{room.board_size || 4}</p>
+                  </div>
+                  <button
+                    onClick={() => joinRoom(room.code)}
+                    disabled={isJoiningRoom || (room.member_count || 0) >= (room.max_players || 4)}
+                    className="join-button"
+                  >
+                    {(room.member_count || 0) >= (room.max_players || 4) ? 'Fullt' : 'Gå med'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
+    </div>
+  );
+};
+
+export default HomePage;
