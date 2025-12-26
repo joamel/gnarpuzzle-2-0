@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useGame } from '../contexts/GameContext';
 import { apiService } from '../services/apiService';
+import { socketService } from '../services/socketService';
 import { Room } from '../types/game';
 
 const HomePage: React.FC = () => {
@@ -33,6 +34,35 @@ const HomePage: React.FC = () => {
     const interval = setInterval(loadRooms, 10000); // Refresh every 10s
 
     return () => clearInterval(interval);
+  }, []);
+
+  // Socket.IO lobby events for real-time room updates
+  useEffect(() => {
+    if (!socketService.isConnected()) return;
+
+    const handleRoomCreated = (data: any) => {
+      console.log('Room created via Socket.IO:', data);
+      // Refresh room list
+      apiService.getRooms().then(rooms => {
+        setAvailableRooms(Array.isArray(rooms) ? rooms : []);
+      });
+    };
+
+    const handleRoomUpdated = (data: any) => {
+      console.log('Room updated via Socket.IO:', data);
+      // Refresh room list
+      apiService.getRooms().then(rooms => {
+        setAvailableRooms(Array.isArray(rooms) ? rooms : []);
+      });
+    };
+
+    socketService.on('room:created', handleRoomCreated);
+    socketService.on('room:updated', handleRoomUpdated);
+
+    return () => {
+      socketService.off('room:created', handleRoomCreated);
+      socketService.off('room:updated', handleRoomUpdated);
+    };
   }, []);
 
   const handleCreateRoom = async () => {
@@ -90,8 +120,15 @@ const HomePage: React.FC = () => {
           <h1>🧩 GnarPuzzle</h1>
           <div className="user-info">
             <span>Hej {user?.username}!</span>
-            <button onClick={logout} className="logout-button">
-              Logga ut
+            <button 
+              onClick={async () => {
+                localStorage.clear();
+                await logout();
+                window.location.reload();
+              }} 
+              className="logout-button"
+            >
+              Logga ut & Rensa
             </button>
           </div>
         </div>
@@ -154,10 +191,10 @@ const HomePage: React.FC = () => {
                     <p>{room.member_count || 0}/{room.max_players || 4} spelare</p>
                     <p>Rutstorlek: {room.board_size || 4}x{room.board_size || 4}</p>
                   </div>
-                  <button 
-                    onClick={() => handleJoinRoom(room.code)}
+                  <button
+                    onClick={() => joinRoom(room.code)}
                     disabled={isJoiningRoom || (room.member_count || 0) >= (room.max_players || 4)}
-                    className="join-room-button"
+                    className="join-button"
                   >
                     {(room.member_count || 0) >= (room.max_players || 4) ? 'Fullt' : 'Gå med'}
                   </button>

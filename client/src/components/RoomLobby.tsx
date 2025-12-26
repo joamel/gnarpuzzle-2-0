@@ -10,20 +10,42 @@ interface RoomLobbyProps {
 const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   const { user } = useAuth();
   const { currentRoom, startGame, leaveRoom, isLoading, error } = useGame();
-  const [playerList, setPlayerList] = useState(currentRoom?.members || []);
+  
+  // Säkerställ att användaren är inkluderad från början
+  const initialPlayers = currentRoom?.members || (user ? [{
+    userId: user.id,
+    username: user.username,
+    role: 'owner',
+    joinedAt: new Date().toISOString()
+  }] : []);
+  
+  const [playerList, setPlayerList] = useState(initialPlayers);
   const [isStarting, setIsStarting] = useState(false);
 
   const isOwner = currentRoom && user && currentRoom.createdBy === user.id;
-  const canStartGame = playerList.length >= 2 && playerList.length <= (currentRoom?.max_players || 4);
+  const canStartGame = playerList.length >= 2; // Minst 2 spelare krävs
+  const hasEnoughPlayers = playerList.length >= 2;
 
   useEffect(() => {
+    console.log('RoomLobby - currentRoom updated:', currentRoom);
     if (currentRoom?.members) {
+      console.log('RoomLobby - setting playerList from currentRoom.members:', currentRoom.members);
       setPlayerList(currentRoom.members);
+    } else if (currentRoom && user) {
+      // Om members är tom, lägg till användaren själv
+      console.log('RoomLobby - members empty, adding self:', user);
+      setPlayerList([{
+        userId: user.id,
+        username: user.username,
+        role: 'owner',
+        joinedAt: new Date().toISOString()
+      }]);
     }
-  }, [currentRoom]);
+  }, [currentRoom, user]);
 
   useEffect(() => {
     const handleRoomJoined = (data: any) => {
+      console.log('Room joined event:', data);
       setPlayerList(prev => {
         const exists = prev.some(member => member.userId === data.user.id);
         if (!exists) {
@@ -39,11 +61,15 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
     };
 
     const handleRoomLeft = (data: any) => {
+      console.log('Room left event:', data);
       setPlayerList(prev => prev.filter(member => member.userId !== data.user.id));
     };
 
     const handleRoomUpdated = (data: any) => {
-      setPlayerList(data.room.members);
+      console.log('Room updated event:', data);
+      if (data.room?.members) {
+        setPlayerList(data.room.members);
+      }
     };
 
     socketService.on('room:joined', handleRoomJoined);
@@ -103,25 +129,25 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
         <div className="settings-grid">
           <div className="setting-item">
             <span className="setting-label">Rutstorlek:</span>
-            <span className="setting-value">{currentRoom.board_size || 4}×{currentRoom.board_size || 4}</span>
+            <span className="setting-value">{currentRoom.settings?.grid_size || 4}×{currentRoom.settings?.grid_size || 4}</span>
           </div>
           <div className="setting-item">
             <span className="setting-label">Max spelare:</span>
-            <span className="setting-value">{currentRoom.max_players || 4}</span>
+            <span className="setting-value">{currentRoom.settings?.max_players || 4}</span>
           </div>
           <div className="setting-item">
             <span className="setting-label">Bokstavstid:</span>
-            <span className="setting-value">{currentRoom.turn_duration || 30}s</span>
+            <span className="setting-value">{currentRoom.settings?.letter_timer || 30}s</span>
           </div>
           <div className="setting-item">
             <span className="setting-label">Placeringstid:</span>
-            <span className="setting-value">{currentRoom.turn_duration || 30}s</span>
+            <span className="setting-value">{currentRoom.settings?.placement_timer || 30}s</span>
           </div>
         </div>
       </div>
 
       <div className="players-section">
-        <h3>Spelare ({playerList.length}/{currentRoom.max_players || 4})</h3>
+        <h3>Spelare ({playerList.length}/{currentRoom.settings?.max_players || 4})</h3>
         <div className="players-list">
           {playerList.map(member => (
             <div key={member.userId} className="player-item">
@@ -135,7 +161,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
           ))}
           
           {/* Show empty slots */}
-          {Array.from({ length: (currentRoom.max_players || 4) - playerList.length }, (_, i) => (
+          {Array.from({ length: (currentRoom.settings?.max_players || 4) - playerList.length }, (_, i) => (
             <div key={`empty-${i}`} className="player-item empty">
               <div className="player-info">
                 <span className="player-name">Väntar på spelare...</span>
@@ -154,21 +180,38 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
 
       <div className="lobby-actions">
         {isOwner && (
-          <button
-            onClick={handleStartGame}
-            disabled={!canStartGame || isStarting || isLoading}
-            className="start-game-button primary-button"
-          >
-            {isStarting ? 'Startar spel...' : 'Starta spel'}
-          </button>
+          <>
+            <button
+              onClick={handleStartGame}
+              disabled={!canStartGame || isStarting || isLoading}
+              className="start-game-button primary-button"
+            >
+              {isStarting ? 'Startar spel...' : 'Starta spel'}
+            </button>
+            {!hasEnoughPlayers && (
+              <p className="requirement-message">
+                Minst 2 spelare krävs för att starta ({playerList.length}/2)
+              </p>
+            )}
+            {hasEnoughPlayers && (
+              <p className="ready-message">
+                ✅ Redo att starta spelet!
+              </p>
+            )}
+          </>
         )}
 
         {!isOwner && (
           <div className="waiting-message">
             <p>Väntar på att {currentRoom?.members?.find(m => m.role === 'owner')?.username || 'spelägaren'} startar spelet</p>
-            {!canStartGame && (
+            {!hasEnoughPlayers && (
               <p className="requirement-message">
-                Minst 2 spelare krävs för att starta
+                Minst 2 spelare krävs för att starta ({playerList.length}/2)
+              </p>
+            )}
+            {hasEnoughPlayers && (
+              <p className="ready-message">
+                ✅ Redo att starta spelet!
               </p>
             )}
           </div>

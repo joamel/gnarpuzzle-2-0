@@ -236,6 +236,15 @@
   color: #ff6b35 !important;
 }
 
+.ready-message {
+  font-weight: 600;
+  color: #28a745 !important;
+  background: #d4edda;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #c3e6cb;
+}
+
 .leave-room-button {
   background: white;
   color: #666;
