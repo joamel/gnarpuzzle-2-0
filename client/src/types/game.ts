@@ -39,6 +39,12 @@ export interface Room {
   members: RoomMember[];
   currentGame?: GameState;
   createdAt: string;
+  // API response fields
+  member_count?: number;
+  max_players?: number;
+  board_size?: number;
+  status?: string;
+  turn_duration?: number;
 }
 
 export interface RoomMember {

@@ -15,6 +15,10 @@ export interface Room {
   settings: RoomSettings;
   players: Player[];
   game?: Game;
+  // Additional properties for API responses
+  member_count?: number;
+  max_players?: number;
+  board_size?: number;
 }
 
 export interface RoomSettings {
