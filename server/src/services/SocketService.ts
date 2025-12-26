@@ -1,5 +1,5 @@
 import { Server as SocketServer, Socket } from 'socket.io';
-import { logger } from '../index';
+import { logger } from '../utils/logger';
 import { GameStateService } from './GameStateService';
 
 // Types for Socket.IO events

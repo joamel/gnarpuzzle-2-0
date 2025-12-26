@@ -21,9 +21,11 @@ const HomePage: React.FC = () => {
     const loadRooms = async () => {
       try {
         const rooms = await apiService.getRooms();
-        setAvailableRooms(rooms);
+        // Ensure rooms is an array
+        setAvailableRooms(Array.isArray(rooms) ? rooms : []);
       } catch (err) {
         console.error('Failed to load rooms:', err);
+        setAvailableRooms([]); // Set to empty array on error
       }
     };
 
@@ -149,15 +151,15 @@ const HomePage: React.FC = () => {
                   <div className="room-info">
                     <h4>{room.name}</h4>
                     <p>Kod: <strong>{room.code}</strong></p>
-                    <p>{room.members.length}/{room.settings.max_players} spelare</p>
-                    <p>Rutstorlek: {room.settings.grid_size}x{room.settings.grid_size}</p>
+                    <p>{room.member_count || 0}/{room.max_players || 4} spelare</p>
+                    <p>Rutstorlek: {room.board_size || 4}x{room.board_size || 4}</p>
                   </div>
                   <button 
                     onClick={() => handleJoinRoom(room.code)}
-                    disabled={isJoiningRoom || room.members.length >= room.settings.max_players}
+                    disabled={isJoiningRoom || (room.member_count || 0) >= (room.max_players || 4)}
                     className="join-room-button"
                   >
-                    {room.members.length >= room.settings.max_players ? 'Fullt' : 'Gå med'}
+                    {(room.member_count || 0) >= (room.max_players || 4) ? 'Fullt' : 'Gå med'}
                   </button>
                 </div>
               ))}

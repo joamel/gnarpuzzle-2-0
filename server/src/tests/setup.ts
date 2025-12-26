@@ -1,4 +1,5 @@
-// Jest setup file
+// Vitest setup file
+import { beforeAll, vi } from 'vitest';
 import { DatabaseManager } from '../config/database';
 import { MigrationManager } from '../config/migrations';
 
@@ -19,8 +20,8 @@ const originalConsoleWarn = console.warn;
 
 beforeAll(() => {
   // Suppress non-error console output during tests
-  console.log = jest.fn();
-  console.warn = jest.fn();
+  console.log = vi.fn();
+  console.warn = vi.fn();
 });
 
 afterAll(() => {

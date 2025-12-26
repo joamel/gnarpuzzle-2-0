@@ -1,7 +1,7 @@
 import express from 'express';
 import { GameModel, PlayerModel } from '../models';
 import { AuthService, AuthenticatedRequest } from '../services/AuthService';
-import { logger } from '../index';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 

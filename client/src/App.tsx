@@ -12,63 +12,62 @@ import './styles/lobby.css';
 import './styles/game.css';
 import './styles/gamepage.css';
 
-// Protected route component
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="loading-page" style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-      }}>
-        <div style={{ textAlign: 'center', color: 'white' }}>
-          <div className="loading-spinner" style={{ margin: '0 auto 16px' }}></div>
-          <p>Laddar GnarPuzzle...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return <GameProvider>{children}</GameProvider>;
-};
-
-// Public route component
-const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="loading-page" style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-      }}>
-        <div style={{ textAlign: 'center', color: 'white' }}>
-          <div className="loading-spinner" style={{ margin: '0 auto 16px' }}></div>
-          <p>Laddar GnarPuzzle...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
-
-  return <>{children}</>;
-};
-
 function App() {
+  // Protected route component - moved inside App to have access to AuthProvider
+  const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { isAuthenticated, isLoading } = useAuth();
+
+    if (isLoading) {
+      return (
+        <div className="loading-page" style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+        }}>
+          <div style={{ textAlign: 'center', color: 'white' }}>
+            <div className="loading-spinner" style={{ margin: '0 auto 16px' }}></div>
+            <p>Laddar GnarPuzzle...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (!isAuthenticated) {
+      return <Navigate to="/login" replace />;
+    }
+
+    return <GameProvider>{children}</GameProvider>;
+  };
+
+  // Public route component - moved inside App to have access to AuthProvider
+  const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { isAuthenticated, isLoading } = useAuth();
+
+    if (isLoading) {
+      return (
+        <div className="loading-page" style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+        }}>
+          <div style={{ textAlign: 'center', color: 'white' }}>
+            <div className="loading-spinner" style={{ margin: '0 auto 16px' }}></div>
+            <p>Laddar GnarPuzzle...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (isAuthenticated) {
+      return <Navigate to="/" replace />;
+    }
+
+    return <>{children}</>;
+  };
   return (
     <AuthProvider>
       <Router>

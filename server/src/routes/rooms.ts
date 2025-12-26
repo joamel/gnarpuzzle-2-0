@@ -1,7 +1,8 @@
 import express from 'express';
 import { RoomModel } from '../models';
 import { AuthService, AuthenticatedRequest } from '../services/AuthService';
-import { logger, getSocketService } from '../index';
+import { getSocketService } from '../index';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 

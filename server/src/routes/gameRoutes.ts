@@ -1,5 +1,5 @@
 import express from 'express';
-import { GameController } from '../controllers/GameController';
+import { GameController } from '../controllers/gameController';
 import { SocketService } from '../services/SocketService';
 
 export function createGameRoutes(socketService: SocketService): express.Router {

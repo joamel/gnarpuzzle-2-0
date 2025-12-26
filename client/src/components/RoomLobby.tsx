@@ -14,10 +14,10 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   const [isStarting, setIsStarting] = useState(false);
 
   const isOwner = currentRoom && user && currentRoom.createdBy === user.id;
-  const canStartGame = playerList.length >= 2 && playerList.length <= currentRoom?.settings.max_players!;
+  const canStartGame = playerList.length >= 2 && playerList.length <= (currentRoom?.max_players || 4);
 
   useEffect(() => {
-    if (currentRoom) {
+    if (currentRoom?.members) {
       setPlayerList(currentRoom.members);
     }
   }, [currentRoom]);
@@ -103,25 +103,25 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
         <div className="settings-grid">
           <div className="setting-item">
             <span className="setting-label">Rutstorlek:</span>
-            <span className="setting-value">{currentRoom.settings.grid_size}×{currentRoom.settings.grid_size}</span>
+            <span className="setting-value">{currentRoom.board_size || 4}×{currentRoom.board_size || 4}</span>
           </div>
           <div className="setting-item">
             <span className="setting-label">Max spelare:</span>
-            <span className="setting-value">{currentRoom.settings.max_players}</span>
+            <span className="setting-value">{currentRoom.max_players || 4}</span>
           </div>
           <div className="setting-item">
             <span className="setting-label">Bokstavstid:</span>
-            <span className="setting-value">{currentRoom.settings.letter_timer}s</span>
+            <span className="setting-value">{currentRoom.turn_duration || 30}s</span>
           </div>
           <div className="setting-item">
             <span className="setting-label">Placeringstid:</span>
-            <span className="setting-value">{currentRoom.settings.placement_timer}s</span>
+            <span className="setting-value">{currentRoom.turn_duration || 30}s</span>
           </div>
         </div>
       </div>
 
       <div className="players-section">
-        <h3>Spelare ({playerList.length}/{currentRoom.settings.max_players})</h3>
+        <h3>Spelare ({playerList.length}/{currentRoom.max_players || 4})</h3>
         <div className="players-list">
           {playerList.map(member => (
             <div key={member.userId} className="player-item">
@@ -135,7 +135,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
           ))}
           
           {/* Show empty slots */}
-          {Array.from({ length: currentRoom.settings.max_players - playerList.length }, (_, i) => (
+          {Array.from({ length: (currentRoom.max_players || 4) - playerList.length }, (_, i) => (
             <div key={`empty-${i}`} className="player-item empty">
               <div className="player-info">
                 <span className="player-name">Väntar på spelare...</span>
@@ -165,7 +165,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
 
         {!isOwner && (
           <div className="waiting-message">
-            <p>Väntar på att {currentRoom.members.find(m => m.role === 'owner')?.username || 'spelägaren'} startar spelet</p>
+            <p>Väntar på att {currentRoom?.members?.find(m => m.role === 'owner')?.username || 'spelägaren'} startar spelet</p>
             {!canStartGame && (
               <p className="requirement-message">
                 Minst 2 spelare krävs för att starta

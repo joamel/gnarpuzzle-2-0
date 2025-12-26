@@ -4,11 +4,11 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import winston from 'winston';
 import dotenv from 'dotenv';
 import { DatabaseManager } from './config/database';
 import { SocketService } from './services/SocketService';
 import { RoomCleanupService } from './services/RoomCleanupService';
+import { logger } from './utils/logger';
 
 // Load environment variables
 dotenv.config();
@@ -16,31 +16,6 @@ dotenv.config();
 const app = express();
 const server = createServer(app);
 const PORT = process.env.PORT || 3001;
-
-// Winston Logger Setup
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.errors({ stack: true }),
-    winston.format.json()
-  ),
-  defaultMeta: { service: 'gnarpuzzle-server' },
-  transports: [
-    new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'logs/combined.log' }),
-  ],
-});
-
-// Console logging in development
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: winston.format.combine(
-      winston.format.colorize(),
-      winston.format.simple()
-    )
-  }));
-}
 
 // Mobile-optimized CORS
 const corsOptions = {
@@ -224,7 +199,7 @@ process.on('SIGINT', async () => {
 // Start the server
 startServer();
 
-export { app, io, logger };
+export { app, io };
 export function getSocketService(): SocketService | null {
   return socketService || null;
 }

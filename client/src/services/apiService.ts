@@ -27,7 +27,7 @@ class ApiService {
     
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers as Record<string, string> || {}),
     };
 
     if (this.token) {
@@ -54,77 +54,81 @@ class ApiService {
 
   // Auth endpoints
   async login(username: string): Promise<{ token: string; user: any }> {
-    return this.request('/auth/login', {
+    return this.request<{ token: string; user: any }>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username }),
     });
   }
 
   async logout(): Promise<void> {
-    await this.request('/auth/logout', { method: 'DELETE' });
+    await this.request<any>('/api/auth/logout', { method: 'DELETE' });
     this.clearToken();
   }
 
   async getCurrentUser(): Promise<any> {
-    return this.request('/auth/me');
+    return this.request<any>('/api/auth/me');
   }
 
   // Room endpoints
   async getRooms(): Promise<any[]> {
-    return this.request('/rooms');
+    const response = await this.request<{ success: boolean; rooms: any[]; total: number }>('/api/rooms');
+    // Backend returns { success: true, rooms: [], total: 0 }
+    return response.rooms || [];
   }
 
   async createRoom(name: string, settings?: any): Promise<any> {
-    return this.request('/rooms', {
+    const response = await this.request<{ success: boolean; room: any }>('/api/rooms', {
       method: 'POST',
       body: JSON.stringify({ name, settings }),
     });
+    // Backend returns { success: true, room: {...} }
+    return response.room || response;
   }
 
   async getRoomByCode(code: string): Promise<any> {
-    return this.request(`/rooms/${code}`);
+    return this.request<any>(`/api/rooms/${code}`);
   }
 
   async joinRoom(code: string): Promise<any> {
-    return this.request(`/rooms/${code}/join`, { method: 'POST' });
+    return this.request<any>(`/api/rooms/${code}/join`, { method: 'POST' });
   }
 
   async leaveRoom(code: string): Promise<any> {
-    return this.request(`/rooms/${code}/leave`, { method: 'DELETE' });
+    return this.request<any>(`/api/rooms/${code}/leave`, { method: 'DELETE' });
   }
 
   // Game endpoints
   async startGame(roomId: number): Promise<any> {
-    return this.request(`/rooms/${roomId}/start`, { method: 'POST' });
+    return this.request<any>(`/api/rooms/${roomId}/start`, { method: 'POST' });
   }
 
   async selectLetter(gameId: number, playerId: number, letter: string): Promise<any> {
-    return this.request(`/games/${gameId}/select-letter`, {
+    return this.request<any>(`/api/games/${gameId}/select-letter`, {
       method: 'POST',
       body: JSON.stringify({ playerId, letter }),
     });
   }
 
   async placeLetter(gameId: number, playerId: number, x: number, y: number): Promise<any> {
-    return this.request(`/games/${gameId}/place-letter`, {
+    return this.request<any>(`/api/games/${gameId}/place-letter`, {
       method: 'POST',
       body: JSON.stringify({ playerId, x, y }),
     });
   }
 
   async confirmPlacement(gameId: number, playerId: number): Promise<any> {
-    return this.request(`/games/${gameId}/confirm-placement`, {
+    return this.request<any>(`/api/games/${gameId}/confirm-placement`, {
       method: 'POST',
       body: JSON.stringify({ playerId }),
     });
   }
 
   async getPlayerScore(gameId: number, userId: number): Promise<{ score: number; words: any[] }> {
-    return this.request(`/games/${gameId}/players/${userId}/score`);
+    return this.request<{ score: number; words: any[] }>(`/api/games/${gameId}/players/${userId}/score`);
   }
 
   async getAllPlayerScores(gameId: number): Promise<{ scores: any }> {
-    return this.request(`/games/${gameId}/scores`);
+    return this.request<{ scores: any }>(`/api/games/${gameId}/scores`);
   }
 }
 

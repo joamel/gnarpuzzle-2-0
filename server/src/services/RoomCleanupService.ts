@@ -1,4 +1,4 @@
-import { logger } from '../index';
+import { logger } from '../utils/logger';
 import { RoomModel } from '../models';
 
 export class RoomCleanupService {

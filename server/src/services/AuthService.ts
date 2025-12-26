@@ -1,7 +1,8 @@
-import jwt, { SignOptions } from 'jsonwebtoken';
+import * as jwt from 'jsonwebtoken';
+import { SignOptions } from 'jsonwebtoken';
 import { Request, Response } from 'express';
 import { UserModel } from '../models';
-import { logger } from '../index';
+import { logger } from '../utils/logger';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-this';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
@@ -80,7 +81,7 @@ export class AuthService {
         logger.info(`User login: ${username}`);
       }
 
-      const token = this.generateToken(user);
+      const token = AuthService.generateToken(user);
 
       res.status(200).json({
         success: true,
@@ -116,7 +117,7 @@ export class AuthService {
         return;
       }
 
-      const decoded = this.verifyToken(token);
+      const decoded = AuthService.verifyToken(token);
       if (!decoded) {
         res.status(401).json({
           error: 'Invalid token',
@@ -137,7 +138,7 @@ export class AuthService {
 
       // Update last active and generate new token
       await UserModel.updateLastActive(user.id);
-      const newToken = this.generateToken(user);
+      const newToken = AuthService.generateToken(user);
 
       res.status(200).json({
         success: true,

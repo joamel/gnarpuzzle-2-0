@@ -1,12 +1,13 @@
+import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
 import { GameStateService } from '../services/GameStateService';
 import { SocketService } from '../services/SocketService';
 
 // Mock SocketService for testing
 const mockSocketService = {
-  broadcastToRoom: jest.fn(),
-  emitToGame: jest.fn(),
-  emitToRoom: jest.fn(),
-  emitToUser: jest.fn()
+  broadcastToRoom: vi.fn(),
+  emitToGame: vi.fn(),
+  emitToRoom: vi.fn(),
+  emitToUser: vi.fn()
 } as unknown as SocketService;
 
 describe('GameStateService', () => {
