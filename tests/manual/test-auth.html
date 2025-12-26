@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Authentication</title>
+</head>
+<body>
+    <h1>Test Authentication & Socket.IO</h1>
+    
+    <div id="status">
+        <p>Status: <span id="auth-status">Not logged in</span></p>
+        <p>Socket: <span id="socket-status">Disconnected</span></p>
+    </div>
+    
+    <div>
+        <input type="text" id="username" placeholder="Enter username" value="TestUser">
+        <button onclick="login()">Login</button>
+        <button onclick="clearStorage()">Clear Storage</button>
+    </div>
+    
+    <div id="logs" style="margin-top: 20px; max-height: 400px; overflow-y: auto; background: #f0f0f0; padding: 10px;">
+        <h3>Logs:</h3>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        let socket;
+        
+        function log(message) {
+            const logs = document.getElementById('logs');
+            logs.innerHTML += `<p>${new Date().toLocaleTimeString()} - ${message}</p>`;
+            logs.scrollTop = logs.scrollHeight;
+            console.log(message);
+        }
+
+        function updateStatus() {
+            const token = localStorage.getItem('auth_token');
+            document.getElementById('auth-status').textContent = token ? 'Logged in' : 'Not logged in';
+            document.getElementById('socket-status').textContent = socket?.connected ? 'Connected' : 'Disconnected';
+        }
+
+        async function login() {
+            const username = document.getElementById('username').value;
+            if (!username) {
+                log('Please enter a username');
+                return;
+            }
+            
+            try {
+                log(`Attempting login with username: ${username}`);
+                
+                const response = await fetch('http://localhost:3001/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                log(`Login successful! Token: ${data.token.substring(0, 20)}...`);
+                
+                // Store token
+                localStorage.setItem('auth_token', data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+                
+                updateStatus();
+                
+                // Connect socket with new token
+                connectSocket(data.token);
+                
+            } catch (error) {
+                log(`Login failed: ${error.message}`);
+            }
+        }
+
+        function connectSocket(token) {
+            if (socket) {
+                socket.disconnect();
+            }
+            
+            log(`Connecting to Socket.IO with token...`);
+            
+            socket = io('http://localhost:3001', {
+                auth: { token },
+                autoConnect: true
+            });
+            
+            socket.on('connect', () => {
+                log('✅ Socket.IO connected!');
+                updateStatus();
+            });
+            
+            socket.on('disconnect', (reason) => {
+                log(`❌ Socket.IO disconnected: ${reason}`);
+                updateStatus();
+            });
+            
+            socket.on('authenticated', (data) => {
+                log(`🔐 Socket.IO authenticated successfully: ${JSON.stringify(data)}`);
+            });
+            
+            socket.on('authentication_error', (error) => {
+                log(`🚨 Socket.IO authentication failed: ${JSON.stringify(error)}`);
+            });
+            
+            socket.on('connect_error', (error) => {
+                log(`💥 Socket.IO connection error: ${error.message}`);
+            });
+        }
+
+        function clearStorage() {
+            localStorage.clear();
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+            log('🧹 Storage cleared and socket disconnected');
+            updateStatus();
+        }
+
+        // Initialize on page load
+        updateStatus();
+        log('Test page loaded');
+        
+        // If token exists, try to connect
+        const existingToken = localStorage.getItem('auth_token');
+        if (existingToken) {
+            log('Found existing token, attempting socket connection...');
+            connectSocket(existingToken);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplayer Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+        .player-section { 
+            border: 2px solid #fff; 
+            margin: 20px 0; 
+            padding: 20px; 
+            border-radius: 10px;
+            background: rgba(255,255,255,0.1);
+        }
+        button { 
+            padding: 10px 20px; 
+            margin: 5px; 
+            border: none; 
+            border-radius: 5px; 
+            background: #4CAF50; 
+            color: white; 
+            cursor: pointer;
+        }
+        button:hover { background: #45a049; }
+        button:disabled { background: #cccccc; cursor: not-allowed; }
+        .status { 
+            background: rgba(0,0,0,0.3); 
+            padding: 10px; 
+            border-radius: 5px; 
+            margin: 10px 0; 
+            font-family: monospace;
+        }
+        .logs { 
+            background: rgba(0,0,0,0.5); 
+            padding: 10px; 
+            border-radius: 5px; 
+            height: 200px; 
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        input { 
+            padding: 8px; 
+            margin: 5px; 
+            border: 1px solid #ccc; 
+            border-radius: 3px; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔥 GnarPuzzle Multiplayer Test</h1>
+        
+        <!-- Player 1 -->
+        <div class="player-section">
+            <h2>🎮 Player 1</h2>
+            <div class="status" id="player1-status">Status: Not logged in</div>
+            <button onclick="loginPlayer1()">Login as Player1</button>
+            <button onclick="createRoom(1)">Create Room</button>
+            <button onclick="getRooms(1)">Refresh Rooms</button>
+            <div id="player1-rooms"></div>
+            <input type="text" id="player1-join-code" placeholder="Room code">
+            <button onclick="joinRoom(1)">Join Room</button>
+        </div>
+        
+        <!-- Player 2 -->
+        <div class="player-section">
+            <h2>🎯 Player 2</h2>
+            <div class="status" id="player2-status">Status: Not logged in</div>
+            <button onclick="loginPlayer2()">Login as Player2</button>
+            <button onclick="createRoom(2)">Create Room</button>
+            <button onclick="getRooms(2)">Refresh Rooms</button>
+            <div id="player2-rooms"></div>
+            <input type="text" id="player2-join-code" placeholder="Room code">
+            <button onclick="joinRoom(2)">Join Room</button>
+        </div>
+        
+        <!-- Logs -->
+        <div class="player-section">
+            <h2>📝 Real-time Logs</h2>
+            <div class="logs" id="logs"></div>
+            <button onclick="clearLogs()">Clear Logs</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        // Player data
+        const players = {
+            1: {
+                token: null,
+                socket: null,
+                user: null
+            },
+            2: {
+                token: null,
+                socket: null,
+                user: null
+            }
+        };
+        
+        function log(message, player = null) {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const playerPrefix = player ? `[P${player}] ` : '';
+            logs.innerHTML += `<div>${timestamp} ${playerPrefix}${message}</div>`;
+            logs.scrollTop = logs.scrollHeight;
+            console.log(`${timestamp} ${playerPrefix}${message}`);
+        }
+        
+        function updateStatus(player, status) {
+            document.getElementById(`player${player}-status`).textContent = `Status: ${status}`;
+        }
+        
+        async function loginPlayer1() {
+            await loginPlayer(1, 'Player1');
+        }
+        
+        async function loginPlayer2() {
+            await loginPlayer(2, 'Player2');
+        }
+        
+        async function loginPlayer(playerId, username) {
+            try {
+                log(`Logging in as ${username}...`, playerId);
+                
+                const response = await fetch('http://localhost:3001/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
+                
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                players[playerId].token = data.token;
+                players[playerId].user = data.user;
+                
+                log(`Login successful! Token: ${data.token.substring(0, 20)}...`, playerId);
+                updateStatus(playerId, `Logged in as ${username}`);
+                
+                // Connect Socket.IO
+                connectSocket(playerId);
+                
+            } catch (error) {
+                log(`Login failed: ${error.message}`, playerId);
+                updateStatus(playerId, `Login failed: ${error.message}`);
+            }
+        }
+        
+        function connectSocket(playerId) {
+            const token = players[playerId].token;
+            if (!token) return;
+            
+            log(`Connecting Socket.IO...`, playerId);
+            
+            const socket = io('http://localhost:3001', {
+                auth: { token },
+                autoConnect: true
+            });
+            
+            players[playerId].socket = socket;
+            
+            socket.on('connect', () => {
+                log(`✅ Socket.IO connected! ID: ${socket.id}`, playerId);
+                updateStatus(playerId, `Connected (${socket.id.substring(0, 8)}...)`);
+            });
+            
+            socket.on('disconnect', (reason) => {
+                log(`❌ Socket.IO disconnected: ${reason}`, playerId);
+                updateStatus(playerId, `Disconnected: ${reason}`);
+            });
+            
+            socket.on('authenticated', (data) => {
+                log(`🔐 Socket.IO authenticated: ${JSON.stringify(data)}`, playerId);
+            });
+            
+            socket.on('authentication_error', (error) => {
+                log(`🚨 Socket.IO auth failed: ${JSON.stringify(error)}`, playerId);
+            });
+            
+            // Room events
+            socket.on('room:created', (data) => {
+                log(`🏠 Room created: ${JSON.stringify(data)}`, playerId);
+                getRooms(playerId); // Refresh rooms
+            });
+            
+            socket.on('room:updated', (data) => {
+                log(`🔄 Room updated: ${JSON.stringify(data)}`, playerId);
+                getRooms(playerId); // Refresh rooms
+            });
+            
+            socket.on('room:member_joined', (data) => {
+                log(`👤 Member joined: ${JSON.stringify(data)}`, playerId);
+            });
+        }
+        
+        async function createRoom(playerId) {
+            const token = players[playerId].token;
+            if (!token) {
+                log('Must login first!', playerId);
+                return;
+            }
+            
+            try {
+                log('Creating room...', playerId);
+                
+                const response = await fetch('http://localhost:3001/api/rooms', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ 
+                        name: `Player${playerId}'s Room`,
+                        settings: {
+                            grid_size: 4,
+                            max_players: 4,
+                            letter_timer: 10,
+                            placement_timer: 15,
+                            private: false
+                        }
+                    })
+                });
+                
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const room = await response.json();
+                log(`🏠 Room created: ${room.room.code} (${room.room.name})`, playerId);
+                
+                // Refresh room lists for both players
+                getRooms(1);
+                getRooms(2);
+                
+            } catch (error) {
+                log(`Create room failed: ${error.message}`, playerId);
+            }
+        }
+        
+        async function getRooms(playerId) {
+            try {
+                const response = await fetch('http://localhost:3001/api/rooms');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const rooms = await response.json();
+                const roomsDiv = document.getElementById(`player${playerId}-rooms`);
+                
+                if (rooms && rooms.length > 0) {
+                    roomsDiv.innerHTML = '<h4>Available Rooms:</h4>' + 
+                        rooms.map(room => 
+                            `<div>${room.code} - ${room.name} (${room.member_count || 0}/${room.max_players})</div>`
+                        ).join('');
+                } else {
+                    roomsDiv.innerHTML = '<div>No rooms available</div>';
+                }
+                
+            } catch (error) {
+                log(`Get rooms failed: ${error.message}`, playerId);
+            }
+        }
+        
+        async function joinRoom(playerId) {
+            const token = players[playerId].token;
+            const roomCode = document.getElementById(`player${playerId}-join-code`).value;
+            
+            if (!token) {
+                log('Must login first!', playerId);
+                return;
+            }
+            
+            if (!roomCode) {
+                log('Must enter room code!', playerId);
+                return;
+            }
+            
+            try {
+                log(`Joining room: ${roomCode}...`, playerId);
+                
+                const response = await fetch(`http://localhost:3001/api/rooms/${roomCode}/join`, {
+                    method: 'POST',
+                    headers: { 
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const result = await response.json();
+                log(`✅ Joined room: ${roomCode}`, playerId);
+                log(`Room members: ${JSON.stringify(result.room.members)}`, playerId);
+                
+                // Refresh room lists for both players
+                getRooms(1);
+                getRooms(2);
+                
+            } catch (error) {
+                log(`Join room failed: ${error.message}`, playerId);
+            }
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+        
+        // Initialize
+        log('Multiplayer test initialized');
+    </script>
+</body>
+</html>
