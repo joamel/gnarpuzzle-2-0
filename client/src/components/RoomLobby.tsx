@@ -8,39 +8,48 @@ interface RoomLobbyProps {
   onStartGame: () => void;
 }
 
+// Extended Player type for lobby display
+interface LobbyMember {
+  userId: string;
+  username: string;
+  role: 'owner' | 'member';
+  joinedAt: string;
+}
+
 const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   const { user: authUser } = useAuth();
   const { currentRoom, startGame, leaveRoom, isLoading, error } = useGame();
   
-  // Extract actual user from auth response if it's wrapped
-  const user = authUser?.user || authUser;
-  
   // Initialize player list
-  const [playerList, setPlayerList] = useState<any[]>([]);
+  const [playerList, setPlayerList] = useState<LobbyMember[]>([]);
   const [isStarting, setIsStarting] = useState(false);
 
-  const isOwner = currentRoom && user && currentRoom.createdBy === user.id;
+  const isOwner = currentRoom && authUser && String(currentRoom.createdBy).trim() === String(authUser.id).trim();
   const canStartGame = playerList.length >= 2; // Minst 2 spelare krävs
   const hasEnoughPlayers = playerList.length >= 2;
 
   useEffect(() => {
     console.log('🏠 RoomLobby - currentRoom updated:', currentRoom);
     console.log('👤 Raw authUser:', authUser);
-    console.log('👤 Processed user:', user);
-    console.log('🆔 User ID:', user?.id);
-    console.log('📝 Username:', user?.username);
+    console.log('🆔 User ID:', authUser?.id);
+    console.log('📝 Username:', authUser?.username);
+    console.log('👑 isOwner check:', {
+      createdBy: currentRoom?.createdBy,
+      userId: authUser?.id,
+      createdByString: String(currentRoom?.createdBy).trim(),
+      userIdString: String(authUser?.id).trim(),
+      isOwner: currentRoom && authUser && String(currentRoom.createdBy).trim() === String(authUser.id).trim()
+    });
     
-    if (currentRoom?.members && currentRoom.members.length > 0) {
-      console.log('✅ RoomLobby - setting playerList from currentRoom.members:', currentRoom.members);
-      setPlayerList(currentRoom.members);
-    } else if (currentRoom && user) {
-      // Om members är tom eller undefined, lägg till användaren själv
-      console.log('⚠️ RoomLobby - members empty, adding self. User data:', user);
-      console.log('🏠 Room createdBy:', currentRoom.createdBy, 'User ID:', user.id);
+    // Since Room doesn't have players property, always add user if room exists
+    if (currentRoom && authUser) {
+      // Add the current user to player list
+      console.log('⚠️ RoomLobby - adding self to player list. User data:', authUser);
+      console.log('🏠 Room createdBy:', currentRoom.createdBy, 'User ID:', authUser.id);
       setPlayerList([{
-        userId: user.id,
-        username: user.username,
-        role: currentRoom.createdBy === user.id ? 'owner' : 'member',
+        userId: String(authUser.id),
+        username: authUser.username,
+        role: String(currentRoom.createdBy).trim() === String(authUser.id).trim() ? 'owner' : 'member',
         joinedAt: new Date().toISOString()
       }]);
       
@@ -61,7 +70,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
         });
       }
     }
-  }, [currentRoom, user, authUser]);
+  }, [currentRoom, authUser]);
 
   useEffect(() => {
     const handleMemberJoined = (data: any) => {
@@ -75,10 +84,10 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
         // Otherwise, manually add the user
         console.log('📝 Manually adding user to member list');
         setPlayerList(prev => {
-          const exists = prev.some(member => member.userId === data.user.id);
+          const exists = prev.some(member => member.userId === String(data.user.id));
           if (!exists) {
             const newList = [...prev, {
-              userId: data.user.id,
+              userId: String(data.user.id),
               username: data.user.username,
               role: 'member' as const,
               joinedAt: new Date().toISOString()
@@ -104,7 +113,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
 
     const handleRoomLeft = (data: any) => {
       console.log('📤 Room left event:', data);
-      setPlayerList(prev => prev.filter(member => member.userId !== data.user.id));
+      setPlayerList(prev => prev.filter(member => member.userId !== String(data.user.id)));
     };
 
     const handleRoomUpdated = (data: any) => {
@@ -241,9 +250,8 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
         <details style={{marginBottom: '10px', fontSize: '12px', color: '#666'}}>
           <summary>Debug Info</summary>
           <pre style={{background: '#f5f5f5', padding: '10px', fontSize: '11px'}}>
-            currentRoom.members: {JSON.stringify(currentRoom.members, null, 2)}
             playerList: {JSON.stringify(playerList, null, 2)}
-            user: {JSON.stringify(user, null, 2)}
+            user: {JSON.stringify(authUser, null, 2)}
           </pre>
         </details>
         <div className="players-list">
@@ -252,7 +260,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
               <div className="player-info">
                 <span className="player-name">{member.username}</span>
                 {member.role === 'owner' && <span className="owner-badge">👑</span>}
-                {member.userId === user?.id && <span className="you-badge">Du</span>}
+                {member.userId === String(authUser?.id) && <span className="you-badge">Du</span>}
               </div>
               <div className="player-status online">Online</div>
             </div>
@@ -301,7 +309,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
 
         {!isOwner && (
           <div className="waiting-message">
-            <p>Väntar på att {currentRoom?.members?.find(m => m.role === 'owner')?.username || 'spelägaren'} startar spelet</p>
+            <p>Väntar på att {playerList?.find((m: LobbyMember) => m.role === 'owner')?.username || 'spelägaren'} startar spelet</p>
             {!hasEnoughPlayers && (
               <p className="requirement-message">
                 Minst 2 spelare krävs för att starta ({playerList.length}/2)

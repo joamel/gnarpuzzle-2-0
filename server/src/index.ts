@@ -151,7 +151,9 @@ async function startServer() {
     logger.error('Failed to start server:', error);
     process.exit(1);
   }
-}// Graceful shutdown
+}
+
+// Graceful shutdown
 process.on('SIGTERM', async () => {
   logger.info('Received SIGTERM, shutting down gracefully');
   

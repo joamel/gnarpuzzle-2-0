@@ -7,7 +7,7 @@ export class GameModel {
     
     return await dbManager.transaction(async (db) => {
       // Create game
-      const availableLetters = this.generateAvailableLetters();
+      const availableLetters = GameModel.generateAvailableLetters();
       const gameResult = await db.run(`
         INSERT INTO games (room_id, available_letters) 
         VALUES (?, ?)
@@ -30,7 +30,7 @@ export class GameModel {
       const { RoomModel: RM } = await import('./RoomModel');
       await RM.updateStatus(roomId, 'playing');
       
-      return await this.findById(gameId) as Game;
+      return await GameModel.findById(gameId) as Game;
     });
   }
 
@@ -70,7 +70,7 @@ export class GameModel {
   }
 
   static async getWithPlayers(gameId: number): Promise<GameWithPlayers | null> {
-    const game = await this.findById(gameId);
+    const game = await GameModel.findById(gameId);
     if (!game) return null;
 
     const dbManager = await DatabaseManager.getInstance();
