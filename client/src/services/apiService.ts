@@ -76,10 +76,15 @@ class ApiService {
     return response.rooms || [];
   }
 
-  async createRoom(name: string, settings?: any): Promise<any> {
+  async createRoom(name: string, options?: { max_players?: number; board_size?: number; turn_duration?: number }): Promise<any> {
     const response = await this.request<{ success: boolean; room: any }>('/api/rooms', {
       method: 'POST',
-      body: JSON.stringify({ name, settings }),
+      body: JSON.stringify({ 
+        name, 
+        max_players: options?.max_players,
+        board_size: options?.board_size,
+        turn_duration: options?.turn_duration
+      }),
     });
     // Backend returns { success: true, room: {...} }
     return response.room || response;
@@ -90,7 +95,9 @@ class ApiService {
   }
 
   async joinRoom(code: string): Promise<any> {
-    return this.request<any>(`/api/rooms/${code}/join`, { method: 'POST' });
+    const response = await this.request<{ success: boolean; message: string; room: any }>(`/api/rooms/${code}/join`, { method: 'POST' });
+    // Backend returns { success: true, message: 'Successfully joined room', room: {...} }
+    return response.room || response;
   }
 
   async leaveRoom(code: string): Promise<any> {

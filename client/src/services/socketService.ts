@@ -9,6 +9,11 @@ export interface SocketEvents {
   // Room events
   'room:created': (data: { room: any }) => void;
   'room:joined': (data: { room: any; user: any }) => void;
+  'room:member_joined': (data: { 
+    user: { id: number; username: string }; 
+    room: { id: number; code: string; name: string; members: any[] };
+    memberCount: number;
+  }) => void;
   'room:left': (data: { room: any; user: any }) => void;
   'room:updated': (data: { room: any }) => void;
 

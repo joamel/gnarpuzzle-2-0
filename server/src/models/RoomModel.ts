@@ -39,7 +39,13 @@ export class RoomModel {
     const room = await this.findById(result.lastInsertRowid as number) as Room;
     
     // Auto-join creator to room
-    await this.addMember(room.id, data.created_by);
+    console.log(`🏠 RoomModel.create: Auto-joining user ${data.created_by} to room ${room.id}`);
+    const addMemberResult = await this.addMember(room.id, data.created_by);
+    console.log(`🏠 RoomModel.create: addMember result:`, addMemberResult);
+    
+    // Verify member was added
+    const memberCount = await this.getMemberCount(room.id);
+    console.log(`🏠 RoomModel.create: Member count after adding:`, memberCount);
     
     return room;
   }
@@ -98,14 +104,20 @@ export class RoomModel {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
     
+    console.log(`👥 RoomModel.addMember: Adding user ${userId} to room ${roomId}`);
+    
     try {
       const result = await db.run(`
         INSERT INTO room_members (room_id, user_id) 
         VALUES (?, ?)
       `, roomId, userId);
       
+      console.log(`👥 RoomModel.addMember: Insert result:`, result);
+      console.log(`👥 RoomModel.addMember: Changes:`, result.changes);
+      
       return result.changes > 0;
     } catch (error) {
+      console.error(`❌ RoomModel.addMember: Error adding member:`, error);
       // Handle unique constraint violation (user already in room)
       return false;
     }
@@ -127,13 +139,19 @@ export class RoomModel {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
     
-    return await db.all(`
+    console.log(`🔍 RoomModel.getRoomMembers: Getting members for room ${roomId}`);
+    
+    const members = await db.all(`
       SELECT u.* 
       FROM users u
       JOIN room_members rm ON u.id = rm.user_id
       WHERE rm.room_id = ?
       ORDER BY rm.joined_at ASC
     `, roomId) as User[];
+    
+    console.log(`🔍 RoomModel.getRoomMembers: Found ${members.length} members:`, members);
+    
+    return members;
   }
 
   static async getMemberCount(roomId: number): Promise<number> {

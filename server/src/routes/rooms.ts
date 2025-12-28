@@ -241,9 +241,20 @@ router.post('/:code/join', AuthService.authenticateToken, async (req, res) => {
     // Check if user is already in room
     const isAlreadyMember = await RoomModel.isUserInRoom(room.id, authReq.user!.id);
     if (isAlreadyMember) {
-      res.status(400).json({
-        error: 'Already in room',
-        message: 'You are already a member of this room'
+      // User is already in room - return success with room data
+      console.log(`✅ User ${authReq.user!.username} already member of room ${room.code}`);
+      
+      // Get room with updated member list
+      const updatedRoom = await RoomModel.findByCode(code);
+      if (!updatedRoom) {
+        res.status(404).json({ error: 'Room not found after join' });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Already a member of this room',
+        room: updatedRoom
       });
       return;
     }

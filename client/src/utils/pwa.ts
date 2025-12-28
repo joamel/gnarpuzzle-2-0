@@ -47,6 +47,12 @@ export function registerServiceWorker() {
 let deferredPrompt: any = null;
 
 export function initPWAInstallPrompt() {
+  // Skip install prompt in development mode
+  if (import.meta.env.DEV || window.location.hostname === 'localhost') {
+    console.log('🚀 Development mode: PWA install prompt disabled');
+    return;
+  }
+  
   // Listen for install prompt
   window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault();
@@ -219,12 +225,13 @@ export function initPerformanceMonitoring() {
   if ('performance' in window) {
     // Measure initial load time
     window.addEventListener('load', () => {
-      const loadTime = performance.timing.loadEventEnd - performance.timing.navigationStart;
-      console.log(`App loaded in ${loadTime}ms`);
+      // Use more reliable timing measurement
+      const loadTime = performance.now();
+      console.log(`App loaded in ${Math.round(loadTime)}ms`);
       
       // Report to analytics if available
       if (loadTime > 3000) {
-        console.warn('Slow app loading detected:', loadTime);
+        console.warn('Slow app loading detected:', Math.round(loadTime));
       }
     });
     

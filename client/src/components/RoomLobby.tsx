@@ -2,24 +2,21 @@ import React, { useEffect, useState } from 'react';
 import { useGame } from '../contexts/GameContext';
 import { useAuth } from '../contexts/AuthContext';
 import { socketService } from '../services/socketService';
+import { apiService } from '../services/apiService';
 
 interface RoomLobbyProps {
   onStartGame: () => void;
 }
 
 const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
-  const { user } = useAuth();
+  const { user: authUser } = useAuth();
   const { currentRoom, startGame, leaveRoom, isLoading, error } = useGame();
   
-  // Säkerställ att användaren är inkluderad från början
-  const initialPlayers = currentRoom?.members || (user ? [{
-    userId: user.id,
-    username: user.username,
-    role: 'owner',
-    joinedAt: new Date().toISOString()
-  }] : []);
+  // Extract actual user from auth response if it's wrapped
+  const user = authUser?.user || authUser;
   
-  const [playerList, setPlayerList] = useState(initialPlayers);
+  // Initialize player list
+  const [playerList, setPlayerList] = useState<any[]>([]);
   const [isStarting, setIsStarting] = useState(false);
 
   const isOwner = currentRoom && user && currentRoom.createdBy === user.id;
@@ -27,61 +24,131 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   const hasEnoughPlayers = playerList.length >= 2;
 
   useEffect(() => {
-    console.log('RoomLobby - currentRoom updated:', currentRoom);
-    if (currentRoom?.members) {
-      console.log('RoomLobby - setting playerList from currentRoom.members:', currentRoom.members);
+    console.log('🏠 RoomLobby - currentRoom updated:', currentRoom);
+    console.log('👤 Raw authUser:', authUser);
+    console.log('👤 Processed user:', user);
+    console.log('🆔 User ID:', user?.id);
+    console.log('📝 Username:', user?.username);
+    
+    if (currentRoom?.members && currentRoom.members.length > 0) {
+      console.log('✅ RoomLobby - setting playerList from currentRoom.members:', currentRoom.members);
       setPlayerList(currentRoom.members);
     } else if (currentRoom && user) {
-      // Om members är tom, lägg till användaren själv
-      console.log('RoomLobby - members empty, adding self:', user);
+      // Om members är tom eller undefined, lägg till användaren själv
+      console.log('⚠️ RoomLobby - members empty, adding self. User data:', user);
+      console.log('🏠 Room createdBy:', currentRoom.createdBy, 'User ID:', user.id);
       setPlayerList([{
         userId: user.id,
         username: user.username,
-        role: 'owner',
+        role: currentRoom.createdBy === user.id ? 'owner' : 'member',
         joinedAt: new Date().toISOString()
       }]);
+      
+      // Force refresh to get latest member data from server
+      console.log('🔄 Attempting to fetch fresh member data...');
+      if (currentRoom.code) {
+        apiService.getRoomByCode(currentRoom.code).then(freshData => {
+          console.log('🆕 Fresh room data received:', freshData);
+          console.log('🆕 Fresh members array:', freshData?.room?.members);
+          if (freshData?.room?.members && freshData.room.members.length > 0) {
+            console.log('✅ Updating playerList with fresh data:', freshData.room.members);
+            setPlayerList(freshData.room.members);
+          } else {
+            console.log('⚠️ Fresh data still has empty members array');
+          }
+        }).catch(err => {
+          console.error('❌ Failed to fetch fresh room data:', err);
+        });
+      }
     }
-  }, [currentRoom, user]);
+  }, [currentRoom, user, authUser]);
 
   useEffect(() => {
-    const handleRoomJoined = (data: any) => {
-      console.log('Room joined event:', data);
-      setPlayerList(prev => {
-        const exists = prev.some(member => member.userId === data.user.id);
-        if (!exists) {
-          return [...prev, {
-            userId: data.user.id,
-            username: data.user.username,
-            role: 'member' as const,
-            joinedAt: new Date().toISOString()
-          }];
+    const handleMemberJoined = (data: any) => {
+      console.log('📥 Member joined event:', data);
+      
+      // If backend provides proper member list, use it
+      if (data.room?.members && Array.isArray(data.room.members) && data.room.members.length > 0) {
+        console.log('🎯 Using backend member list from join event:', data.room.members);
+        setPlayerList(data.room.members);
+      } else if (data.user) {
+        // Otherwise, manually add the user
+        console.log('📝 Manually adding user to member list');
+        setPlayerList(prev => {
+          const exists = prev.some(member => member.userId === data.user.id);
+          if (!exists) {
+            const newList = [...prev, {
+              userId: data.user.id,
+              username: data.user.username,
+              role: 'member' as const,
+              joinedAt: new Date().toISOString()
+            }];
+            console.log('👥 Updated player list:', newList);
+            return newList;
+          }
+          return prev;
+        });
+        
+        // Also trigger a refresh to get latest data from server
+        if (currentRoom?.code) {
+          console.log('🔄 Fetching fresh data after member join...');
+          apiService.getRoomByCode(currentRoom.code).then(freshData => {
+            console.log('🆕 Fresh data after join:', freshData);
+            if (freshData?.members && freshData.members.length > 0) {
+              setPlayerList(freshData.members);
+            }
+          }).catch(err => console.error('❌ Failed to fetch after join:', err));
         }
-        return prev;
-      });
+      }
     };
 
     const handleRoomLeft = (data: any) => {
-      console.log('Room left event:', data);
+      console.log('📤 Room left event:', data);
       setPlayerList(prev => prev.filter(member => member.userId !== data.user.id));
     };
 
     const handleRoomUpdated = (data: any) => {
-      console.log('Room updated event:', data);
-      if (data.room?.members) {
+      console.log('🔄 Room updated event:', data);
+      if (data.room?.members && Array.isArray(data.room.members)) {
+        console.log('🔄 Updating member list from room update:', data.room.members);
         setPlayerList(data.room.members);
       }
     };
 
-    socketService.on('room:joined', handleRoomJoined);
+    socketService.on('room:member_joined', handleMemberJoined);
     socketService.on('room:left', handleRoomLeft);
     socketService.on('room:updated', handleRoomUpdated);
 
+    // Periodic sync to ensure member list stays up to date
+    let syncInterval: NodeJS.Timeout;
+    if (currentRoom?.code) {
+      syncInterval = setInterval(() => {
+        console.log('🔄 Periodic member sync...');
+        apiService.getRoomByCode(currentRoom.code).then(freshData => {
+          if (freshData?.members && freshData.members.length > 0) {
+            setPlayerList(prev => {
+              // Only update if member list actually changed
+              const currentIds = prev.map(p => p.userId).sort();
+              const freshIds = freshData.members.map((m: any) => m.userId).sort();
+              
+              if (JSON.stringify(currentIds) !== JSON.stringify(freshIds)) {
+                console.log('👥 Periodic sync: Member list changed, updating...');
+                return freshData.members;
+              }
+              return prev;
+            });
+          }
+        }).catch(err => console.error('❌ Periodic sync failed:', err));
+      }, 10000); // Sync every 10 seconds
+    }
+
     return () => {
-      socketService.off('room:joined', handleRoomJoined);
+      socketService.off('room:member_joined', handleMemberJoined);
       socketService.off('room:left', handleRoomLeft);
       socketService.off('room:updated', handleRoomUpdated);
+      if (syncInterval) clearInterval(syncInterval);
     };
-  }, []);
+  }, [currentRoom]);
 
   const handleStartGame = async () => {
     if (!currentRoom || !canStartGame) return;
@@ -148,9 +215,40 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
 
       <div className="players-section">
         <h3>Spelare ({playerList.length}/{currentRoom.settings?.max_players || 4})</h3>
+        
+        {/* Force refresh button for debugging */}
+        <button 
+          onClick={async () => {
+            if (currentRoom?.code) {
+              console.log('🔄 Force refreshing room data...');
+              try {
+                const freshRoomData = await apiService.getRoomByCode(currentRoom.code);
+                console.log('Fresh room data:', freshRoomData);
+                if (freshRoomData?.members) {
+                  setPlayerList(freshRoomData.members);
+                }
+              } catch (err) {
+                console.error('Failed to refresh room data:', err);
+              }
+            }
+          }}
+          style={{background: 'blue', color: 'white', padding: '5px', marginBottom: '10px', fontSize: '12px'}}
+        >
+          🔄 Force Refresh Members
+        </button>
+        
+        {/* Debug info */}
+        <details style={{marginBottom: '10px', fontSize: '12px', color: '#666'}}>
+          <summary>Debug Info</summary>
+          <pre style={{background: '#f5f5f5', padding: '10px', fontSize: '11px'}}>
+            currentRoom.members: {JSON.stringify(currentRoom.members, null, 2)}
+            playerList: {JSON.stringify(playerList, null, 2)}
+            user: {JSON.stringify(user, null, 2)}
+          </pre>
+        </details>
         <div className="players-list">
-          {playerList.map(member => (
-            <div key={member.userId} className="player-item">
+          {playerList.map((member, index) => (
+            <div key={`player-${member.userId || index}-${member.username}`} className="player-item">
               <div className="player-info">
                 <span className="player-name">{member.username}</span>
                 {member.role === 'owner' && <span className="owner-badge">👑</span>}
@@ -162,7 +260,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
           
           {/* Show empty slots */}
           {Array.from({ length: (currentRoom.settings?.max_players || 4) - playerList.length }, (_, i) => (
-            <div key={`empty-${i}`} className="player-item empty">
+            <div key={`empty-slot-${playerList.length + i}`} className="player-item empty">
               <div className="player-info">
                 <span className="player-name">Väntar på spelare...</span>
               </div>
@@ -223,6 +321,14 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
           className="leave-room-button secondary-button"
         >
           Lämna rum
+        </button>
+        
+        <button
+          onClick={() => window.location.href = '/'}
+          className="back-to-home-button secondary-button"
+          style={{marginLeft: '10px'}}
+        >
+          Tillbaka till startsidan
         </button>
       </div>
 

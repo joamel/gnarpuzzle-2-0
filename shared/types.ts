@@ -54,7 +54,6 @@ export interface GameState {
   phase_timer_end?: number; // timestamp when current phase ends
   current_letter?: string;
   turn_number: number;
-}
   timeRemaining?: number;
 }
 

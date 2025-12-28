@@ -18,6 +18,7 @@ class SimpleDatabaseMock implements MockDatabase {
   private users: Map<number, any> = new Map();
   private rooms: Map<number, any> = new Map();
   private roomsByCode: Map<string, any> = new Map();
+  private roomMembers: Map<string, { room_id: number; user_id: number; joined_at: string }> = new Map();
 
   async exec(query: string): Promise<void> {
     console.log(`🔍 EXEC: ${query.substring(0, 50)}...`);
@@ -63,7 +64,15 @@ class SimpleDatabaseMock implements MockDatabase {
 
     // Handle room_members insertions (joining rooms)
     if (query.toLowerCase().includes('insert into room_members')) {
-      // Mock: just return success
+      const [room_id, user_id] = params;
+      const memberKey = `${room_id}-${user_id}`;
+      const memberData = {
+        room_id,
+        user_id,
+        joined_at: new Date().toISOString()
+      };
+      this.roomMembers.set(memberKey, memberData);
+      console.log(`💾 Mock DB: Stored room member ${user_id} in room ${room_id}`);
       return { lastInsertRowid: this.nextId++, changes: 1 };
     }
 
@@ -110,17 +119,21 @@ class SimpleDatabaseMock implements MockDatabase {
     // Handle COUNT queries for room members
     if (query.toLowerCase().includes('select count(*) as count') && 
         query.toLowerCase().includes('from room_members')) {
-      // Mock: return count of 1 for any room
-      return { count: 1 };
+      const roomId = params[0];
+      const memberCount = Array.from(this.roomMembers.values())
+        .filter(member => member.room_id === roomId).length;
+      console.log(`🔢 Mock DB: Room ${roomId} has ${memberCount} members`);
+      return { count: memberCount };
     }
 
     // Handle room member existence checks
     if (query.toLowerCase().includes('select 1 from room_members')) {
-      // Mock: assume user is already member (return 1) or not (return null)
-      // const roomId = params[0];
-      // const userId = params[1];
-      // For simplicity, assume user is not yet a member
-      return null;
+      const roomId = params[0];
+      const userId = params[1];
+      const memberKey = `${roomId}-${userId}`;
+      const exists = this.roomMembers.has(memberKey);
+      console.log(`🔍 Mock DB: User ${userId} ${exists ? 'is' : 'is not'} member of room ${roomId}`);
+      return exists ? { '1': 1 } : null;
     }
     
     return null;
@@ -129,12 +142,42 @@ class SimpleDatabaseMock implements MockDatabase {
   async all(query: string, ...params: any[]): Promise<any[]> {
     console.log(`🔍 ALL: ${query.substring(0, 50)}... with params:`, params);
     
+    // Handle room members JOIN query
+    if (query.toLowerCase().includes('select u.*') && 
+        query.toLowerCase().includes('from users u') &&
+        query.toLowerCase().includes('join room_members rm')) {
+      const roomId = params[0];
+      console.log(`👥 Mock DB: Getting members for room ${roomId}`);
+      
+      // Find all members for this room
+      const memberUserIds = Array.from(this.roomMembers.values())
+        .filter(member => member.room_id === roomId)
+        .map(member => member.user_id);
+        
+      console.log(`👥 Mock DB: Found member IDs: [${memberUserIds.join(', ')}]`);
+      
+      // Get user details for each member
+      const members = memberUserIds.map(userId => {
+        const user = this.users.get(userId);
+        console.log(`👤 Mock DB: Looking up user ${userId}:`, user);
+        return user;
+      }).filter(user => user !== undefined);
+        
+      console.log(`👥 Mock DB: Returning ${members.length} members:`, members);
+      return members;
+    }
+    
     // Return active rooms
     if (query.toLowerCase().includes('select') && query.toLowerCase().includes('from rooms')) {
-      return Array.from(this.rooms.values()).map(room => ({
-        ...room,
-        member_count: 1 // Mock member count
-      }));
+      return Array.from(this.rooms.values()).map(room => {
+        // Calculate actual member count
+        const memberCount = Array.from(this.roomMembers.values())
+          .filter(member => member.room_id === room.id).length;
+        return {
+          ...room,
+          member_count: memberCount
+        };
+      });
     }
     
     return [];

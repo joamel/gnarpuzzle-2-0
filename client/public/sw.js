@@ -1,6 +1,6 @@
-const CACHE_NAME = 'gnarpuzzle-v1';
-const STATIC_CACHE = 'gnarpuzzle-static-v1';
-const API_CACHE = 'gnarpuzzle-api-v1';
+const CACHE_NAME = 'gnarpuzzle-v3';
+const STATIC_CACHE = 'gnarpuzzle-static-v3';
+const API_CACHE = 'gnarpuzzle-api-v3';
 
 // Assets to cache for offline use
 const STATIC_ASSETS = [
@@ -91,8 +91,8 @@ async function handleApiRequest(request) {
     // Try network first for fresh data
     const networkResponse = await fetch(request);
     
-    // Cache successful responses
-    if (networkResponse.ok) {
+    // Cache successful GET responses only (HTTP/HTTPS only)
+    if (networkResponse.ok && request.method === 'GET' && request.url.startsWith('http')) {
       cache.put(request, networkResponse.clone());
     }
     
@@ -155,7 +155,7 @@ async function handleStaticRequest(request) {
   try {
     // Fallback to network and cache for next time
     const networkResponse = await fetch(request);
-    if (networkResponse.ok) {
+    if (networkResponse.ok && request.method === 'GET' && request.url.startsWith('http')) {
       cache.put(request, networkResponse.clone());
     }
     return networkResponse;

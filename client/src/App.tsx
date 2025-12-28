@@ -73,7 +73,10 @@ function App() {
   return (
     <div className="app-container">
       <AuthProvider>
-        <Router>
+        <Router future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true
+        }}>
           <Routes>
             <Route 
               path="/login" 

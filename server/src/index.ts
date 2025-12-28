@@ -25,17 +25,17 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
-// Mobile-optimized rate limiting
-const limiter = rateLimit({
+// Mobile-optimized rate limiting - disabled in development
+const limiter = process.env.NODE_ENV === 'production' ? rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'), // limit each IP to 100 requests per windowMs
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'), // 100 requests
   message: {
     error: 'Too many requests from this IP, please try again later.',
-    retryAfter: 15 * 60 // 15 minutes in seconds
+    retryAfter: 15 * 60 // 15 minutes
   },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-});
+}) : (req: any, res: any, next: any) => next(); // No rate limiting in development
 
 // Socket.IO Setup with mobile optimization
 const io = new Server(server, {

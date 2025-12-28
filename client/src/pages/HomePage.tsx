@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useGame } from '../contexts/GameContext';
@@ -10,10 +10,12 @@ const HomePage: React.FC = () => {
   const { user, logout } = useAuth();
   const { joinRoom, currentRoom } = useGame();
   const navigate = useNavigate();
+  const shouldNavigate = useRef(false);
   
   const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
   const [roomCode, setRoomCode] = useState('');
-  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false); // For modal visibility
+  const [creatingRoom, setCreatingRoom] = useState(false); // For actual room creation
   const [isJoiningRoom, setIsJoiningRoom] = useState(false);
   const [error, setError] = useState('');
   const [roomName, setRoomName] = useState('');
@@ -37,6 +39,17 @@ const HomePage: React.FC = () => {
     const interval = setInterval(loadRooms, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  // Handle navigation to game if already in a room
+  useEffect(() => {
+    if (currentRoom && shouldNavigate.current) {
+      shouldNavigate.current = false;
+      // Use setTimeout to avoid navigation during render
+      setTimeout(() => {
+        navigate('/game');
+      }, 0);
+    }
+  }, [currentRoom, navigate]);
 
   // Socket.IO event listeners for real-time updates
   useEffect(() => {
@@ -76,54 +89,25 @@ const HomePage: React.FC = () => {
     };
   }, []);
 
-  const createRoom = async () => {
-    if (!roomName.trim()) return;
-    
-    setIsCreatingRoom(true);
-    setError('');
-
-    try {
-      const roomData = await apiService.createRoom(roomName.trim(), {
-        max_players: maxPlayers,
-        board_size: boardSize
-      });
-
-      if (roomData?.code) {
-        await joinRoomByCode(roomData.code);
-      } else {
-        throw new Error('Ingen rumskod returnerades');
-      }
-    } catch (err: any) {
-      console.error('Failed to create room:', err);
-      setError(err.message || 'Kunde inte skapa rum');
-    } finally {
-      setIsCreatingRoom(false);
-    }
-  };
-
   const joinRoomByCode = async (code: string) => {
     if (!code.trim()) return;
 
+    console.log('🚀 joinRoomByCode called with code:', code);
     setIsJoiningRoom(true);
     setError('');
 
     try {
-      await joinRoom(code.trim());
-      navigate('/game');
+      shouldNavigate.current = true;
+      const roomResult = await joinRoom(code.trim());
+      console.log('✅ joinRoom result:', roomResult);
     } catch (err: any) {
-      console.error('Failed to join room:', err);
+      console.error('❌ Failed to join room:', err);
       setError(err.message || 'Kunde inte gå med i rum');
     } finally {
       setIsJoiningRoom(false);
       setRoomCode('');
     }
   };
-
-  // Redirect if already in a room
-  if (currentRoom) {
-    navigate('/game');
-    return <div>Redirecting to game...</div>;
-  }
 
   return (
     <div className="content-wrapper">
@@ -318,12 +302,71 @@ const HomePage: React.FC = () => {
               </div>
               
               <button
-                onClick={createRoom}
-                disabled={!roomName.trim() || isCreatingRoom}
+                type="button"
+onClick={async () => {
+                  if (!roomName.trim()) {
+                    setError('Rumnamn får inte vara tomt');
+                    return;
+                  }
+                  
+                  if (creatingRoom) {
+                    return;
+                  }
+                  
+                  setCreatingRoom(true);
+                  setError('');
+                  
+                  try {
+                    const roomData = await apiService.createRoom(roomName.trim(), {
+                      max_players: maxPlayers,
+                      board_size: boardSize
+                    });
+                    
+                    console.log('✅ Room created successfully:', roomData);
+                    
+                    // Room creation automatically joins the user, so just navigate
+                    if (roomData?.room?.code || roomData?.code) {
+                      const roomCode = roomData.room?.code || roomData.code;
+                      console.log(`🎯 Navigating directly to room ${roomCode}`);
+                      
+                      // Set the room data in context and navigate
+                      const room = roomData.room || roomData;
+                      await joinRoom(roomCode);
+                      
+                      setIsCreatingRoom(false);
+                      setRoomName('');
+                      shouldNavigate.current = true;
+                    } else {
+                      throw new Error('Ingen rumskod returnerades från servern');
+                    }
+                  } catch (err: any) {
+                    setError(err.message || 'Kunde inte skapa rum');
+                  } finally {
+                    setCreatingRoom(false);
+                  }
+                }}
+disabled={!roomName.trim() || creatingRoom}
                 className="btn btn-primary btn-full btn-lg"
               >
-                {isCreatingRoom ? 'Skapar rum...' : 'Skapa rum'}
+                {creatingRoom ? 'Skapar rum...' : 'Skapa rum'}
               </button>
+              
+              {/* Quick debug */}
+              <small style={{color: '#666', display: 'block', marginTop: '5px'}}>
+                Debug: creatingRoom={creatingRoom.toString()}, roomName="{roomName}", disabled={((!roomName.trim() || creatingRoom).toString())}
+              </small>
+
+              
+              {creatingRoom && (
+                <button
+                  onClick={() => setCreatingRoom(false)}
+                  className="btn btn-secondary btn-full"
+                  style={{ marginTop: '10px' }}
+                >
+                  Avbryt / Återställ
+                </button>
+              )}
+              
             </div>
           </div>
         </div>
