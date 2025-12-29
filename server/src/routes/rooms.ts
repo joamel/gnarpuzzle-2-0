@@ -278,8 +278,7 @@ router.post('/:code/join', AuthService.authenticateToken, async (req, res) => {
       return;
     }
 
-    // Get updated room with members
-    const updatedRoom = await RoomModel.findByCode(code);
+    // Get updated room with members  
     const members = await RoomModel.getRoomMembers(room.id);
 
     logger.info(`User ${authReq.user!.username} joined room ${code}`);

@@ -35,7 +35,7 @@ const limiter = process.env.NODE_ENV === 'production' ? rateLimit({
   },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-}) : (req: any, res: any, next: any) => next(); // No rate limiting in development
+}) : (_req: any, _res: any, next: any) => next(); // No rate limiting in development
 
 // Socket.IO Setup with mobile optimization
 const io = new Server(server, {

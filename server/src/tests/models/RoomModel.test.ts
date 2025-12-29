@@ -205,17 +205,16 @@ describe('RoomModel', () => {
         name: 'Test Room',
         status: 'waiting'
       };
-      const mockMembers = [{ id: 1, username: 'Player1' }];
 
       mockDb.get.mockResolvedValueOnce(mockRoom);
-      mockDb.all.mockResolvedValueOnce(mockMembers);
 
       const result = await RoomModel.findByCode('TEST01');
 
-      expect(result).toEqual({
-        ...mockRoom,
-        members: mockMembers
-      });
+      expect(result).toEqual(mockRoom);
+      expect(mockDb.get).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT * FROM rooms WHERE code = ?'),
+        'TEST01'
+      );
     });
 
     it('should return null when room not found', async () => {
@@ -229,20 +228,34 @@ describe('RoomModel', () => {
 
   describe('getActiveRooms', () => {
     it('should return active rooms with member counts', async () => {
-      const mockRooms = [
-        { id: 1, name: 'Room 1', status: 'waiting' },
-        { id: 2, name: 'Room 2', status: 'in_game' }
+      const mockRoomsQuery = [
+        { id: 1, name: 'Room 1', status: 'waiting', member_count: 1 },
+        { id: 2, name: 'Room 2', status: 'in_game', member_count: 2 }
       ];
+      const mockMembers1 = [{ id: 1, username: 'Player1' }];
+      const mockMembers2 = [{ id: 2, username: 'Player2' }, { id: 3, username: 'Player3' }];
 
-      mockDb.all.mockResolvedValueOnce(mockRooms);
+      // Mock the main query and member queries
+      mockDb.all
+        .mockResolvedValueOnce(mockRoomsQuery) // Main rooms query
+        .mockResolvedValueOnce(mockMembers1)   // Members for room 1
+        .mockResolvedValueOnce(mockMembers2);  // Members for room 2
 
       const result = await RoomModel.getActiveRooms();
 
-      expect(result).toEqual(mockRooms);
-      expect(mockDb.all).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT'),
-        expect.arrayContaining(['waiting', 'in_game'])
-      );
+      expect(result).toHaveLength(2);
+      expect(result[0]).toMatchObject({
+        id: 1,
+        name: 'Room 1',
+        status: 'waiting',
+        members: mockMembers1
+      });
+      expect(result[1]).toMatchObject({
+        id: 2,
+        name: 'Room 2', 
+        status: 'in_game',
+        members: mockMembers2
+      });
     });
   });
 });
