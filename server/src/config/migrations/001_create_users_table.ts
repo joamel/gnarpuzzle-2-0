@@ -10,8 +10,7 @@ export const migration: Migration = {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       last_active DATETIME DEFAULT CURRENT_TIMESTAMP,
       
-      CONSTRAINT username_length CHECK (length(username) >= 2 AND length(username) <= 20),
-      CONSTRAINT username_chars CHECK (username REGEXP '^[a-zA-Z0-9_åäöÅÄÖ]+$')
+      CONSTRAINT username_length CHECK (length(username) >= 2 AND length(username) <= 20)
     );
 
     CREATE INDEX idx_users_username ON users(username);

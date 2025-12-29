@@ -1,4 +1,6 @@
-const migration = {
+import { Migration } from '../migrations';
+
+export const migration: Migration = {
   version: 6,
   name: 'enhance_game_logic_schema',
   up: `

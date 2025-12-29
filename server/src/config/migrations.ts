@@ -30,7 +30,7 @@ export class MigrationManager {
   public async runMigrations(): Promise<void> {
     await this.ensureMigrationTable();
     
-    const migrations = this.loadMigrations();
+    const migrations = await this.loadMigrations();
     const executedVersions = await this.getExecutedVersions();
 
     for (const migration of migrations) {
@@ -59,7 +59,7 @@ export class MigrationManager {
       return;
     }
 
-    const migrations = this.loadMigrations();
+    const migrations = await this.loadMigrations();
     const migration = migrations.find(m => m.version === lastMigration.version);
     
     if (!migration || !migration.down) {
@@ -80,7 +80,7 @@ export class MigrationManager {
     console.log(`✅ Rollback completed: ${migration.name}`);
   }
 
-  private loadMigrations(): Migration[] {
+  private async loadMigrations(): Promise<Migration[]> {
     if (!fs.existsSync(this.migrationsPath)) {
       return [];
     }
@@ -92,8 +92,12 @@ export class MigrationManager {
     const migrations: Migration[] = [];
     
     for (const file of migrationFiles) {
-      const migrationModule = require(path.join(this.migrationsPath, file));
-      migrations.push(migrationModule.default || migrationModule.migration || migrationModule);
+      try {
+        const migrationModule = await import(path.join(this.migrationsPath, file));
+        migrations.push(migrationModule.default || migrationModule.migration || migrationModule);
+      } catch (error) {
+        console.error(`❌ Failed to load migration ${file}:`, error);
+      }
     }
 
     return migrations.sort((a, b) => a.version - b.version);
@@ -115,7 +119,7 @@ export class MigrationManager {
   }
 
   public async getStatus(): Promise<void> {
-    const migrations = this.loadMigrations();
+    const migrations = await this.loadMigrations();
     const executedVersions = await this.getExecutedVersions();
 
     console.log('\n📋 Migration Status:');

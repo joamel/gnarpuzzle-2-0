@@ -1,11 +1,12 @@
-// Real SQLite database implementation (currently disabled due to compilation issues)
-// TODO: Re-enable when SQLite dependencies are properly configured
+// Hybrid database implementation supporting both SQLite and Mock
+// Automatically detects if better-sqlite3 is available
 
 import * as path from 'path';
 import * as fs from 'fs';
+import { DatabaseInterface, SQLiteDatabase } from './sqlite';
 
 // For now, we'll use a simple in-memory mock for development
-interface MockDatabase {
+interface MockDatabase extends DatabaseInterface {
   exec: (query: string) => Promise<void>;
   run: (query: string, ...params: any[]) => Promise<{ lastInsertRowid: number; changes: number }>;
   get: (query: string, ...params: any[]) => Promise<any | null>;
@@ -190,7 +191,7 @@ class SimpleDatabaseMock implements MockDatabase {
 
 export class DatabaseManager {
   private static instance: DatabaseManager;
-  private db: MockDatabase;
+  private db: DatabaseInterface;
 
   private constructor() {
     // Constructor is now async via init()
@@ -213,14 +214,21 @@ export class DatabaseManager {
       fs.mkdirSync(dbDir, { recursive: true });
     }
 
-    // Use mock database for now
-    this.db = new SimpleDatabaseMock();
-    
-    console.log(`📁 Mock Database connected for development: ${dbPath}`);
-    console.log(`ℹ️  To use real SQLite, install: npm install sqlite3 sqlite @types/sqlite3`);
+    // Try to use SQLite if available, otherwise fallback to mock
+    try {
+      // Check if better-sqlite3 is available
+      require.resolve('better-sqlite3');
+      this.db = new SQLiteDatabase(dbPath);
+      console.log(`✅ Using real SQLite database: ${dbPath}`);
+    } catch (error) {
+      // Fallback to mock database
+      this.db = new SimpleDatabaseMock();
+      console.log(`📁 Mock Database connected for development: ${dbPath}`);
+      console.log(`ℹ️  To use real SQLite, install: npm install better-sqlite3 @types/better-sqlite3`);
+    }
   }
 
-  public getDatabase(): MockDatabase {
+  public getDatabase(): DatabaseInterface {
     return this.db;
   }
 
@@ -231,7 +239,7 @@ export class DatabaseManager {
   }
 
   // Transaction helper
-  public async transaction<T>(fn: (db: MockDatabase) => Promise<T>): Promise<T> {
+  public async transaction<T>(fn: (db: DatabaseInterface) => Promise<T>): Promise<T> {
     console.log('🔄 Starting transaction');
     try {
       const result = await fn(this.db);
@@ -244,9 +252,9 @@ export class DatabaseManager {
   }
 }
 
-let dbInstance: MockDatabase | null = null;
+let dbInstance: DatabaseInterface | null = null;
 
-export async function getDatabase(): Promise<MockDatabase> {
+export async function getDatabase(): Promise<DatabaseInterface> {
   if (!dbInstance) {
     const manager = await DatabaseManager.getInstance();
     dbInstance = manager.getDatabase();

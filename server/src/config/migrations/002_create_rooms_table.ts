@@ -15,7 +15,6 @@ export const migration: Migration = {
       status TEXT NOT NULL DEFAULT 'waiting',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       
-      CONSTRAINT room_code_format CHECK (code REGEXP '^[A-Z0-9]{6}$'),
       CONSTRAINT room_name_length CHECK (length(name) >= 2 AND length(name) <= 30),
       CONSTRAINT max_players_range CHECK (max_players >= 2 AND max_players <= 6),
       CONSTRAINT board_size_valid CHECK (board_size IN (4, 5, 6)),

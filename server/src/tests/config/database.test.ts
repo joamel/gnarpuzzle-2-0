@@ -1,13 +1,31 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DatabaseManager } from '../../config/database';
+import { MigrationManager } from '../../config/migrations';
 
 describe('Mock Database', () => {
   let dbManager: DatabaseManager;
   let db: any;
 
   beforeEach(async () => {
+    // Reset database singleton for clean state
+    (DatabaseManager as any)._instance = null;
+    
     dbManager = await DatabaseManager.getInstance();
     db = dbManager.getDatabase();
+    
+    // Run migrations to ensure tables exist
+    const migrationManager = new MigrationManager();
+    await migrationManager.runMigrations();
+    
+    // Clean up existing data for fresh test state
+    await db.run('DELETE FROM room_members');
+    await db.run('DELETE FROM players');
+    await db.run('DELETE FROM games');
+    await db.run('DELETE FROM rooms');
+    await db.run('DELETE FROM users');
+    
+    // Reset AUTOINCREMENT counters for consistent test IDs
+    await db.run("DELETE FROM sqlite_sequence WHERE name IN ('users', 'rooms', 'games', 'players', 'room_members')");
   });
 
   describe('User Operations', () => {
@@ -54,10 +72,13 @@ describe('Mock Database', () => {
 
   describe('Room Operations', () => {
     it('should create rooms with correct data', async () => {
+      // Create a user first for foreign key reference
+      const userResult = await db.run('INSERT INTO users (username) VALUES (?)', 'testuser');
+      
       const roomData = [
         'ABC123',      // code
         'Test Room',   // name
-        1,             // created_by
+        userResult.lastInsertRowid,  // created_by
         4,             // max_players
         4,             // board_size
         30,            // turn_duration
@@ -78,7 +99,10 @@ describe('Mock Database', () => {
     });
 
     it('should retrieve rooms by code', async () => {
-      const roomData = ['XYZ789', 'Code Room', 1, 4, 4, 30, '{}'];
+      // Create a user first for foreign key reference
+      const userResult = await db.run('INSERT INTO users (username) VALUES (?)', 'codeuser');
+      
+      const roomData = ['XYZ789', 'Code Room', userResult.lastInsertRowid, 4, 4, 30, '{}'];
       await db.run('INSERT INTO rooms (code, name, created_by, max_players, board_size, turn_duration, settings) VALUES (?, ?, ?, ?, ?, ?, ?)', ...roomData);
 
       const room = await db.get('SELECT * FROM rooms WHERE code = ?', 'XYZ789');
@@ -89,22 +113,29 @@ describe('Mock Database', () => {
     });
 
     it('should return active rooms list', async () => {
+      // Create a user first for foreign key reference
+      const userResult = await db.run('INSERT INTO users (username) VALUES (?)', 'listuser');
+      
       // Create multiple rooms
-      await db.run('INSERT INTO rooms (code, name, created_by, max_players, board_size, turn_duration, settings) VALUES (?, ?, ?, ?, ?, ?, ?)', 'ROOM1', 'Room 1', 1, 4, 4, 30, '{}');
-      await db.run('INSERT INTO rooms (code, name, created_by, max_players, board_size, turn_duration, settings) VALUES (?, ?, ?, ?, ?, ?, ?)', 'ROOM2', 'Room 2', 1, 6, 5, 45, '{}');
+      await db.run('INSERT INTO rooms (code, name, created_by, max_players, board_size, turn_duration, settings) VALUES (?, ?, ?, ?, ?, ?, ?)', 'ROOM1', 'Room 1', userResult.lastInsertRowid, 4, 4, 30, '{}');
+      await db.run('INSERT INTO rooms (code, name, created_by, max_players, board_size, turn_duration, settings) VALUES (?, ?, ?, ?, ?, ?, ?)', 'ROOM2', 'Room 2', userResult.lastInsertRowid, 6, 5, 45, '{}');
 
-      const rooms = await db.all('SELECT r.*, COUNT(rm.user_id) as member_count FROM rooms r LEFT JOIN room_members rm ON r.id = rm.room_id GROUP BY r.id');
+      const rooms = await db.all('SELECT r.*, COUNT(rm.user_id) as member_count FROM rooms r LEFT JOIN room_members rm ON r.id = rm.room_id GROUP BY r.id') as any[];
 
       // Mock database accumulates rooms from previous tests, so check for at least 2
       expect(rooms.length).toBeGreaterThanOrEqual(2);
       // Find our specific rooms
-      const room1 = rooms.find(r => r.code === 'ROOM1');
-      const room2 = rooms.find(r => r.code === 'ROOM2'); 
-      expect(room1).toMatchObject({
+      const room1 = rooms.find((r: any) => r.code === 'ROOM1');
+      const room2 = rooms.find((r: any) => r.code === 'ROOM2'); 
+      
+      expect(room1).toBeDefined();
+      expect(room2).toBeDefined();
+      
+      expect(room1!).toMatchObject({
         code: 'ROOM1',
         name: 'Room 1'
       });
-      expect(room2).toMatchObject({
+      expect(room2!).toMatchObject({
         code: 'ROOM2',
         name: 'Room 2'
       });
