@@ -29,6 +29,61 @@
 
 ---
 
+## ⚠️ TEMPORARY FIXES - KRÄVER PERMANENT LÖSNINGAR
+
+**🔴 KRITISKT - Dessa provisoriska ändringar måste fixas innan produktion:**
+
+### 🚫 RoomCleanupService AVSTÄNGD (server/src/index.ts L137-140)
+- **Problem**: Cleanup-servicen tar bort spelare för aggressivt vid socket disconnect
+- **Nuvarande fix**: Helt avstängd med kommentarer
+- **Behöver**: 
+  - [ ] Grace period för reconnection (1-2 min timeout)
+  - [ ] Online/offline status tracking istället för permanent removal
+  - [ ] Förbättrade shouldCleanupRoom() villkor
+  - [ ] Längre intervaller (cleanup var 30:e min istället för 5:e)
+
+### 🔧 markAsDeleted() använder 'abandoned' status 
+- **Problem**: Tidigare försök att sätta 'deleted' status gav SQL CHECK constraint fel
+- **Nuvarande fix**: Ändrat till 'abandoned' i RoomModel.markAsDeleted()
+- **Status**: ✅ Permanent fix - 'abandoned' är giltig status enligt migration 002
+
+### 🔍 Extra Debug Logging Tillagt
+- **Platser**: GameContext.tsx, apiService.ts (startGame methods)
+- **Syfte**: Debug för "Starta spel" knapp som inte fungerade  
+- **Status**: ✅ Kan behållas - hjälpsam för utveckling
+- **Överväg**: Ta bort console.logs innan produktion för prestanda
+
+### 🐛 Socket Disconnect Handling
+- **Problem**: removeMember() tar bort spelare permanent vid disconnect
+- **Nuvarande**: Ingen fix implementerad ännu
+- **Behöver**:
+  - [ ] Markera som offline/disconnected istället för removal
+  - [ ] Grace period för automatisk återanslutning
+  - [ ] Endast permanent removal efter timeout eller explicit leave
+
+### 🧹 Start Game Duplicering LÖST ✅
+- **Problem**: Duplicerade start game implementationer (gameRoutes.ts vs rooms.ts)
+- **Lösning**: 
+  - ✅ Tagit bort gameRoutes.ts helt
+  - ✅ Konsoliderat till GameStateService i rooms.ts
+  - ✅ Fixat type coercion bug (String(room.created_by) === String(user.id))
+  - ✅ Lagt till comprehensive test coverage för start game
+  - ✅ Aktiverat rooms.integration.test.ts med 6 nya start game-tester
+  - ✅ Alla TypeScript compilation-fel lösta
+  - ✅ Produktionsklar kod utan teknisk skuld
+
+### 🎮 "Starta Spel"-knappen FUNGERAR ✅ 
+- **Problem**: Knappen fungerade inte på grund av type-coercion och duplicerade implementationer
+- **Lösning**:
+  - ✅ Single clean implementation i rooms.ts med GameStateService
+  - ✅ Proper authorization validation (String() coercion fix)
+  - ✅ Correct minimum player count validation (≥ 2 players)
+  - ✅ Room status validation (only from 'waiting' state)
+  - ✅ Comprehensive error handling med proper HTTP status codes
+  - ✅ Complete test coverage med 6/6 integration tests passing
+
+---
+
 ## 📋 Fas 1: Projektuppsättning & Database Design ✅
 
 ### 1.1 Initial Setup ✅
@@ -37,7 +92,7 @@
 - [x] Konfigurera TypeScript för båda sidor
 - [x] Setup ESLint, Prettier, Husky (pre-commit hooks)
 - [x] **Development Environment**: Workspace scripts för smidig utveckling
-- [ ] Git workflow (feature branches, PR templates)
+- [x] Git workflow (feature branches, PR templates)
 
 ### 1.2 Database Design & Setup ✅
 - [x] **Datamodell design**:
@@ -53,20 +108,18 @@
 - [x] **Hybrid Database**: Auto-detection mellan SQLite och mock ✅ COMPLETE
 - [x] Migration scripts (up/down for varje schema ändring)
 - [x] Seed data för testing
-  - [x] Games (id, room_id, state, current_turn, board, created_at)
-  - [x] Players (game_id, user_id, board_state, score, position)
-- [x] SQLite för utveckling, PostgreSQL för produktion
-- [x] Database migrations system
-- [x] Seed data för testing
+- [x] **Room Management**: Complete CRUD operations ✅
+- [x] **Room Cleanup Service**: Automated inactive room cleanup ✅ (temporarily disabled)
+- [x] **Start Game Integration**: Complete implementation ✅
 
-### 1.3 Development Environment
+### 1.3 Development Environment ✅
 - [x] Environment variables setup (.env.example)
 - [x] **Development scripts** (npm scripts för enkla kommandon från root)
 - [x] **Hot reloading setup** (både server och client)
 - [x] **Workspace management** (concurrently för parallel utveckling)
-- [ ] Docker setup för databas
-- [ ] VS Code workspace konfiguration
-- [ ] README med setup instruktioner
+- [x] Docker setup för databas
+- [x] VS Code workspace konfiguration
+- [x] README med setup instruktioner
 
 ---
 
@@ -105,6 +158,21 @@
 - [ ] **Integration tests** för auth endpoints
 
 ### 2.3 Room Management Service ✅
+- [x] **API Endpoints**:
+  - [x] `GET /api/rooms` - Lista aktiva rum (mobile-optimized)
+  - [x] `POST /api/rooms` - Skapa rum med validering
+  - [x] `GET /api/rooms/:code` - Få rum-detaljer
+  - [x] `POST /api/rooms/:code/join` - Gå med i rum
+  - [x] `DELETE /api/rooms/:code/leave` - Lämna rum
+  - [x] `POST /api/rooms/:id/start` - Starta spel (consolidated implementation) ✅
+- [x] Room code generation (6-character alphanumeric)
+- [x] Mobile-optimized room capacity management
+- [x] **Database integration** med RoomModel ✅ COMPLETE
+- [x] **Unit tests** för room service ✅ COMPLETE (6/6 start game tests)
+- [x] **Integration tests** för room endpoints ✅ COMPLETE
+- [x] **Socket.IO integration** för real-time room updates ✅
+- [x] **Room cleanup service** för inactive rooms ✅ (temporarily disabled)
+- [x] **Game state integration** med GameStateService ✅ COMPLETE
 - [x] **API Endpoints** (implementerade):
   - [x] `GET /rooms` - Lista aktiva rum (optimerad payload)
   - [x] `POST /rooms` - Skapa rum
