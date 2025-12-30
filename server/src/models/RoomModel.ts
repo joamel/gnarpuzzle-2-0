@@ -180,6 +180,19 @@ export class RoomModel {
     return result.changes > 0;
   }
 
+  static async transferOwnership(roomId: number, newCreatorId: number): Promise<boolean> {
+    const dbManager = await DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+    
+    const result = await db.run(`
+      UPDATE rooms 
+      SET created_by = ? 
+      WHERE id = ?
+    `, newCreatorId, roomId);
+    
+    return result.changes > 0;
+  }
+
   static async deleteEmptyRooms(): Promise<number> {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
@@ -221,8 +234,8 @@ export class RoomModel {
     return await db.all(`
       SELECT r.* FROM rooms r
       WHERE r.status != 'deleted' 
-      AND r.updated_at < ?
-      ORDER BY r.updated_at ASC
+      AND r.created_at < ?
+      ORDER BY r.created_at ASC
     `, cutoffTime) as Room[];
   }
 
@@ -252,7 +265,7 @@ export class RoomModel {
     
     await db.run(`
       UPDATE rooms 
-      SET status = 'deleted', updated_at = CURRENT_TIMESTAMP 
+      SET status = 'abandoned' 
       WHERE id = ?
     `, roomId);
   }
