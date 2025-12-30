@@ -1,13 +1,15 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { GameProvider } from './contexts/GameContext';
 import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
 import GamePage from './pages/GamePage';
+import GameTestPage from './pages/GameTestPage';
 import './styles/global.css';
 import './styles/mobile.css';
-import './styles/pwa.css';
+// Removed PWA styles to avoid conflicts
+// import './styles/pwa.css';
 import './styles/login.css';
 import './styles/home.css';
 import './styles/lobby.css';
@@ -15,6 +17,18 @@ import './styles/game.css';
 import './styles/gamepage.css';
 
 function App() {
+  // Unregister any existing Service Workers in development
+  useEffect(() => {
+    if ('serviceWorker' in navigator && import.meta.env.DEV) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for(let registration of registrations) {
+          console.log('Unregistering Service Worker:', registration.scope);
+          registration.unregister();
+        }
+      });
+    }
+  }, []);
+
   // Protected route component - moved inside App to have access to AuthProvider
   const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { isAuthenticated, isLoading } = useAuth();
@@ -100,6 +114,14 @@ function App() {
                 <ProtectedRoute>
                   <GamePage />
                 </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/test" 
+              element={
+                <div style={{ isolation: 'isolate' }}>
+                  <GameTestPage />
+                </div>
               } 
             />
             <Route path="*" element={<Navigate to="/" replace />} />
