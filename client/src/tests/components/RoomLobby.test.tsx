@@ -83,10 +83,14 @@ describe('RoomLobby Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     
-    // Reset mock apiService
+    // Reset mock apiService - match real API response structure
     (apiService.getRoomByCode as any).mockResolvedValue({
       success: true,
-      room: { ...mockRoom, players: [] }
+      room: { 
+        ...mockRoom, 
+        members: [],  // Real API returns 'members', not 'players'
+        createdBy: mockRoom.createdBy
+      }
     });
   });
 
@@ -109,16 +113,22 @@ describe('RoomLobby Component', () => {
     expect(screen.getByText('Du')).toBeDefined(); // Self badge
   });
 
-  it('should display members from currentRoom.players', () => {
-    const roomWithPlayers = {
+  it('should display members from API response', () => {
+    // Real API returns { room: { members: [...] } }
+    const roomWithMembers = {
       ...mockRoom,
-      players: [
-        { userId: '123', username: 'testuser', ready: false, score: 0, position: 0 },
-        { userId: '456', username: 'player2', ready: false, score: 0, position: 1 }
+      members: [
+        { id: 123, username: 'testuser' },
+        { id: 456, username: 'player2' }
       ]
     };
     
-    mockGameContext.currentRoom = roomWithPlayers;
+    (apiService.getRoomByCode as any).mockResolvedValue({
+      success: true,
+      room: roomWithMembers
+    });
+    
+    mockGameContext.currentRoom = mockRoom;
     
     renderRoomLobby();
     
@@ -139,13 +149,15 @@ describe('RoomLobby Component', () => {
   });
 
   it('should handle force refresh button click', async () => {
+    // Real API structure: { success: true, room: { members: [...] } }
     const freshRoomData = {
       success: true,
       room: {
         ...mockRoom,
-        players: [
-          { userId: '123', username: 'testuser', ready: false, score: 0, position: 0 },
-          { userId: '789', username: 'newplayer', ready: false, score: 0, position: 1 }
+        createdBy: 123,
+        members: [
+          { id: 123, username: 'testuser' },
+          { id: 789, username: 'newplayer' }
         ]
       }
     };
@@ -208,15 +220,21 @@ describe('RoomLobby Component', () => {
   });
 
   it('should render unique keys for all player items', () => {
-    const roomWithPlayers = {
+    // Real API structure with members array
+    const roomWithMembers = {
       ...mockRoom,
-      players: [
-        { userId: '123', username: 'testuser', ready: false, score: 0, position: 0 },
-        { userId: '456', username: 'player2', ready: false, score: 0, position: 1 }
+      members: [
+        { id: 123, username: 'testuser' },
+        { id: 456, username: 'player2' }
       ]
     };
 
-    mockGameContext.currentRoom = roomWithPlayers;
+    (apiService.getRoomByCode as any).mockResolvedValue({
+      success: true,
+      room: roomWithMembers
+    });
+
+    mockGameContext.currentRoom = mockRoom;
 
     const { container } = renderRoomLobby();
     
