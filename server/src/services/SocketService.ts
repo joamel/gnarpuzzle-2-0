@@ -118,7 +118,9 @@ export class SocketService {
 
       // Disconnect handling
       socket.on('disconnect', () => {
-        this.handleDisconnect(socket);
+        this.handleDisconnect(socket).catch(err => {
+          logger.error('Error in disconnect handler:', err);
+        });
       });
 
       // Mobile-specific events
@@ -211,9 +213,11 @@ export class SocketService {
       
       // Update user data
       this.connectedUsers.set(socket.id, { ...userData, roomCode });
-
-      // TODO: Add user to room in database
-      // TODO: Get updated room data
+      
+      // Get room info from database
+      const { RoomModel } = await import('../models');
+      const room = await RoomModel.findByCode(roomCode);
+      const members = room ? await RoomModel.getRoomMembers(room.id) : [];
 
       // Notify others in the room
       socket.to(`room:${roomCode}`).emit('room:member_joined', {
@@ -221,6 +225,17 @@ export class SocketService {
           id: userData.userId,
           username: userData.username
         },
+        room: room ? {
+          id: room.id,
+          code: room.code,
+          name: room.name,
+          members: members.map(m => ({
+            userId: String(m.id),
+            username: m.username,
+            role: m.id === room.created_by ? 'owner' : 'member'
+          }))
+        } : null,
+        memberCount: members.length,
         roomCode
       });
 
@@ -228,13 +243,23 @@ export class SocketService {
       socket.emit('room:joined', {
         success: true,
         roomCode,
-        // TODO: Include room details, members, etc.
+        room: room ? {
+          id: room.id,
+          code: room.code,
+          name: room.name,
+          members: members.map(m => ({
+            userId: String(m.id),
+            username: m.username,
+            role: m.id === room.created_by ? 'owner' : 'member'
+          }))
+        } : null
       });
 
-      logger.info(`User joined room: ${userData.username} -> ${roomCode}`, {
+      logger.info(`User joined Socket.IO room: ${userData.username} -> room:${roomCode}`, {
         service: 'gnarpuzzle-server',
         userId: userData.userId,
-        roomCode
+        roomCode,
+        memberCount: members.length
       });
     } catch (error) {
       socket.emit('room:join_error', {
@@ -519,19 +544,76 @@ export class SocketService {
     }
   }
 
-  private handleDisconnect(socket: Socket): void {
+  private async handleDisconnect(socket: Socket): Promise<void> {
     const userData = this.connectedUsers.get(socket.id);
     
     if (userData) {
-      // Notify room/game of disconnection
-      if (userData.roomCode) {
-        socket.to(`room:${userData.roomCode}`).emit('room:member_disconnected', {
-          user: {
-            id: userData.userId,
-            username: userData.username
-          },
-          roomCode: userData.roomCode
-        });
+      // If user was in a room, automatically remove them
+      if (userData.roomCode && userData.userId) {
+        try {
+          const RoomModel = (await import('../models/RoomModel')).RoomModel;
+          const room = await RoomModel.findByCode(userData.roomCode);
+          
+          if (room) {
+            const isCreator = room.created_by === userData.userId;
+            
+            // Ensure room has a valid ID
+            if (!room.id || typeof room.id !== 'number') {
+              logger.error('Room found but has invalid ID, cannot process disconnect');
+              return;
+            }
+            
+            const roomId = room.id as number; // Force cast since we validated it exists
+            
+            // Notify room BEFORE removing user (while socket is still connected to room)
+            socket.to(`room:${userData.roomCode}`).emit('room:member_left', {
+              user: {
+                id: userData.userId,
+                username: userData.username
+              },
+              roomCode: userData.roomCode,
+              wasCreator: isCreator
+            });
+            
+            // Remove user from room
+            const removed = await RoomModel.removeMember(roomId!, userData.userId);
+            
+            if (removed) {
+              // If the creator left, transfer ownership to next member
+              if (isCreator) {
+                const remainingMembers = await RoomModel.getRoomMembers(roomId!);
+                if (remainingMembers.length > 0) {
+                  const newCreator = remainingMembers[0];
+                  await RoomModel.transferOwnership(roomId!, newCreator.id);
+                  
+                  // Notify room about new creator
+                  socket.to(`room:${userData.roomCode}`).emit('room:ownership_transferred', {
+                    newCreator: {
+                      id: newCreator.id,
+                      username: newCreator.username
+                    },
+                    roomCode: userData.roomCode,
+                    previousCreator: userData.username
+                  });
+                  
+                  logger.info(`Auto-transfer ownership of room ${userData.roomCode} from ${userData.username} to ${newCreator.username}`);
+                }
+              }
+              
+              // Emit updated room data to remaining members
+              const updatedRoom = await RoomModel.findByCode(userData.roomCode);
+              if (updatedRoom) {
+                socket.to(`room:${userData.roomCode}`).emit('room:updated', {
+                  room: updatedRoom
+                });
+              }
+              
+              logger.info(`Auto-removed disconnected user ${userData.username} from room ${userData.roomCode}`);
+            }
+          }
+        } catch (error) {
+          logger.error('Error during disconnect cleanup:', error);
+        }
       }
 
       logger.info(`Client disconnected: ${userData.username || 'Anonymous'}`, {
@@ -576,7 +658,19 @@ export class SocketService {
   // Public methods for emitting events from other services
 
   public emitToRoom(roomCode: string, event: string, data: any): void {
-    this.io.to(`room:${roomCode}`).emit(event, data);
+    const roomName = `room:${roomCode}`;
+    const room = this.io.sockets.adapter.rooms.get(roomName);
+    const socketCount = room ? room.size : 0;
+    
+    logger.info(`📡 emitToRoom: Sending ${event} to ${roomName} (${socketCount} sockets in room)`, {
+      service: 'gnarpuzzle-server',
+      roomCode,
+      event,
+      socketCount,
+      socketIds: room ? Array.from(room) : []
+    });
+    
+    this.io.to(roomName).emit(event, data);
   }
 
   public emitToGame(gameId: number, event: string, data: any): void {
@@ -593,20 +687,46 @@ export class SocketService {
 
   public joinRoom(userId: string, roomCode: string): void {
     // Find socket by user ID and join room
+    logger.info(`🚪 joinRoom called: userId=${userId}, roomCode=${roomCode}`, {
+      service: 'gnarpuzzle-server'
+    });
+    
+    let found = false;
     for (const [socketId, userData] of this.connectedUsers.entries()) {
+      logger.info(`   Checking socket ${socketId}: userId=${userData.userId}`, {
+        service: 'gnarpuzzle-server'
+      });
+      
       if (userData.userId?.toString() === userId) {
         const socket = this.io.sockets.sockets.get(socketId);
         if (socket) {
           socket.join(`room:${roomCode}`);
           this.connectedUsers.set(socketId, { ...userData, roomCode });
-          logger.info(`User ${userData.username} joined room ${roomCode} via API`, {
+          found = true;
+          logger.info(`✅ User ${userData.username} joined Socket.IO room room:${roomCode}`, {
             service: 'gnarpuzzle-server',
             userId: userData.userId,
+            socketId,
             roomCode
+          });
+        } else {
+          logger.warn(`⚠️ Socket not found for socketId ${socketId}`, {
+            service: 'gnarpuzzle-server'
           });
         }
         break;
       }
+    }
+    
+    if (!found) {
+      logger.warn(`⚠️ Could not find socket for userId ${userId} to join room ${roomCode}`, {
+        service: 'gnarpuzzle-server',
+        connectedUsers: Array.from(this.connectedUsers.entries()).map(([sid, data]) => ({
+          socketId: sid,
+          userId: data.userId,
+          username: data.username
+        }))
+      });
     }
   }
 
