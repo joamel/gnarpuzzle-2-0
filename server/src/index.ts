@@ -83,11 +83,9 @@ app.get('/api/health', (_req, res) => {
 // API Routes
 import { authRoutes } from './routes/auth';
 import { roomRoutes } from './routes/rooms';
-import { gameRoutes } from './routes/games';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
-app.use('/api/games', gameRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -116,7 +114,7 @@ app.use('*', (req, res) => {
 // Socket.IO connection handling
 // Socket.IO connection handling - now delegated to SocketService
 let socketService: SocketService;
-let roomCleanupService: RoomCleanupService;
+let roomCleanupService: RoomCleanupService | undefined;
 
 io.on('connection', (socket) => {
   logger.info(`Client connected: ${socket.id}`);
@@ -134,10 +132,10 @@ async function startServer() {
     socketService = new SocketService(io);
     logger.info('Socket.IO service initialized');
 
-    // Initialize and start room cleanup service
-    roomCleanupService = new RoomCleanupService();
-    roomCleanupService.start();
-    logger.info('Room cleanup service started');
+    // Initialize and start room cleanup service (temporarily disabled for testing)
+    // roomCleanupService = new RoomCleanupService();
+    // roomCleanupService.start();
+    // logger.info('Room cleanup service started');
 
     // Start server
     server.listen(PORT, () => {
@@ -160,7 +158,7 @@ process.on('SIGTERM', async () => {
   server.close(async () => {
     try {
       // Stop room cleanup service
-      if (roomCleanupService) {
+      if (roomCleanupService && roomCleanupService.stop) {
         roomCleanupService.stop();
         logger.info('Room cleanup service stopped');
       }
@@ -182,7 +180,7 @@ process.on('SIGINT', async () => {
   server.close(async () => {
     try {
       // Stop room cleanup service
-      if (roomCleanupService) {
+      if (roomCleanupService && roomCleanupService.stop) {
         roomCleanupService.stop();
         logger.info('Room cleanup service stopped');
       }
