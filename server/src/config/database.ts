@@ -74,6 +74,7 @@ class SimpleDatabaseMock implements MockDatabase {
       };
       this.roomMembers.set(memberKey, memberData);
       console.log(`💾 Mock DB: Stored room member ${user_id} in room ${room_id}`);
+      console.log(`💾 Mock DB: Current room members:`, Array.from(this.roomMembers.entries()));
       return { lastInsertRowid: this.nextId++, changes: 1 };
     }
 
@@ -149,17 +150,27 @@ class SimpleDatabaseMock implements MockDatabase {
         query.toLowerCase().includes('join room_members rm')) {
       const roomId = params[0];
       console.log(`👥 Mock DB: Getting members for room ${roomId}`);
+      console.log(`👥 Mock DB: All room members in system:`, Array.from(this.roomMembers.entries()));
+      console.log(`👥 Mock DB: All users in system:`, Array.from(this.users.entries()));
       
       // Find all members for this room
       const memberUserIds = Array.from(this.roomMembers.values())
-        .filter(member => member.room_id === roomId)
+        .filter(member => {
+          const matches = member.room_id === roomId || member.room_id === Number(roomId);
+          console.log(`👥 Mock DB: Comparing member.room_id ${member.room_id} (${typeof member.room_id}) with ${roomId} (${typeof roomId}): ${matches}`);
+          return matches;
+        })
         .map(member => member.user_id);
         
-      console.log(`👥 Mock DB: Found member IDs: [${memberUserIds.join(', ')}]`);
+      console.log(`👥 Mock DB: Found member IDs for room ${roomId}: [${memberUserIds.join(', ')}]`);
       
       // Get user details for each member
       const members = memberUserIds.map(userId => {
-        const user = this.users.get(userId);
+        // Try both number and string versions of the ID
+        let user = this.users.get(userId);
+        if (!user) {
+          user = this.users.get(Number(userId));
+        }
         console.log(`👤 Mock DB: Looking up user ${userId}:`, user);
         return user;
       }).filter(user => user !== undefined);
