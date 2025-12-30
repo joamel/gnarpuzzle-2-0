@@ -16,6 +16,14 @@ export interface SocketEvents {
   }) => void;
   'room:left': (data: { room: any; user: any }) => void;
   'room:updated': (data: { room: any }) => void;
+  'room:member_left': (data: { 
+    user: { id: number; username: string }; 
+    roomCode: string;
+  }) => void;
+  'room:ownership_transferred': (data: { 
+    roomCode: string; 
+    newCreator: { id: number; username: string }; 
+  }) => void;
 
   // Game events
   'game:phase_changed': (data: { 
@@ -126,6 +134,26 @@ class SocketService {
       return;
     }
     this.socket.emit(event, data);
+  }
+
+  // Join a room for real-time updates
+  joinRoom(roomCode: string): void {
+    if (!this.socket?.connected) {
+      console.warn('⚠️ Socket not connected, cannot join room:', roomCode);
+      return;
+    }
+    console.log(`🚪 Joining Socket.IO room: ${roomCode}`);
+    this.socket.emit('room:join', { roomCode });
+  }
+
+  // Leave a room
+  leaveRoom(roomCode: string): void {
+    if (!this.socket?.connected) {
+      console.warn('⚠️ Socket not connected, cannot leave room:', roomCode);
+      return;
+    }
+    console.log(`🚪 Leaving Socket.IO room: ${roomCode}`);
+    this.socket.emit('room:leave', { roomCode });
   }
 
   on<K extends keyof SocketEvents>(event: K, listener: SocketEvents[K]): void {

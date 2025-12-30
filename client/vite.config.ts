@@ -43,10 +43,10 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    port: 3002,  // Byt port helt för att undvika cached WebSocket connections
     host: true,
     hmr: {
-      port: 5173,
+      port: 3003,  // Använd helt separat port för HMR
       host: 'localhost',
     },
   },

@@ -94,7 +94,16 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         isWarning: false,
       });
       
-      if (currentGame) {
+      // If we don't have a current game yet but get a phase change, create game object
+      if (!currentGame && data.gameId) {
+        setCurrentGame({
+          id: data.gameId,
+          roomId: currentRoom?.id || 0,
+          phase: data.phase,
+          currentTurn: data.current_turn || null,
+          status: 'active'
+        });
+      } else if (currentGame) {
         setCurrentGame(prev => prev ? { ...prev, phase: data.phase, currentTurn: data.current_turn || prev.currentTurn } : null);
       }
     };
@@ -140,35 +149,95 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       }
     };
 
+    const handleRoomMemberLeft = (data: any) => {
+      console.log(`🚪 Member left room: ${data.user.username}`);
+      
+      // Force refresh room data to get updated member list
+      if (currentRoom && currentRoom.code === data.roomCode) {
+        fetchRoomData(data.roomCode).catch(err => {
+          console.error('Failed to refresh room data after member left:', err);
+        });
+      }
+    };
+
+    const handleOwnershipTransferred = (data: any) => {
+      console.log(`👑 Room ownership transferred to: ${data.newCreator.username}`);
+      
+      // Update current room data
+      if (currentRoom && currentRoom.code === data.roomCode) {
+        setCurrentRoom(prev => prev ? { 
+          ...prev, 
+          created_by: data.newCreator.id 
+        } : null);
+      }
+    };
+
+    const handleRoomUpdated = (data: any) => {
+      console.log(`🔄 Room updated:`, data.room);
+      
+      // Update current room data
+      if (currentRoom && currentRoom.code === data.room.code) {
+        setCurrentRoom(data.room);
+      }
+    };
+
     // Register socket events
     socketService.on('game:phase_changed', handleGamePhaseChanged);
     socketService.on('letter:selected', handleLetterSelected);
     socketService.on('letter:placed', handleLetterPlaced);
     socketService.on('game:ended', handleGameEnded);
+    socketService.on('room:member_left', handleRoomMemberLeft);
+    socketService.on('room:ownership_transferred', handleOwnershipTransferred);
+    socketService.on('room:updated', handleRoomUpdated);
 
     return () => {
       socketService.off('game:phase_changed', handleGamePhaseChanged);
       socketService.off('letter:selected', handleLetterSelected);
       socketService.off('letter:placed', handleLetterPlaced);
       socketService.off('game:ended', handleGameEnded);
+      socketService.off('room:member_left', handleRoomMemberLeft);
+      socketService.off('room:ownership_transferred', handleOwnershipTransferred);
+      socketService.off('room:updated', handleRoomUpdated);
     };
   }, [currentGame, user?.id]);
 
   // Game actions
   const startGame = useCallback(async (roomId: number) => {
+    console.log('🎮 GameContext.startGame called with roomId:', roomId);
     try {
       setIsLoading(true);
       setError(null);
       
+      console.log('📡 Calling apiService.startGame...');
       const game = await apiService.startGame(roomId);
+      console.log('✅ Game started successfully:', game);
       setCurrentGame(game);
       
     } catch (err) {
+      console.error('❌ Error in startGame:', err);
+      console.error('Error details:', {
+        name: err instanceof Error ? err.name : 'Unknown',
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined
+      });
+      
       const message = err instanceof Error ? err.message : 'Failed to start game';
       setError(message);
       throw err;
     } finally {
       setIsLoading(false);
+      console.log('🏁 startGame finished, isLoading set to false');
+    }
+  }, []);
+
+  // Helper function to fetch room data
+  const fetchRoomData = useCallback(async (roomCode: string) => {
+    try {
+      const room = await apiService.getRoomByCode(roomCode);
+      return room;
+    } catch (err) {
+      console.error(`Failed to fetch room data for ${roomCode}:`, err);
+      throw err;
     }
   }, []);
 

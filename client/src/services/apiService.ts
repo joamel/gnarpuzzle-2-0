@@ -106,7 +106,18 @@ class ApiService {
 
   // Game endpoints
   async startGame(roomId: number): Promise<any> {
-    return this.request<any>(`/api/rooms/${roomId}/start`, { method: 'POST' });
+    console.log('🌐 ApiService.startGame called with roomId:', roomId);
+    const endpoint = `/api/rooms/${roomId}/start`;
+    console.log('📍 Making POST request to:', endpoint);
+    
+    try {
+      const result = await this.request<any>(endpoint, { method: 'POST' });
+      console.log('✅ ApiService.startGame success:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ ApiService.startGame failed:', error);
+      throw error;
+    }
   }
 
   async selectLetter(gameId: number, playerId: number, letter: string): Promise<any> {
