@@ -39,6 +39,7 @@ router.get('/:id', AuthService.authenticateToken, async (req, res) => {
         id: gameWithPlayers.id,
         room_id: gameWithPlayers.room_id,
         state: gameWithPlayers.state,
+        current_phase: gameWithPlayers.current_phase, // Add current_phase
         current_turn: gameWithPlayers.current_turn,
         turn_number: gameWithPlayers.turn_number,
         board_state: gameWithPlayers.board_state,
@@ -50,7 +51,11 @@ router.get('/:id', AuthService.authenticateToken, async (req, res) => {
           position: player.position,
           score: player.score,
           ready_to_start: player.ready_to_start,
-          words_found: player.words_found
+          words_found: player.words_found,
+          grid_state: player.grid_state,
+          current_letter: player.current_letter,
+          placement_confirmed: player.placement_confirmed,
+          final_score: player.final_score
         }))
       }
     });
@@ -214,6 +219,167 @@ router.get('/room/:roomId', AuthService.authenticateToken, async (req, res) => {
     res.status(500).json({
       error: 'Unable to fetch game',
       message: 'Internal server error'
+    });
+  }
+});
+
+/**
+ * POST /api/games/:id/select-letter
+ * Select letter for current player
+ * Requires authentication
+ */
+router.post('/:id/select-letter', AuthService.authenticateToken, async (req, res) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const gameId = parseInt(req.params.id);
+    const { letter } = req.body;
+
+    if (isNaN(gameId)) {
+      res.status(400).json({
+        error: 'Invalid game ID',
+        message: 'Game ID must be a number'
+      });
+      return;
+    }
+
+    if (!letter || typeof letter !== 'string') {
+      res.status(400).json({
+        error: 'Invalid letter',
+        message: 'Letter must be provided as a string'
+      });
+      return;
+    }
+
+    // Get GameStateService instance
+    const { GameStateService } = await import('../services/GameStateService');
+    const { getSocketService } = await import('../index');
+    const socketService = getSocketService();
+    
+    if (!socketService) {
+      throw new Error('Socket service not available');
+    }
+    
+    const gameStateService = GameStateService.getInstance(socketService);
+    
+    // Select letter
+    await gameStateService.selectLetter(gameId, authReq.user!.id, letter);
+
+    res.json({
+      success: true,
+      message: 'Letter selected successfully',
+      letter: letter
+    });
+
+  } catch (error) {
+    logger.error('Select letter error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to select letter';
+    res.status(400).json({
+      error: 'Unable to select letter',
+      message: message
+    });
+  }
+});
+
+/**
+ * POST /api/games/:id/place-letter
+ * Place letter on grid
+ * Requires authentication
+ */
+router.post('/:id/place-letter', AuthService.authenticateToken, async (req, res) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const gameId = parseInt(req.params.id);
+    const { x, y } = req.body;
+
+    if (isNaN(gameId)) {
+      res.status(400).json({
+        error: 'Invalid game ID',
+        message: 'Game ID must be a number'
+      });
+      return;
+    }
+
+    if (typeof x !== 'number' || typeof y !== 'number') {
+      res.status(400).json({
+        error: 'Invalid coordinates',
+        message: 'x and y must be numbers'
+      });
+      return;
+    }
+
+    // Get GameStateService instance
+    const { GameStateService } = await import('../services/GameStateService');
+    const { getSocketService } = await import('../index');
+    const socketService = getSocketService();
+    
+    if (!socketService) {
+      throw new Error('Socket service not available');
+    }
+    
+    const gameStateService = GameStateService.getInstance(socketService);
+    
+    // Place letter
+    await gameStateService.placeLetter(gameId, authReq.user!.id, x, y);
+
+    res.json({
+      success: true,
+      message: 'Letter placed successfully',
+      coordinates: { x, y }
+    });
+
+  } catch (error) {
+    logger.error('Place letter error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to place letter';
+    res.status(400).json({
+      error: 'Unable to place letter',
+      message: message
+    });
+  }
+});
+
+/**
+ * POST /api/games/:id/confirm-placement
+ * Confirm letter placement
+ * Requires authentication
+ */
+router.post('/:id/confirm-placement', AuthService.authenticateToken, async (req, res) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const gameId = parseInt(req.params.id);
+
+    if (isNaN(gameId)) {
+      res.status(400).json({
+        error: 'Invalid game ID',
+        message: 'Game ID must be a number'
+      });
+      return;
+    }
+
+    // Get GameStateService instance
+    const { GameStateService } = await import('../services/GameStateService');
+    const { getSocketService } = await import('../index');
+    const socketService = getSocketService();
+    
+    if (!socketService) {
+      throw new Error('Socket service not available');
+    }
+    
+    const gameStateService = GameStateService.getInstance(socketService);
+    
+    // Confirm placement
+    await gameStateService.confirmPlacement(gameId, authReq.user!.id);
+
+    res.json({
+      success: true,
+      message: 'Placement confirmed successfully'
+    });
+
+  } catch (error) {
+    logger.error('Confirm placement error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to confirm placement';
+    res.status(400).json({
+      error: 'Unable to confirm placement',
+      message: message
     });
   }
 });

@@ -93,8 +93,8 @@ router.post('/', AuthService.authenticateToken, async (req, res) => {
       settings: {
         max_players,
         grid_size: board_size,
-        placement_timer: turn_duration || 15, // Default 15 seconds if not provided
-        letter_timer: 10,
+        placement_timer: turn_duration || 30, // Increased from 15 to 30 seconds
+        letter_timer: 20,  // Increased from 10 to 20 seconds
         is_private: false
       }
     });
@@ -525,6 +525,16 @@ router.post('/:id/start', AuthService.authenticateToken, async (req, res) => {
 
     // Update room status to playing
     await RoomModel.updateStatus(roomId, 'playing');
+
+    // Notify all room members that the game has started
+    socketService.broadcastToRoom(`room:${room.code}`, 'game:started', {
+      gameId: game.id,
+      roomId: roomId,
+      phase: game.current_phase,
+      currentTurn: game.current_turn,
+      timer_end: game.phase_timer_end,
+      message: 'Game has started!'
+    });
 
     logger.info(`Game started for room ${roomId} by user ${authReq.user!.username}`, {
       gameId: game.id,
