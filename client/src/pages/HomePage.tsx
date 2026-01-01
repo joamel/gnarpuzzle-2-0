@@ -20,7 +20,7 @@ const HomePage: React.FC = () => {
   const [error, setError] = useState('');
   const [roomName, setRoomName] = useState('');
   const [maxPlayers, setMaxPlayers] = useState(4);
-  const [boardSize, setBoardSize] = useState(4);
+  const [boardSize, setBoardSize] = useState(5); // Match server default
 
   // Load available rooms
   const loadRooms = async () => {
@@ -218,8 +218,8 @@ const HomePage: React.FC = () => {
                         </span>
                       </div>
                       <div className="flex items-center gap-4 text-xs text-gray-400">
-                        <span>👥 {room.member_count || 0}/{room.max_players || 4}</span>
-                        <span>📏 {room.board_size || 4}×{room.board_size || 4}</span>
+                        <span>👥 {room.member_count || 0}/{room.max_players || 6}</span>
+                        <span>📏 {room.board_size || 5}×{room.board_size || 5}</span>
                       </div>
                     </div>
                     <button

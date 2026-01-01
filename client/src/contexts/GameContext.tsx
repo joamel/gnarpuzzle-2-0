@@ -61,7 +61,14 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   const [leaderboard, setLeaderboard] = useState<Leaderboard[] | null>(null);
 
   const currentPlayer = players.find(p => p.userId === user?.id) || null;
-  const isMyTurn = currentGame?.currentTurn === currentPlayer?.position;
+  
+  // Enhanced turn calculation with better debugging
+  const currentTurnNum = currentGame?.currentTurn ? Number(currentGame.currentTurn) : 0;
+  const playerPosNum = currentPlayer?.position ? Number(currentPlayer.position) : 0;
+  const isMyTurn = currentTurnNum === playerPosNum && currentTurnNum > 0;
+
+  // Only log turn issues when there's an actual problem
+  // Removed excessive debug logging for cleaner console
 
   // Timer management
   useEffect(() => {
@@ -88,6 +95,12 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
 
     const handleGamePhaseChanged = (data: any) => {
       setGamePhase(data.phase);
+      
+      // Clear selected letter when starting new letter selection phase
+      if (data.phase === 'letter_selection') {
+        setSelectedLetter(null);
+      }
+      
       setGameTimer({
         endTime: data.timer_end,
         remainingSeconds: Math.ceil((data.timer_end - Date.now()) / 1000),
@@ -104,14 +117,22 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
           status: 'active'
         });
       } else if (currentGame) {
-        setCurrentGame(prev => prev ? { ...prev, phase: data.phase, currentTurn: data.current_turn || prev.currentTurn } : null);
+        setCurrentGame(prev => {
+          if (!prev) return null;
+          const updatedGame = { 
+            ...prev, 
+            phase: data.phase, 
+            currentTurn: data.current_turn !== undefined ? data.current_turn : prev.currentTurn 
+          };
+          // Game state updated
+          return updatedGame;
+        });
       }
     };
 
     const handleLetterSelected = (data: any) => {
-      if (data.playerId === user?.id) {
-        setSelectedLetter(data.letter);
-      }
+      // All players should get the selected letter to place on their own grids
+      setSelectedLetter(data.letter);
       
       // Update player state
       setPlayers(prev => prev.map(p => 
@@ -146,6 +167,218 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       
       if (currentGame) {
         setCurrentGame(prev => prev ? { ...prev, status: 'completed' } : null);
+      }
+    };
+
+    const handleGameStarted = (data: any) => {
+      // console.log('🎮 Game started event received:', data);
+      // console.log('📡 Socket data phase:', data.phase, 'gameId:', data.gameId);
+      
+      // Join the game socket room for receiving game events
+      if (data.gameId) {
+        console.log('🚪 Joining game socket room:', data.gameId);
+        socketService.joinGame(data.gameId);
+      }
+      
+      // Create game state from the event data
+      const gameState = {
+        id: data.gameId,
+        roomId: data.roomId,
+        phase: data.phase,
+        currentTurn: data.currentTurn || 1, // Use socket data, fallback to 1
+        status: 'active' as const
+      };
+      
+      setCurrentGame(gameState);
+      setGamePhase(data.phase as GamePhase);
+      console.log('✅ Set gamePhase from socket to:', data.phase);
+      
+      // Update room status to playing
+      if (currentRoom) {
+        setCurrentRoom({
+          ...currentRoom,
+          status: 'playing'
+        });
+      }
+      
+      // Set timer if provided
+      if (data.timer_end) {
+        setGameTimer({
+          endTime: data.timer_end,
+          remainingSeconds: Math.ceil((data.timer_end - Date.now()) / 1000),
+          isWarning: false,
+        });
+      }
+      
+      console.log('🎮 Game started, fetching current game state...');
+      
+      // Fetch current game state to get accurate phase and player data
+      if (data.gameId) {
+        console.log('🔄 Fetching game data for gameId:', data.gameId);
+        
+        apiService.getGame(data.gameId).then(gameData => {
+          console.log('🎮 Fetched current game data:', gameData);
+          
+          if (gameData && gameData.game) {
+            const game = gameData.game;
+            console.log('🔍 API game object:', game);
+            console.log('🔍 API game.current_phase:', game.current_phase);
+            console.log('🔍 API game keys:', Object.keys(game));
+            console.log('✅ Setting game phase to:', game.current_phase);
+            
+            // Only update gamePhase if API has valid phase, otherwise keep socket phase
+            if (game.current_phase) {
+              setGamePhase(game.current_phase as GamePhase);
+            } else {
+              console.log('⚠️ API has no current_phase, keeping socket phase:', data.phase);
+            }
+            
+            setCurrentGame({
+              id: game.id,
+              roomId: game.room_id,
+              phase: game.current_phase || data.phase, // Fallback to socket phase
+              currentTurn: game.current_turn,
+              status: 'active'
+            });
+            
+            console.log('🎯 Setting currentGame with turn data:', {
+              gameId: game.id,
+              currentTurn: game.current_turn,
+              currentTurnType: typeof game.current_turn
+            });
+            
+            // Set players from game data
+            if (game.players) {
+              try {
+                console.log('🔄 Processing players from game data:', game.players.length);
+                
+                const mappedPlayers = game.players.map((p: any, index: number) => {
+                  console.log(`🎯 Processing player ${index + 1}:`, {
+                    id: p.id,
+                    user_id: p.user_id,
+                    position: p.position,
+                    username: p.username,
+                    grid_state_type: typeof p.grid_state,
+                    grid_state_sample: typeof p.grid_state === 'string' 
+                      ? p.grid_state.substring(0, 100) + '...' 
+                      : p.grid_state ? 'parsed object' : 'null'
+                  });
+                  
+                  let parsedGrid;
+                  try {
+                    // Handle case where grid_state might already be parsed
+                    if (typeof p.grid_state === 'string') {
+                      parsedGrid = JSON.parse(p.grid_state || '[[]]');
+                    } else if (p.grid_state && Array.isArray(p.grid_state)) {
+                      parsedGrid = p.grid_state;
+                    } else {
+                      throw new Error('Invalid grid_state format');
+                    }
+                  } catch (parseError) {
+                    console.warn(`⚠️ Failed to parse grid_state for player ${p.user_id}:`, (parseError as Error).message);
+                    console.warn(`Grid state content:`, p.grid_state);
+                    // Create default grid based on room settings
+                    const gridSize = currentRoom?.board_size || 5;
+                    parsedGrid = Array(gridSize).fill(null).map((_, y) => 
+                      Array(gridSize).fill(null).map((_, x) => ({
+                        letter: null,
+                        x: x,
+                        y: y
+                      }))
+                    );
+                  }
+                  
+                  return {
+                    id: p.id,
+                    userId: p.user_id,
+                    gameId: game.id,
+                    position: p.position,
+                    username: p.username,
+                    grid: parsedGrid,
+                    currentLetter: p.current_letter || undefined,
+                    placementConfirmed: p.placement_confirmed === 1,
+                    finalScore: p.final_score || 0,
+                    connected: true
+                  };
+                });
+                
+                console.log('✅ Successfully mapped players:', mappedPlayers.length);
+                setPlayers(mappedPlayers);
+                
+                console.log('👥 Setting players with position data:', 
+                  mappedPlayers.map((p: Player) => ({ 
+                    userId: p.userId, 
+                    username: p.username, 
+                    position: p.position, 
+                    positionType: typeof p.position 
+                  }))
+                );
+                
+                // Set selectedLetter for current user if they have a current letter
+                if (user) {
+                  const currentPlayer = mappedPlayers.find((p: any) => p.userId === user.id);
+                  if (currentPlayer?.currentLetter) {
+                    console.log('Setting selectedLetter from game state:', currentPlayer.currentLetter);
+                    setSelectedLetter(currentPlayer.currentLetter);
+                  }
+                }
+              } catch (mappingError) {
+                console.error('❌ Error during player mapping:', mappingError);
+                console.log('🔄 Trying fallback - setting mock player data');
+                
+                // Fallback: Set basic game phase from socket data
+                if (data.phase) {
+                  setGamePhase(data.phase as GamePhase);
+                  setCurrentGame({
+                    id: data.gameId,
+                    roomId: data.roomId,
+                    phase: data.phase,
+                    currentTurn: data.currentTurn || 1,
+                    status: 'active'
+                  });
+                }
+              }
+            }
+          }
+        }).catch(err => {
+          console.error('❌ Failed to fetch game state:', err);
+          console.log('🔄 Trying fallback - setting basic game phase');
+          
+          // Fallback: Set basic game phase from socket data
+          if (data.phase) {
+            console.log('📡 Setting game phase from socket data:', data.phase);
+            setGamePhase(data.phase as GamePhase);
+            setCurrentGame({
+              id: data.gameId,
+              roomId: data.roomId,
+              phase: data.phase,
+              currentTurn: data.currentTurn || 1,
+              status: 'active'
+            });
+          }
+          
+          // Fallback: Create minimal mock player data
+          if (user) {
+            const gridSize = currentRoom?.board_size || 5; // Use room settings or default
+            const mockPlayer: Player = {
+              id: user.id,
+              userId: user.id,
+              gameId: data.gameId,
+              position: 1, // Will be updated when real player data arrives
+              username: user.username,
+              grid: Array(gridSize).fill(null).map((_, y) => Array(gridSize).fill(null).map((_, x) => ({
+                letter: null,
+                x: x,
+                y: y
+              }))),
+              currentLetter: undefined,
+              placementConfirmed: false,
+              finalScore: 0,
+              connected: true
+            };
+            setPlayers([mockPlayer]);
+          }
+        });
       }
     };
 
@@ -186,6 +419,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     socketService.on('letter:selected', handleLetterSelected);
     socketService.on('letter:placed', handleLetterPlaced);
     socketService.on('game:ended', handleGameEnded);
+    socketService.on('game:started', handleGameStarted);
     socketService.on('room:member_left', handleRoomMemberLeft);
     socketService.on('room:ownership_transferred', handleOwnershipTransferred);
     socketService.on('room:updated', handleRoomUpdated);
@@ -195,15 +429,19 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       socketService.off('letter:selected', handleLetterSelected);
       socketService.off('letter:placed', handleLetterPlaced);
       socketService.off('game:ended', handleGameEnded);
+      socketService.off('game:started', handleGameStarted);
       socketService.off('room:member_left', handleRoomMemberLeft);
       socketService.off('room:ownership_transferred', handleOwnershipTransferred);
       socketService.off('room:updated', handleRoomUpdated);
     };
-  }, [currentGame, user?.id]);
+  }, [currentGame, currentRoom, user, players.length]);
 
   // Game actions
   const startGame = useCallback(async (roomId: number) => {
     console.log('🎮 GameContext.startGame called with roomId:', roomId);
+    console.log('🎮 Type of roomId:', typeof roomId);
+    console.log('🎮 Current room from state:', currentRoom);
+    console.log('🎮 Current room ID from state:', currentRoom?.id);
     try {
       setIsLoading(true);
       setError(null);
@@ -211,7 +449,56 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       console.log('📡 Calling apiService.startGame...');
       const game = await apiService.startGame(roomId);
       console.log('✅ Game started successfully:', game);
+      console.log('🎮 Game object structure:', {
+        game,
+        gameKeys: game ? Object.keys(game) : 'no game',
+        gamePhase: game?.phase,
+        gameId: game?.id
+      });
       setCurrentGame(game);
+      console.log('🎮 setCurrentGame called with:', game);
+      
+      // Set game phase directly from API response
+      if (game?.phase) {
+        console.log('🎯 Setting gamePhase to:', game.phase);
+        setGamePhase(game.phase as GamePhase);
+      }
+      
+      // Update room status to 'playing' after successful game start
+      if (currentRoom) {
+        console.log('🏠 Updating room status to playing');
+        setCurrentRoom({
+          ...currentRoom,
+          status: 'playing'
+        });
+      }
+      
+      // TODO: Load players data for the new game
+      // For now, we'll rely on Socket events to populate players
+      console.log('🎮 Game started successfully, waiting for player data...');
+      
+      // TEMPORARY: Create mock player data so GameInterface can render
+      if (user && game?.id) {
+        const gridSize = currentRoom?.board_size || 5; // Use room settings or default
+        const mockPlayer: Player = {
+          id: user.id,
+          userId: user.id,
+          gameId: game.id,
+          position: 1, // Will be updated when real player data arrives
+          username: user.username,
+          grid: Array(gridSize).fill(null).map((_, y) => Array(gridSize).fill(null).map((_, x) => ({
+            letter: null,
+            x: x,
+            y: y
+          }))),
+          currentLetter: undefined,
+          placementConfirmed: false,
+          finalScore: 0,
+          connected: true
+        };
+        console.log('🎮 Setting mock player data:', mockPlayer);
+        setPlayers([mockPlayer]);
+      }
       
     } catch (err) {
       console.error('❌ Error in startGame:', err);
@@ -228,7 +515,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       setIsLoading(false);
       console.log('🏁 startGame finished, isLoading set to false');
     }
-  }, []);
+  }, [currentRoom, user]);
 
   // Helper function to fetch room data
   const fetchRoomData = useCallback(async (roomCode: string) => {
@@ -242,19 +529,48 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   }, []);
 
   const selectLetter = useCallback(async (letter: string) => {
+    console.log('🎯 selectLetter called with:', {
+      letter,
+      currentGame: currentGame ? { id: currentGame.id, currentTurn: currentGame.currentTurn } : null,
+      currentPlayer: currentPlayer ? { userId: currentPlayer.userId, username: currentPlayer.username, position: currentPlayer.position } : null,
+      isMyTurn,
+      gamePhase
+    });
+
     if (!currentGame || !currentPlayer) {
+      console.error('❌ selectLetter failed - missing game or player:', {
+        hasCurrentGame: !!currentGame,
+        hasCurrentPlayer: !!currentPlayer,
+        playersLength: players.length,
+        userId: user?.id
+      });
       throw new Error('No active game or player');
     }
 
+    // Check if it's the player's turn
+    if (!isMyTurn) {
+      console.error('❌ selectLetter failed - not player turn:', {
+        currentTurn: currentGame.currentTurn,
+        currentTurnType: typeof currentGame.currentTurn,
+        playerPosition: currentPlayer.position,
+        playerPositionType: typeof currentPlayer.position,
+        isMyTurnCalculation: `${Number(currentGame.currentTurn)} === ${Number(currentPlayer.position)} = ${Number(currentGame.currentTurn) === Number(currentPlayer.position)}`
+      });
+      throw new Error('It is not your turn to select a letter');
+    }
+
     try {
+      console.log('📡 Calling apiService.selectLetter...');
       await apiService.selectLetter(currentGame.id, currentPlayer.userId, letter);
+      console.log('✅ apiService.selectLetter completed successfully');
       setSelectedLetter(letter);
+      console.log('✅ setSelectedLetter called with:', letter);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to select letter';
       setError(message);
       throw err;
     }
-  }, [currentGame, currentPlayer]);
+  }, [currentGame, currentPlayer, isMyTurn]);
 
   const placeLetter = useCallback(async (x: number, y: number) => {
     if (!currentGame || !currentPlayer || !selectedLetter) {
@@ -298,7 +614,11 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       setIsLoading(true);
       setError(null);
       
+      console.log('🏠 GameContext.joinRoom called with code:', code);
       const room = await apiService.joinRoom(code);
+      console.log('🏠 GameContext.joinRoom received room data:', room);
+      console.log('🏠 Room ID from server:', room.id);
+      console.log('🏠 Room object keys:', Object.keys(room));
       setCurrentRoom(room);
       
       return room;

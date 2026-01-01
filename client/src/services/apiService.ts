@@ -1,5 +1,15 @@
 const API_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
 
+interface GameData {
+  id: number;
+  room_id: number;
+  status: string;
+  board: any;
+  current_turn: number;
+  created_at: string;
+  updated_at: string;
+}
+
 class ApiService {
   private baseUrl: string;
   private token: string | null = null;
@@ -66,7 +76,9 @@ class ApiService {
   }
 
   async getCurrentUser(): Promise<any> {
-    return this.request<any>('/api/auth/me');
+    const response = await this.request<{ success: boolean; user: any }>('/api/auth/me');
+    // Backend returns { success: true, user: { id, username } }
+    return response.user || response;
   }
 
   // Room endpoints
@@ -106,13 +118,13 @@ class ApiService {
 
   // Game endpoints
   async startGame(roomId: number): Promise<any> {
-    console.log('🌐 ApiService.startGame called with roomId:', roomId);
+    // console.log('🌐 ApiService.startGame called with roomId:', roomId);
     const endpoint = `/api/rooms/${roomId}/start`;
-    console.log('📍 Making POST request to:', endpoint);
+    // console.log('📍 Making POST request to:', endpoint);
     
     try {
-      const result = await this.request<any>(endpoint, { method: 'POST' });
-      console.log('✅ ApiService.startGame success:', result);
+      const result = await this.request<GameData>(endpoint, { method: 'POST' });
+      // console.log('✅ ApiService.startGame success:', result);
       return result;
     } catch (error) {
       console.error('❌ ApiService.startGame failed:', error);
@@ -147,6 +159,10 @@ class ApiService {
 
   async getAllPlayerScores(gameId: number): Promise<{ scores: any }> {
     return this.request<{ scores: any }>(`/api/games/${gameId}/scores`);
+  }
+
+  async getGame(gameId: number): Promise<any> {
+    return this.request<any>(`/api/games/${gameId}`);
   }
 }
 

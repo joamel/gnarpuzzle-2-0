@@ -12,10 +12,25 @@ const GamePage: React.FC = () => {
   const [gameStarted, setGameStarted] = useState(false);
 
   useEffect(() => {
+    console.log('🎮 GamePage useEffect triggered:', {
+      currentGame: !!currentGame,
+      gamePhase,
+      currentGameStarted: gameStarted,
+      roomStatus: currentRoom?.status,
+      shouldStartGame: currentGame && (gamePhase === 'letter_selection' || gamePhase === 'letter_placement')
+    });
+    
     if (currentGame && (gamePhase === 'letter_selection' || gamePhase === 'letter_placement')) {
+      console.log('🎮 Setting gameStarted to true!');
       setGameStarted(true);
     }
-  }, [currentGame, gamePhase]);
+    
+    // If room status is "playing", show game interface even without currentGame
+    if (currentRoom?.status === 'playing') {
+      console.log('🎮 Room status is playing - setting gameStarted to true!');
+      setGameStarted(true);
+    }
+  }, [currentGame, gamePhase, currentRoom?.status]);
 
   const handleStartGame = () => {
     setGameStarted(true);
@@ -24,6 +39,17 @@ const GamePage: React.FC = () => {
   const handleBackToLobby = () => {
     setGameStarted(false);
   };
+
+  console.log('🎮 GamePage render decision:', {
+    currentRoom: !!currentRoom,
+    currentGame: !!currentGame, 
+    gamePhase,
+    gameStarted,
+    leaderboard: !!leaderboard,
+    willShowLeaderboard: gamePhase === 'finished' && leaderboard,
+    willShowGame: gameStarted && currentGame,
+    willShowLobby: true // fallback
+  });
 
   if (!currentRoom) {
     return (

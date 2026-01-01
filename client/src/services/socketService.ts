@@ -26,6 +26,13 @@ export interface SocketEvents {
   }) => void;
 
   // Game events
+  'game:started': (data: {
+    gameId: number;
+    roomId: number;
+    phase: 'letter_selection' | 'letter_placement';
+    timer_end?: number;
+    message: string;
+  }) => void;
   'game:phase_changed': (data: { 
     gameId: number; 
     phase: 'letter_selection' | 'letter_placement'; 
@@ -154,6 +161,16 @@ class SocketService {
     }
     console.log(`🚪 Leaving Socket.IO room: ${roomCode}`);
     this.socket.emit('room:leave', { roomCode });
+  }
+
+  // Join a game for real-time updates
+  joinGame(gameId: number): void {
+    if (!this.socket?.connected) {
+      console.warn('⚠️ Socket not connected, cannot join game:', gameId);
+      return;
+    }
+    console.log(`🎮 Joining Socket.IO game: ${gameId}`);
+    this.socket.emit('game:join', { gameId });
   }
 
   on<K extends keyof SocketEvents>(event: K, listener: SocketEvents[K]): void {
