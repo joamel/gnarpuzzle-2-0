@@ -20,7 +20,7 @@
     "build:client": "npm run build --workspace=client",
     "test": "npm run test:server && npm run test:client",
     "test:server": "npm run test --workspace=server",
-    "test:client": "npm run test --workspace=client", 
+    "test:client": "npm run test --workspace=client",
     "test:watch": "concurrently \"npm run test:watch --workspace=server\" \"npm run test:watch --workspace=client\"",
     "test:coverage": "npm run test:coverage --workspace=server && npm run test:coverage --workspace=client",
     "db:setup": "npm run db:setup --workspace=server",
@@ -50,5 +50,9 @@
     "websocket",
     "typescript",
     "word-game"
-  ]
+  ],
+  "dependencies": {
+    "node-fetch": "^3.3.2",
+    "playwright": "^1.57.0"
+  }
 }
