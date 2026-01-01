@@ -1,26 +1,25 @@
 # GnarPuzzle - Mobile-First Utvecklingschecklista
 
-## 🚀 Current Status: **Phase 5.0 Multiplayer Stability & Code Quality - COMPLETE** 🎉
+## 🚀 Current Status: **Phase 5.0 Core Game Logic & Turn System - COMPLETE** 🎉
 
-**✅ Completed**: Multiplayer timer race condition fixes and console cleanup  
-**🔄 Current Focus**: Production-ready multiplayer game state management  
+**✅ Completed**: Core multiplayer gameplay with turn-based logic  
+**🔄 Current Focus**: Game end conditions and leaderboard system  
 **📍 Status**: 
-- **Timer Race Conditions**: ✅ COMPLETE - Fixed auto-selection conflicts with manual selection
-- **Console Logging Cleanup**: ✅ COMPLETE - Removed excessive debug output for cleaner development
-- **Multiplayer Synchronization**: ✅ COMPLETE - All players properly receive selected letters
-- **Place Letter Bug**: ✅ COMPLETE - Fixed 400 Bad Request errors for non-selecting players
-- **Code Quality**: ✅ COMPLETE - Removed debug UI and commented code for production readiness
+- **Turn System**: ✅ COMPLETE - User ID based turn logic working correctly
+- **Game Starting**: ✅ COMPLETE - FOREIGN KEY constraints resolved
+- **Letter Selection**: ✅ COMPLETE - Multiplayer turn validation working
+- **Game State Management**: ✅ COMPLETE - Real-time updates via Socket.IO
+- **Frontend-Backend Sync**: ✅ COMPLETE - Turn logic synchronized
+- **Mobile Touch Events**: ✅ COMPLETE - Passive event listener warnings fixed
 
 **🎯 Phase 5.0 Recent Achievements**:
-- ✅ Fixed critical timer race conditions in GameStateService
-- ✅ Implemented proper timer management with activeTimers Map and clearGameTimer method
-- ✅ Fixed selectLetter to update ALL players with current_letter for proper placement
-- ✅ Enhanced timeout handlers with fromTimeout parameter to prevent recursion
-- ✅ Increased timer durations (20s letter selection, 30s placement) for better UX
-- ✅ Cleaned up excessive console logging across frontend and backend
-- ✅ Removed debug UI components and buttons from RoomLobby
-- ✅ Enhanced turn validation with better error messages
-- ✅ Cleaned commented code and production-ready codebase
+- ✅ Fixed FOREIGN KEY constraint issues in game creation
+- ✅ Implemented user_id based turn system (replaced position-based)
+- ✅ Synchronized frontend turn logic with backend changes
+- ✅ Fixed premature game ending bug (grid_state vs board_state column)
+- ✅ Resolved passive event listener warnings on mobile
+- ✅ Complete multiplayer functionality working end-to-end
+- ✅ Real-time turn updates working correctly between players
 
 ---
 
@@ -73,34 +72,6 @@
   - [ ] Grace period för automatisk återanslutning
   - [ ] Endast permanent removal efter timeout eller explicit leave
 
-### 🧹 Console Logging Cleanup LÖST ✅
-- **Problem**: Excessive debug logging fyllde konsolen med spam under utveckling
-- **Lösning**: 
-  - ✅ Tagit bort debug logging från GameStateService (selectLetter, phase changes)
-  - ✅ Rensat excessive logging i GameContext (turn calculations, socket events)
-  - ✅ Kommenterat ut debug output i RoomLobby och ApiService
-  - ✅ Behållit endast error logging och viktiga status updates
-  - ✅ Producerat clean console output för bättre utvecklarupplevelse
-  - ✅ Tagit bort debug UI komponenter (Force Refresh buttons, Debug Info)
-
-### 🎮 Multiplayer Timer Race Conditions LÖST ✅
-- **Problem**: Bokstäver bytte automatiskt C→D→E, spel hoppade till nytt bokstavsval för tidigt
-- **Lösning**:
-  - ✅ Implementerat activeTimers Map för proper timer management
-  - ✅ Lagt till clearGameTimer() method för att rensa timers när manuell selection görs
-  - ✅ Enhanced selectLetter med fromTimeout parameter för att undvika recursion
-  - ✅ Förbättrade timeout handlers med bättre validation och logging
-  - ✅ Ökade timer durations till 20s (letter) och 30s (placement) för bättre UX
-  - ✅ Fixade race conditions där multiple timeouts körde samtidigt
-
-### 🔧 Place Letter 400 Bad Request LÖST ✅
-- **Problem**: "Unable to place letter" error för spelare som inte valde bokstaven
-- **Lösning**:
-  - ✅ selectLetter uppdaterar nu ALLA spelare med current_letter
-  - ✅ Alla spelare kan nu placera samma bokstav som valts
-  - ✅ Fixade database update för både games och players tabeller
-  - ✅ Eliminerat "försvinnande bokstäver" för andra spelare
-
 ### 🧹 Start Game Duplicering LÖST ✅
 - **Problem**: Duplicerade start game implementationer (gameRoutes.ts vs rooms.ts)
 - **Lösning**: 
@@ -111,6 +82,18 @@
   - ✅ Aktiverat rooms.integration.test.ts med 6 nya start game-tester
   - ✅ Alla TypeScript compilation-fel lösta
   - ✅ Produktionsklar kod utan teknisk skuld
+
+### 🎮 Core Game Logic COMPLETE ✅ 
+- **Problem**: Game starting, turn logic och game state management
+- **Lösning**:
+  - ✅ Fixed FOREIGN KEY constraints in GameStateService.startGame()
+  - ✅ Implemented user_id based current_turn system
+  - ✅ Updated getCurrentPlayer() to use user_id instead of position
+  - ✅ Fixed advanceToNextTurn() to properly handle user_id rotation
+  - ✅ Synchronized frontend turn calculation (GameContext.tsx)
+  - ✅ Fixed premature game ending bug (isGameFinished column mismatch)
+  - ✅ Removed passive event listener preventDefault() warnings
+  - ✅ Complete end-to-end multiplayer gameplay working
 
 ### 🎮 "Starta Spel"-knappen FUNGERAR ✅ 
 - **Problem**: Knappen fungerade inte på grund av type-coercion och duplicerade implementationer

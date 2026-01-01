@@ -1,14 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+import { Game } from '../../../shared/types.js';
 
-interface GameData {
-  id: number;
-  room_id: number;
-  status: string;
-  board: any;
-  current_turn: number;
-  created_at: string;
-  updated_at: string;
-}
+const API_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
 
 class ApiService {
   private baseUrl: string;
@@ -117,13 +109,13 @@ class ApiService {
   }
 
   // Game endpoints
-  async startGame(roomId: number): Promise<any> {
-    // console.log('🌐 ApiService.startGame called with roomId:', roomId);
+  async startGame(roomId: number): Promise<Game> {
+    console.log('🌐 ApiService.startGame called with roomId:', roomId);
     const endpoint = `/api/rooms/${roomId}/start`;
-    // console.log('📍 Making POST request to:', endpoint);
+    console.log('📍 Making POST request to:', endpoint);
     
     try {
-      const result = await this.request<GameData>(endpoint, { method: 'POST' });
+      const result = await this.request<Game>(endpoint, { method: 'POST' });
       // console.log('✅ ApiService.startGame success:', result);
       return result;
     } catch (error) {
