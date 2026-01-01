@@ -16,8 +16,8 @@ export class RoomModel {
     const defaultSettings: RoomSettings = {
       grid_size: 5,
       max_players: 6,
-      letter_timer: 10,
-      placement_timer: 15,
+      letter_timer: 20,  // Increased from 10 to 20 seconds
+      placement_timer: 30,  // Increased from 15 to 30 seconds
       is_private: false
     };
     
@@ -131,6 +131,27 @@ export class RoomModel {
       DELETE FROM room_members 
       WHERE room_id = ? AND user_id = ?
     `, roomId, userId);
+    
+    if (result.changes > 0) {
+      // Check if room is now empty and reset status to waiting if needed
+      const memberCount = await this.getMemberCount(roomId);
+      
+      if (memberCount === 0) {
+        console.log(`🔄 Room ${roomId} is now empty, resetting to waiting status...`);
+        
+        // Delete any ongoing games for this room
+        try {
+          await db.run('DELETE FROM players WHERE game_id IN (SELECT id FROM games WHERE room_id = ?)', roomId);
+          await db.run('DELETE FROM games WHERE room_id = ?', roomId);
+        } catch (error) {
+          console.warn('⚠️ Failed to clean up games for empty room:', error);
+        }
+        
+        // Reset room status to waiting
+        await db.run('UPDATE rooms SET status = ? WHERE id = ?', 'waiting', roomId);
+        console.log(`✅ Room ${roomId} reset to waiting status (empty room)`);
+      }
+    }
     
     return result.changes > 0;
   }
@@ -299,8 +320,8 @@ export class RoomModel {
       const defaultSettings: RoomSettings = {
         grid_size: room.board_size || 5,
         max_players: room.max_players || 6,
-        letter_timer: 10,
-        placement_timer: room.turn_duration || 15,
+        letter_timer: 20,  // Increased for better UX
+        placement_timer: room.turn_duration || 30,  // Increased from 15 to 30
         is_private: false
       };
       

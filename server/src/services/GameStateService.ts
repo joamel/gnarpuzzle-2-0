@@ -7,6 +7,8 @@ export class GameStateService {
   private static instance: GameStateService;
   private socketService: SocketService;
   private wordValidationService: WordValidationService;
+  private activeTimers: Map<number, NodeJS.Timeout> = new Map();
+  private gameStateLog: Map<number, string[]> = new Map();
 
   private constructor(socketService: SocketService) {
     this.socketService = socketService;
@@ -101,26 +103,42 @@ export class GameStateService {
       current_turn: game.current_turn
     });
 
-    // Set timeout for auto-advance
-    setTimeout(() => {
+    // Clear any existing timer for this game
+    this.clearGameTimer(gameId);
+    
+    // Set timeout for auto-advance with longer duration
+    const timerId = setTimeout(() => {
       this.handleLetterSelectionTimeout(gameId);
     }, settings.letter_timer * 1000);
+    
+    // Store timer ID for potential clearing
+    this.activeTimers.set(gameId, timerId);
+    
+    console.log(`⏰ Set letter selection timeout for ${settings.letter_timer} seconds`);
   }
 
   /**
    * Handle letter selection by current player
    */
-  async selectLetter(gameId: number, playerId: number, letter: string): Promise<void> {
+  async selectLetter(gameId: number, playerId: number, letter: string, fromTimeout: boolean = false): Promise<void> {
+    
     const game = await this.getGameById(gameId);
     if (!game) throw new Error('Game not found');
 
     if (game.current_phase !== 'letter_selection') {
-      throw new Error('Not in letter selection phase');
+      throw new Error(`Cannot select letter during ${game.current_phase} phase`);
     }
 
+    // Get current player and validate turn
     const currentPlayer = await this.getCurrentPlayer(gameId, game.current_turn!);
     if (!currentPlayer || currentPlayer.user_id !== playerId) {
-      throw new Error('Not your turn');
+      throw new Error(`Not your turn. Current turn: ${game.current_turn}, Your position: ${currentPlayer?.position || 'unknown'}`);
+    }
+    
+    // CRITICAL: Clear the auto-selection timer since player made manual choice
+    // But only if this is NOT from a timeout to avoid clearing the wrong timer
+    if (!fromTimeout) {
+      this.clearGameTimer(gameId);
     }
 
     const dbManager = await DatabaseManager.getInstance();
@@ -133,12 +151,12 @@ export class GameStateService {
       WHERE id = ?
     `, letter, gameId);
 
-    // Update player with selected letter
+    // Update ALL players with selected letter so everyone can place it
     await db.run(`
       UPDATE players 
       SET current_letter = ?
-      WHERE game_id = ? AND user_id = ?
-    `, letter, gameId, playerId);
+      WHERE game_id = ?
+    `, letter, gameId);
 
     // Emit letter selected event
     this.socketService.broadcastToRoom(`game:${gameId}`, 'letter:selected', {
@@ -156,7 +174,9 @@ export class GameStateService {
    * Start letter placement phase for all players
    */
   async startLetterPlacementPhase(gameId: number): Promise<void> {
+    
     const settings = await this.getGameSettings(gameId);
+    
     const phaseEndTime = Date.now() + (settings.placement_timer * 1000);
 
     const dbManager = await DatabaseManager.getInstance();
@@ -175,17 +195,27 @@ export class GameStateService {
       WHERE game_id = ?
     `, gameId);
 
+    // Get updated game state to include current_turn
+    const updatedGame = await this.getGameById(gameId);
+    
     // Emit phase change
     this.socketService.broadcastToRoom(`game:${gameId}`, 'game:phase_changed', {
       gameId,
       phase: 'letter_placement',
-      timer_end: phaseEndTime
+      timer_end: phaseEndTime,
+      current_turn: updatedGame?.current_turn
     });
 
-    // Set timeout for auto-placement
-    setTimeout(() => {
+    // Clear any existing timer
+    this.clearGameTimer(gameId);
+
+    // Set placement timeout with proper management
+    const timerId = setTimeout(() => {
       this.handlePlacementTimeout(gameId);
     }, settings.placement_timer * 1000);
+
+    // Store timer ID
+    this.activeTimers.set(gameId, timerId);
   }
 
   /**
@@ -268,6 +298,9 @@ export class GameStateService {
     `, gameId) as { count: number };
 
     if (confirmedCount.count === totalPlayers.count) {
+      console.log('🎆 All players confirmed - clearing placement timer');
+      this.clearGameTimer(gameId);
+      
       // Check if this ends the game or advances turn
       const gameEnded = await this.checkGameEnd(gameId);
       if (!gameEnded) {
@@ -320,22 +353,38 @@ export class GameStateService {
    * Handle automatic timeout scenarios
    */
   async handleLetterSelectionTimeout(gameId: number): Promise<void> {
+    
     const game = await this.getGameById(gameId);
-    if (!game || game.current_phase !== 'letter_selection') return;
+    if (!game || game.current_phase !== 'letter_selection') {
+      return;
+    }
 
+    // Clear the timer since we're handling it now
+    this.clearGameTimer(gameId);
+    
     // Auto-select random letter
     const letters = this.generateSwedishLetters();
     const randomLetter = letters[Math.floor(Math.random() * letters.length)];
 
     const currentPlayer = await this.getCurrentPlayer(gameId, game.current_turn!);
     if (currentPlayer) {
-      await this.selectLetter(gameId, currentPlayer.user_id, randomLetter);
+      await this.selectLetter(gameId, currentPlayer.user_id, randomLetter, true);
     }
   }
 
   async handlePlacementTimeout(gameId: number): Promise<void> {
+    console.log(`⏰ handlePlacementTimeout triggered for game ${gameId}`);
+    
     const game = await this.getGameById(gameId);
-    if (!game || game.current_phase !== 'letter_placement') return;
+    if (!game || game.current_phase !== 'letter_placement') {
+      console.log(`❌ Skipping timeout - game phase is ${game?.current_phase || 'unknown'}`);
+      return;
+    }
+
+    // Clear the timer since we're handling it now
+    this.clearGameTimer(gameId);
+
+    console.log('🤖 Auto-placing letters due to timeout');
 
     // Auto-place letters for unconfirmed players
     const dbManager = await DatabaseManager.getInstance();
@@ -415,10 +464,10 @@ export class GameStateService {
         0,
         JSON.stringify([]),
         JSON.stringify([]),
-        true,
+        1, // true -> 1
         JSON.stringify([]), // Will be initialized later
         null,
-        false,
+        0, // false -> 0
         0
       );
     }
@@ -477,16 +526,27 @@ export class GameStateService {
     const db = dbManager.getDatabase();
     
     const players = await db.all(`
-      SELECT grid_state FROM players WHERE game_id = ?
-    `, gameId) as { grid_state: string }[];
+      SELECT user_id, grid_state FROM players WHERE game_id = ?
+    `, gameId) as { user_id: number; grid_state: string }[];
+
+    console.log(`🔍 isGameFinished check: gameId=${gameId}, players=${players.length}`);
 
     // Check if any player's grid is full
     for (const player of players) {
       const grid = JSON.parse(player.grid_state) as GridCell[][];
+      const lettersCount = grid.flat().filter(cell => cell.letter).length;
+      const totalCells = grid.flat().length;
       const isEmpty = grid.some(row => row.some(cell => !cell.letter));
-      if (!isEmpty) return true; // Grid is full
+      
+      console.log(`👤 Player ${player.user_id}: ${lettersCount}/${totalCells} letters, isEmpty=${isEmpty}`);
+      
+      if (!isEmpty) {
+        console.log(`🏁 Game ${gameId} is finished - Player ${player.user_id} has full grid!`);
+        return true; // Grid is full
+      }
     }
 
+    console.log(`⏳ Game ${gameId} continues - no player has full grid yet`);
     return false;
   }
 
@@ -566,18 +626,11 @@ export class GameStateService {
    * Check if game should end (all players finished or timeout)
    */
   async checkGameEnd(gameId: number): Promise<boolean> {
-    const dbManager = await DatabaseManager.getInstance();
-    const db = dbManager.getDatabase();
-
-    // Check if all players have confirmed their placement
-    const players = await db.all(`
-      SELECT placement_confirmed FROM players WHERE game_id = ?
-    `, gameId);
-
-    const allConfirmed = players.every(p => p.placement_confirmed === 1);
+    // Only check for game end conditions, not just if all players confirmed
+    const gameFinished = await this.isGameFinished(gameId);
     
-    if (allConfirmed) {
-      await this.endGame(gameId);
+    if (gameFinished) {
+      await this.finishGame(gameId);
       return true;
     }
 
@@ -591,10 +644,10 @@ export class GameStateService {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
 
-    // Update game status
-    await db.run(`
-      UPDATE games SET status = 'completed' WHERE id = ?
-    `, gameId);
+    // Update game status - COMMENTED OUT: games table doesn't have status column
+    // await db.run(`
+    //   UPDATE games SET status = 'completed' WHERE id = ?
+    // `, gameId);
 
     // Calculate final scores
     const scores = await this.calculateAllPlayerScores(gameId);
@@ -653,5 +706,16 @@ export class GameStateService {
   // Public method for testing
   public getSwedishLetters(): string[] {
     return this.generateSwedishLetters();
+  }
+
+  /**
+   * Clear active timer for a game to prevent race conditions
+   */
+  private clearGameTimer(gameId: number): void {
+    const timerId = this.activeTimers.get(gameId);
+    if (timerId) {
+      clearTimeout(timerId);
+      this.activeTimers.delete(gameId);
+    }
   }
 }
