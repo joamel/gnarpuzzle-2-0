@@ -111,7 +111,6 @@ const GameBoard: React.FC<GameBoardProps> = ({ gridSize = 4 }) => {
     gameTimer,
     selectedLetter,
     isMyTurn,
-    currentGame,
     selectLetter,
     placeLetter,
     confirmPlacement,

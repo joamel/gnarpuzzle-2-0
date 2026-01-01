@@ -8,7 +8,6 @@ export class GameStateService {
   private socketService: SocketService;
   private wordValidationService: WordValidationService;
   private activeTimers: Map<number, NodeJS.Timeout> = new Map();
-  private gameStateLog: Map<number, string[]> = new Map();
 
   private constructor(socketService: SocketService) {
     this.socketService = socketService;

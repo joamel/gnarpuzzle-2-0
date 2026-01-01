@@ -329,8 +329,7 @@ onClick={async () => {
                       const roomCode = roomData.room?.code || roomData.code;
                       console.log(`🎯 Navigating directly to room ${roomCode}`);
                       
-                      // Set the room data in context and navigate
-                      const room = roomData.room || roomData;
+                      // Join the room using its code
                       await joinRoom(roomCode);
                       
                       setIsCreatingRoom(false);

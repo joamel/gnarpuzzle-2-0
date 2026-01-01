@@ -26,11 +26,11 @@ const GameBoard: React.FC<GameBoardProps> = ({
     }
   }, [disabled, onCellClick]);
 
-  const handleTouchStart = useCallback((e: React.TouchEvent, x: number, y: number) => {
+  const handleTouchStart = useCallback((_e: React.TouchEvent, x: number, y: number) => {
     setTouchStart({ x, y });
   }, []);
 
-  const handleTouchEnd = useCallback((e: React.TouchEvent, x: number, y: number) => {
+  const handleTouchEnd = useCallback((_e: React.TouchEvent, x: number, y: number) => {
     if (touchStart && touchStart.x === x && touchStart.y === y) {
       handleCellClick(x, y);
     }

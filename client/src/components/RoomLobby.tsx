@@ -110,7 +110,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   useEffect(() => {
     if (!currentRoom?.code) return;
 
-    const handleMemberJoined = (data: any) => {
+    const handleMemberJoined = (_data: any) => {
       // Refresh room data when someone joins
       if (currentRoom.code) {
         apiService.getRoomByCode(currentRoom.code).then(freshData => {

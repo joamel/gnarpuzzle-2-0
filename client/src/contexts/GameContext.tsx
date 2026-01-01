@@ -467,6 +467,55 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     };
   }, [currentGame, currentRoom, user, players.length]);
 
+  // Handle browser refresh/close - warn user and leave room
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (currentRoom && (currentGame || currentRoom.status === 'waiting')) {
+        e.preventDefault();
+        e.returnValue = 'Om du lämnar sidan kommer du att lämna rummet. Är du säker?';
+        return 'Om du lämnar sidan kommer du att lämna rummet. Är du säker?';
+      }
+    };
+
+    const handleUnload = () => {
+      if (currentRoom) {
+        try {
+          // Use sendBeacon for reliable cleanup on page unload
+          const API_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+          const url = `${API_BASE_URL}/api/rooms/${currentRoom.code}/leave`;
+          const data = JSON.stringify({});
+          
+          // Include auth token in the request if available
+          const token = localStorage.getItem('auth_token');
+          const headers = new Headers();
+          headers.append('Content-Type', 'application/json');
+          if (token) {
+            headers.append('Authorization', `Bearer ${token}`);
+          }
+          
+          fetch(url, {
+            method: 'DELETE',
+            headers: headers,
+            body: data,
+            keepalive: true // Important for cleanup on page unload
+          }).catch(() => {
+            // Ignore errors during page unload
+          });
+        } catch (error) {
+          console.warn('Failed to leave room on page unload:', error);
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('unload', handleUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('unload', handleUnload);
+    };
+  }, [currentRoom, currentGame]);
+
   // Game actions
   const startGame = useCallback(async (roomId: number) => {
     console.log('🎮 GameContext.startGame called with roomId:', roomId);
@@ -483,17 +532,24 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       console.log('🎮 Game object structure:', {
         game,
         gameKeys: game ? Object.keys(game) : 'no game',
-        gamePhase: game?.phase,
+        gameState: game?.state,
         gameId: game?.id
       });
-      setCurrentGame(game);
-      console.log('🎮 setCurrentGame called with:', game);
       
-      // Set game phase directly from API response
-      if (game?.phase) {
-        console.log('🎯 Setting gamePhase to:', game.phase);
-        setGamePhase(game.phase as GamePhase);
-      }
+      // Convert Game to GameState format for our context
+      const gameState: GameState = {
+        id: Number(game.id),
+        roomId: Number(game.roomId),
+        phase: 'letter_selection', // Default phase when starting
+        currentTurn: game.currentTurn || 1,
+        status: 'active'
+      };
+      
+      setCurrentGame(gameState);
+      console.log('🎮 setCurrentGame called with:', gameState);
+      
+      // Set game phase 
+      setGamePhase('letter_selection');
       
       // Update room status to 'playing' after successful game start
       if (currentRoom) {
@@ -514,7 +570,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         const mockPlayer: Player = {
           id: user.id,
           userId: user.id,
-          gameId: game.id,
+          gameId: Number(game.id),
           position: 1, // Will be updated when real player data arrives
           username: user.username,
           grid: Array(gridSize).fill(null).map((_, y) => Array(gridSize).fill(null).map((_, x) => ({

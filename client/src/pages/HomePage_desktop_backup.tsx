@@ -16,9 +16,6 @@ const HomePage: React.FC = () => {
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [isJoiningRoom, setIsJoiningRoom] = useState(false);
   const [error, setError] = useState('');
-  const [roomName, setRoomName] = useState('');
-  const [maxPlayers, setMaxPlayers] = useState(4);
-  const [boardSize, setBoardSize] = useState(4);
 
   // Load available rooms
   useEffect(() => {
@@ -74,11 +71,9 @@ const HomePage: React.FC = () => {
       setError('');
       
       const room = await apiService.createRoom(`${user?.username}'s rum`, {
-        grid_size: 4,
+        board_size: 4,
         max_players: 4,
-        letter_timer: 10,
-        placement_timer: 15,
-        private: false,
+        turn_duration: 10,
       });
       
       await joinRoom(room.code);
