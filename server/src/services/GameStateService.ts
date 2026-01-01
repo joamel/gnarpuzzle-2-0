@@ -42,6 +42,18 @@ export class GameStateService {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
 
+    // Get first player from room to set as current turn
+    const firstMember = await db.get(`
+      SELECT user_id FROM room_members 
+      WHERE room_id = ? 
+      ORDER BY joined_at ASC 
+      LIMIT 1
+    `, roomId) as { user_id: number } | null;
+
+    if (!firstMember) {
+      throw new Error('No members found in room');
+    }
+
     // Create initial game state
     const result = await db.run(`
       INSERT INTO games (
@@ -52,7 +64,7 @@ export class GameStateService {
       roomId, 
       'starting', 
       'letter_selection',
-      1, // First player starts
+      firstMember.user_id, // Use actual user_id for current_turn
       1,
       JSON.stringify([]),
       JSON.stringify(this.generateSwedishLetters()),
@@ -325,18 +337,26 @@ export class GameStateService {
       return;
     }
 
-    // Advance to next player
-    const playerCount = await db.get(`
-      SELECT COUNT(*) as count FROM players WHERE game_id = ?
-    `, gameId) as { count: number };
+    // Advance to next player by user_id order
+    const players = await db.all(`
+      SELECT p.user_id, p.position 
+      FROM players p 
+      WHERE p.game_id = ? 
+      ORDER BY p.position ASC
+    `, gameId) as { user_id: number; position: number }[];
 
-    const nextTurn = ((game.current_turn || 1) % playerCount.count) + 1;
+    if (players.length === 0) return;
+
+    // Find current player index
+    const currentIndex = players.findIndex(p => p.user_id === game.current_turn);
+    const nextIndex = (currentIndex + 1) % players.length;
+    const nextUserId = players[nextIndex].user_id;
 
     await db.run(`
       UPDATE games 
       SET current_turn = ?, turn_number = turn_number + 1, current_letter = NULL
       WHERE id = ?
-    `, nextTurn, gameId);
+    `, nextUserId, gameId);
 
     // Clear player letters
     await db.run(`
@@ -417,12 +437,12 @@ export class GameStateService {
     return await db.get('SELECT * FROM games WHERE id = ?', gameId) as Game | null;
   }
 
-  private async getCurrentPlayer(gameId: number, turn: number): Promise<Player | null> {
+  private async getCurrentPlayer(gameId: number, userId: number): Promise<Player | null> {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
     return await db.get(`
-      SELECT * FROM players WHERE game_id = ? AND position = ?
-    `, gameId, turn) as Player | null;
+      SELECT * FROM players WHERE game_id = ? AND user_id = ?
+    `, gameId, userId) as Player | null;
   }
 
   private async getGameSettings(gameId: number): Promise<RoomSettings> {
