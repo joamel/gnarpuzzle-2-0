@@ -63,12 +63,33 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   const currentPlayer = players.find(p => p.userId === user?.id) || null;
   
   // Enhanced turn calculation with better debugging
-  const currentTurnNum = currentGame?.currentTurn ? Number(currentGame.currentTurn) : 0;
-  const playerPosNum = currentPlayer?.position ? Number(currentPlayer.position) : 0;
-  const isMyTurn = currentTurnNum === playerPosNum && currentTurnNum > 0;
+  const currentTurnUserId = currentGame?.currentTurn ? Number(currentGame.currentTurn) : 0;
+  const playerUserId = user?.id ? Number(user.id) : 0;
+  const isMyTurn = currentTurnUserId === playerUserId && currentTurnUserId > 0;
 
   // Only log turn issues when there's an actual problem
   // Removed excessive debug logging for cleaner console
+
+  // Debug logging for currentPlayer calculation  
+  console.log('🔍 GameContext currentPlayer calculation:', {
+    user: user,
+    userId: user?.id,
+    playersCount: players.length,
+    players: players.map(p => ({ userId: p.userId, username: p.username, position: p.position })),
+    currentPlayer: currentPlayer ? { userId: currentPlayer.userId, username: currentPlayer.username, position: currentPlayer.position } : null
+  });
+
+  // Debug logging for turn calculation
+  console.log('🎯 Turn calculation:', {
+    currentGameCurrentTurn: currentGame?.currentTurn,
+    currentGameCurrentTurnType: typeof currentGame?.currentTurn,
+    playerUserId: playerUserId,
+    playerUserIdType: typeof playerUserId,
+    isMyTurn: isMyTurn,
+    gamePhase: gamePhase,
+    comparison: `${currentGame?.currentTurn} === ${playerUserId} = ${currentGame?.currentTurn === playerUserId}`,
+    strictComparison: `${currentGame?.currentTurn} === ${currentPlayer?.position} (${typeof currentGame?.currentTurn}) === (${typeof currentPlayer?.position})`
+  });
 
   // Timer management
   useEffect(() => {
@@ -94,11 +115,20 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     if (!socketService.isConnected()) return;
 
     const handleGamePhaseChanged = (data: any) => {
+      console.log('🚀 handleGamePhaseChanged received:', {
+        phase: data.phase,
+        timer_end: data.timer_end,
+        gameId: data.gameId,
+        current_turn: data.current_turn,
+        timestamp: new Date().toLocaleTimeString()
+      });
+      
       setGamePhase(data.phase);
       
       // Clear selected letter when starting new letter selection phase
       if (data.phase === 'letter_selection') {
         setSelectedLetter(null);
+        console.log('🧹 Cleared selectedLetter for new letter selection phase');
       }
       
       setGameTimer({
@@ -133,6 +163,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     const handleLetterSelected = (data: any) => {
       // All players should get the selected letter to place on their own grids
       setSelectedLetter(data.letter);
+      console.log('📝 Letter selected for ALL players:', data.letter);
       
       // Update player state
       setPlayers(prev => prev.map(p => 
@@ -171,8 +202,8 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     };
 
     const handleGameStarted = (data: any) => {
-      // console.log('🎮 Game started event received:', data);
-      // console.log('📡 Socket data phase:', data.phase, 'gameId:', data.gameId);
+      console.log('🎮 Game started event received:', data);
+      console.log('📡 Socket data phase:', data.phase, 'gameId:', data.gameId);
       
       // Join the game socket room for receiving game events
       if (data.gameId) {
@@ -552,9 +583,9 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       console.error('❌ selectLetter failed - not player turn:', {
         currentTurn: currentGame.currentTurn,
         currentTurnType: typeof currentGame.currentTurn,
-        playerPosition: currentPlayer.position,
-        playerPositionType: typeof currentPlayer.position,
-        isMyTurnCalculation: `${Number(currentGame.currentTurn)} === ${Number(currentPlayer.position)} = ${Number(currentGame.currentTurn) === Number(currentPlayer.position)}`
+        playerUserId: user?.id,
+        playerUserIdType: typeof user?.id,
+        isMyTurnCalculation: `${Number(currentGame.currentTurn)} === ${Number(user?.id)} = ${Number(currentGame.currentTurn) === Number(user?.id)}`
       });
       throw new Error('It is not your turn to select a letter');
     }
