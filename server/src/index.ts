@@ -83,9 +83,11 @@ app.get('/api/health', (_req, res) => {
 // API Routes
 import { authRoutes } from './routes/auth';
 import { roomRoutes } from './routes/rooms';
+import { gameRoutes } from './routes/games';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
+app.use('/api/games', gameRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -131,6 +133,34 @@ async function startServer() {
     // Initialize Socket.IO service
     socketService = new SocketService(io);
     logger.info('Socket.IO service initialized');
+
+    // Development mode: Reset game state on startup
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔄 Development mode: Resetting playing rooms to waiting...');
+      try {
+        const dbManager = await DatabaseManager.getInstance();
+        const db = dbManager.getDatabase();
+        
+        // Delete all active games and players (this clears ongoing game state)
+        await db.run('DELETE FROM players');
+        await db.run('DELETE FROM games');
+        
+        // Reset rooms that are currently playing back to waiting
+        const resetResult = await db.run(`UPDATE rooms SET status = 'waiting' WHERE status = 'playing'`);
+        
+        console.log('✅ Reset all playing rooms to waiting status');
+        console.log(`✅ Reset ${resetResult.changes} playing rooms to waiting status`);
+        
+        // Optionally clear all rooms completely (uncomment for full reset)
+        if (process.env.RESET_ALL_ROOMS === 'true') {
+          await db.run('DELETE FROM room_members');
+          await db.run('DELETE FROM rooms');
+          console.log('✅ Cleared all rooms and room members (RESET_ALL_ROOMS=true)');
+        }
+      } catch (error) {
+        console.error('❌ Failed to reset game state:', error);
+      }
+    }
 
     // Initialize and start room cleanup service (temporarily disabled for testing)
     // roomCleanupService = new RoomCleanupService();

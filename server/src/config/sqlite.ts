@@ -91,4 +91,41 @@ export class SQLiteDatabase implements DatabaseInterface {
   backup(destinationPath: string): void {
     this.db.backup(destinationPath);
   }
+
+  // Development helper: Clear all rooms and games
+  async clearAllRoomsAndGames(): Promise<void> {
+    try {
+      console.log('🧹 Development mode: Clearing all rooms and games...');
+      
+      // Clear in reverse dependency order
+      this.db.exec('DELETE FROM players');
+      this.db.exec('DELETE FROM games');
+      this.db.exec('DELETE FROM room_members');
+      this.db.exec('DELETE FROM rooms');
+      
+      console.log('✅ All rooms and games cleared for development');
+    } catch (error) {
+      console.error('❌ Error clearing rooms and games:', error);
+      throw error;
+    }
+  }
+
+  // Development helper: Reset playing rooms to waiting
+  async resetPlayingRooms(): Promise<void> {
+    try {
+      console.log('🔄 Development mode: Resetting playing rooms to waiting...');
+      
+      // Delete all games and players first  
+      this.db.exec('DELETE FROM players');
+      this.db.exec('DELETE FROM games');
+      
+      // Reset all rooms to waiting status
+      const result = this.db.prepare('UPDATE rooms SET status = ? WHERE status = ?').run('waiting', 'playing');
+      
+      console.log(`✅ Reset ${result.changes} playing rooms to waiting status`);
+    } catch (error) {
+      console.error('❌ Error resetting playing rooms:', error);
+      throw error;
+    }
+  }
 }

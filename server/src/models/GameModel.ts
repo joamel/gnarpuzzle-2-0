@@ -23,7 +23,7 @@ export class GameModel {
         await db.run(`
           INSERT INTO players (game_id, user_id, position) 
           VALUES (?, ?, ?)
-        `, gameId, members[index].id, index);
+        `, gameId, members[index].id, index + 1); // Position starts from 1, not 0
       }
       
       // Update room status

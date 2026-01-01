@@ -231,6 +231,18 @@ export class DatabaseManager {
       require.resolve('better-sqlite3');
       this.db = new SQLiteDatabase(dbPath);
       console.log(`✅ Using real SQLite database: ${dbPath}`);
+      
+      // Development mode: Clear/reset rooms on startup
+      if (process.env.NODE_ENV !== 'production') {
+        const clearMode = process.env.DB_CLEAR_MODE || 'reset'; // 'clear', 'reset', or 'none'
+        
+        if (clearMode === 'clear') {
+          await (this.db as any).clearAllRoomsAndGames();
+        } else if (clearMode === 'reset') {
+          await (this.db as any).resetPlayingRooms();
+        }
+      }
+      
     } catch (error) {
       // Fallback to mock database
       this.db = new SimpleDatabaseMock();

@@ -678,7 +678,9 @@ export class SocketService {
   }
 
   public broadcastToRoom(room: string, event: string, data: any): void {
+    console.log(`📡 SocketService.broadcastToRoom: room=${room}, event=${event}, data=`, data);
     this.io.to(room).emit(event, data);
+    console.log(`✅ Socket event broadcasted to room ${room}`);
   }
 
   public emitToUser(socketId: string, event: string, data: any): void {
