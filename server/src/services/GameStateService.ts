@@ -94,6 +94,12 @@ export class GameStateService {
     const game = await this.getGameById(gameId);
     if (!game) throw new Error('Game not found');
 
+    // Prevent starting if already in letter selection
+    if (game.current_phase === 'letter_selection') {
+      console.log('⚠️ Already in letter selection phase, skipping');
+      return;
+    }
+
     const settings = await this.getGameSettings(gameId);
     const phaseEndTime = Date.now() + (settings.letter_timer * 1000);
 
@@ -185,6 +191,14 @@ export class GameStateService {
    * Start letter placement phase for all players
    */
   async startLetterPlacementPhase(gameId: number): Promise<void> {
+    const game = await this.getGameById(gameId);
+    if (!game) return;
+    
+    // Prevent starting if already in letter placement
+    if (game.current_phase === 'letter_placement') {
+      console.log('⚠️ Already in letter placement phase, skipping');
+      return;
+    }
     
     const settings = await this.getGameSettings(gameId);
     
@@ -312,6 +326,13 @@ export class GameStateService {
       console.log('🎆 All players confirmed - clearing placement timer');
       this.clearGameTimer(gameId);
       
+      // Validate we're still in placement phase before advancing
+      const updatedGame = await this.getGameById(gameId);
+      if (updatedGame?.current_phase !== 'letter_placement') {
+        console.log('⚠️ Skipping turn advance - phase changed during confirmation');
+        return;
+      }
+      
       // Check if this ends the game or advances turn
       const gameEnded = await this.checkGameEnd(gameId);
       if (!gameEnded) {
@@ -329,6 +350,12 @@ export class GameStateService {
 
     const game = await this.getGameById(gameId);
     if (!game) return;
+
+    // Prevent race conditions - only advance if in placement phase
+    if (game.current_phase !== 'letter_placement') {
+      console.log(`⚠️ Skipping turn advance - game not in placement phase: ${game.current_phase}`);
+      return;
+    }
 
     // Check if game is finished (grid full)
     if (await this.isGameFinished(gameId)) {
@@ -375,6 +402,13 @@ export class GameStateService {
     
     const game = await this.getGameById(gameId);
     if (!game || game.current_phase !== 'letter_selection') {
+      console.log(`⚠️ Skipping letter selection timeout - phase is ${game?.current_phase || 'unknown'}`);
+      return;
+    }
+
+    // Check if timer was already cleared (race condition prevention)
+    if (!this.activeTimers.has(gameId)) {
+      console.log(`⚠️ Timer already cleared for game ${gameId}, skipping timeout`);
       return;
     }
 
@@ -397,6 +431,12 @@ export class GameStateService {
     const game = await this.getGameById(gameId);
     if (!game || game.current_phase !== 'letter_placement') {
       console.log(`❌ Skipping timeout - game phase is ${game?.current_phase || 'unknown'}`);
+      return;
+    }
+
+    // Check if timer was already cleared (race condition prevention)
+    if (!this.activeTimers.has(gameId)) {
+      console.log(`⚠️ Timer already cleared for game ${gameId}, skipping timeout`);
       return;
     }
 
@@ -735,6 +775,7 @@ export class GameStateService {
     if (timerId) {
       clearTimeout(timerId);
       this.activeTimers.delete(gameId);
+      console.log(`🕒 Cleared timer for game ${gameId}`);
     }
   }
 }
