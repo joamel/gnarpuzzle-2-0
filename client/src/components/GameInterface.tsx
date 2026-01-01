@@ -8,13 +8,15 @@ interface GameBoardProps {
   onCellClick: (x: number, y: number) => void;
   disabled?: boolean;
   highlightedCell?: { x: number; y: number } | null;
+  temporaryLetter?: { x: number; y: number; letter: string } | null;
 }
 
 const GameBoard: React.FC<GameBoardProps> = ({ 
   grid, 
   onCellClick, 
   disabled = false,
-  highlightedCell 
+  highlightedCell,
+  temporaryLetter
 }) => {
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
 
@@ -49,7 +51,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
     }
     
     if (highlightedCell && highlightedCell.x === x && highlightedCell.y === y) {
-      className += ' highlighted';
+      className += ' temporary-placement';
     }
     
     return className;
@@ -69,7 +71,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
             data-y={y}
           >
             <span className="cell-letter">
-              {cell.letter || ''}
+              {cell.letter || (temporaryLetter && temporaryLetter.x === x && temporaryLetter.y === y ? temporaryLetter.letter : '')}
             </span>
             <div className="cell-coords">{x},{y}</div>
           </div>
@@ -126,11 +128,24 @@ const GameInterface: React.FC = () => {
     gameTimer
   } = useGame();
 
-  const [highlightedCell, setHighlightedCell] = useState<{ x: number; y: number } | null>(null);
+  // Removed excessive debug logging for cleaner console
+
+  const [temporaryPlacement, setTemporaryPlacement] = useState<{ x: number; y: number; letter: string } | null>(null);
+  const [placingLetter, setPlacingLetter] = useState<boolean>(false);
 
   const swedishLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'Å', 'Ä', 'Ö'];
 
   const handleLetterSelect = async (letter: string) => {
+    // Check if it's the player's turn
+    if (!isMyTurn || gamePhase !== 'letter_selection') {
+      console.log('❌ Cannot select letter - not your turn or wrong phase:', {
+        isMyTurn,
+        gamePhase,
+        expectedPhase: 'letter_selection'
+      });
+      return;
+    }
+
     try {
       await selectLetter(letter);
     } catch (err) {
@@ -145,24 +160,27 @@ const GameInterface: React.FC = () => {
 
     const cell = currentPlayer.grid[y][x];
     if (cell.letter) {
-      return; // Cell already occupied
+      return; // Cell already occupied with permanent letter
     }
 
-    try {
-      setHighlightedCell({ x, y });
-      await placeLetter(x, y);
-    } catch (err) {
-      console.error('Failed to place letter:', err);
-      setHighlightedCell(null);
-    }
+    // Set temporary placement - can be moved until confirmed
+    setTemporaryPlacement({ x, y, letter: selectedLetter });
   };
 
   const handleConfirmPlacement = async () => {
+    if (!temporaryPlacement) return;
+
     try {
+      setPlacingLetter(true);
+      // Actually place the letter on server
+      await placeLetter(temporaryPlacement.x, temporaryPlacement.y);
+      // Then confirm the placement
       await confirmPlacement();
-      setHighlightedCell(null);
+      setTemporaryPlacement(null);
     } catch (err) {
       console.error('Failed to confirm placement:', err);
+    } finally {
+      setPlacingLetter(false);
     }
   };
 
@@ -188,12 +206,30 @@ const GameInterface: React.FC = () => {
         </div>
 
         <div className="turn-indicator">
-          {isMyTurn ? (
-            <span className="my-turn">Din tur!</span>
+          {gamePhase === 'letter_selection' ? (
+            isMyTurn ? (
+              <span className="my-turn">🎯 Välj en bokstav!</span>
+            ) : (
+              <span className="other-turn">⏳ Väntar på bokstavsval</span>
+            )
+          ) : gamePhase === 'letter_placement' ? (
+            selectedLetter ? (
+              <span className="my-turn">📍 Placera bokstaven: <strong>{selectedLetter}</strong></span>
+            ) : (
+              <span className="waiting">⌛ Väntar på bokstav...</span>
+            )
           ) : (
             <span className="other-turn">Väntar på andra spelare</span>
           )}
         </div>
+        
+        {/* Enhanced feedback for letter placement phase */}
+        {gamePhase === 'letter_placement' && selectedLetter && (
+          <div className="letter-placement-info">
+            <h3>🎯 Alla spelare placerar: <span className="selected-letter">{selectedLetter}</span></h3>
+            <p>Klicka på en tom ruta för att placera bokstaven, sedan tryck "Bekräfta" när du är klar.</p>
+          </div>
+        )}
       </div>
 
       {gamePhase === 'letter_selection' && isMyTurn && (
@@ -205,7 +241,7 @@ const GameInterface: React.FC = () => {
         />
       )}
 
-      {gamePhase === 'letter_placement' && (
+      {gamePhase === 'letter_placement' && selectedLetter && (
         <div className="placement-section">
           <div className="selected-letter-display">
             <h3>Placera bokstav: <strong>{selectedLetter}</strong></h3>
@@ -216,21 +252,24 @@ const GameInterface: React.FC = () => {
             grid={currentPlayer.grid}
             onCellClick={handleCellClick}
             disabled={!selectedLetter || gamePhase !== 'letter_placement'}
-            highlightedCell={highlightedCell}
+            highlightedCell={temporaryPlacement}
+            temporaryLetter={temporaryPlacement}
           />
 
-          {highlightedCell && selectedLetter && (
+          {temporaryPlacement && selectedLetter && (
             <div className="confirm-section">
-              <p>Placera "{selectedLetter}" på position {highlightedCell.x}, {highlightedCell.y}?</p>
+              <p>Placera "{selectedLetter}" på position {temporaryPlacement.x}, {temporaryPlacement.y}?</p>
+              <p className="placement-hint">💡 Klicka på en annan ruta för att flytta bokstaven</p>
               <div className="confirm-buttons">
                 <button 
                   onClick={handleConfirmPlacement}
                   className="confirm-button primary-button"
+                  disabled={placingLetter}
                 >
-                  Bekräfta placering
+                  {placingLetter ? 'Placerar...' : 'Bekräfta placering'}
                 </button>
                 <button 
-                  onClick={() => setHighlightedCell(null)}
+                  onClick={() => setTemporaryPlacement(null)}
                   className="cancel-button secondary-button"
                 >
                   Ångra

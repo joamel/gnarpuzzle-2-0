@@ -53,17 +53,67 @@
 
 .turn-indicator {
   text-align: center;
+  margin: 10px 0;
+  font-size: 16px;
+  font-weight: bold;
 }
 
 .my-turn {
   color: #28a745;
   font-weight: 600;
   font-size: 14px;
+  animation: pulse 2s ease-in-out infinite;
 }
 
 .other-turn {
   color: #666;
   font-size: 14px;
+}
+
+.waiting {
+  color: #ffc107;
+  font-size: 14px;
+}
+
+.letter-placement-info {
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+  border: 2px solid #2196f3;
+  border-radius: 12px;
+  padding: 15px;
+  margin: 15px 0;
+  text-align: center;
+  box-shadow: 0 4px 8px rgba(33, 150, 243, 0.2);
+}
+
+.letter-placement-info h3 {
+  margin: 0 0 8px 0;
+  color: #1976d2;
+  font-size: 18px;
+}
+
+.letter-placement-info .selected-letter {
+  background: #2196f3;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-weight: bold;
+  font-size: 20px;
+}
+
+.letter-placement-info p {
+  margin: 0;
+  color: #1565c0;
+  font-size: 14px;
+}
+
+.placement-hint {
+  background: rgba(255, 193, 7, 0.1);
+  border-left: 4px solid #ffc107;
+  padding: 8px 12px;
+  margin: 10px 0 !important;
+  border-radius: 4px;
+  font-style: italic;
+  color: #e65100 !important;
 }
 
 /* Letter Selector */
@@ -175,6 +225,29 @@
   animation: highlight 0.5s ease-in-out;
 }
 
+.grid-cell.highlighted-placement {
+  background: linear-gradient(135deg, #28a745, #20c997);
+  border: 2px solid #28a745;
+  box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
+  animation: placement-pulse 1s ease-in-out infinite;
+}
+
+.grid-cell.temporary-placement {
+  background: linear-gradient(45deg, #ffc107, #ffeb3b);
+  border: 3px solid #ff9800;
+  animation: temporary-pulse 1.5s ease-in-out infinite;
+  box-shadow: 0 0 15px rgba(255, 193, 7, 0.6);
+  position: relative;
+}
+
+.grid-cell.temporary-placement::after {
+  content: "📍";
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 10px;
+}
+
 .grid-cell.disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -184,6 +257,28 @@
   0% { transform: scale(1); }
   50% { transform: scale(1.1); }
   100% { transform: scale(1); }
+}
+
+@keyframes placement-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
+    transform: scale(1);
+  }
+  50% { 
+    box-shadow: 0 0 20px rgba(40, 167, 69, 0.8);
+    transform: scale(1.02);
+  }
+}
+
+@keyframes temporary-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 15px rgba(255, 193, 7, 0.6);
+    transform: scale(1);
+  }
+  50% { 
+    box-shadow: 0 0 25px rgba(255, 193, 7, 0.9);
+    transform: scale(1.03);
+  }
 }
 
 .cell-letter {

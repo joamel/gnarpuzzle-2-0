@@ -36,63 +36,35 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   const canStartGame = playerList.length >= 2; // Minst 2 spelare krävs
   const hasEnoughPlayers = playerList.length >= 2;
 
-  // Debug logging for start game button state
-  console.log('🔍 Start game button state:', {
-    isOwner,
-    isOwnerByRole,
-    isActualOwner,
-    playerListLength: playerList.length,
-    canStartGame,
-    isStarting,
-    isLoading,
-    buttonDisabled: !canStartGame || isStarting || isLoading,
-    playerList: playerList.map(p => ({ userId: p.userId, username: p.username, role: p.role }))
-  });
-
-  // Debug ownership specifically
-  console.log('👑 Ownership debug:', {
-    currentRoom_createdBy: currentRoom?.createdBy,
-    currentRoom_createdBy_type: typeof currentRoom?.createdBy,
-    authUser_full: authUser,
-    authUser_id: authUser?.id, 
-    authUser_id_type: typeof authUser?.id,
-    authUser_keys: authUser ? Object.keys(authUser) : 'no authUser',
-    createdBy_string: String(currentRoom?.createdBy || '').trim(),
-    userId_string: String(authUser?.id || '').trim(),
-    strings_match: String(currentRoom?.createdBy || '').trim() === String(authUser?.id || '').trim()
-  });
-
   // Join the Socket.IO room when entering the lobby
   useEffect(() => {
     if (currentRoom?.code) {
-      console.log('🚪 Joining Socket.IO room from RoomLobby:', currentRoom.code);
       socketService.joinRoom(currentRoom.code);
       
       return () => {
-        console.log('🚪 Leaving Socket.IO room from RoomLobby:', currentRoom.code);
         socketService.leaveRoom(currentRoom.code);
       };
     }
   }, [currentRoom?.code]);
 
   useEffect(() => {
-    console.log('🏠 RoomLobby - currentRoom updated:', currentRoom);
-    console.log('👤 Raw authUser:', authUser);
-    console.log('🆔 User ID:', authUser?.id);
-    console.log('📝 Username:', authUser?.username);
-    console.log('👑 isOwner check:', {
-      createdBy: currentRoom?.createdBy,
-      userId: authUser?.id,
-      createdByString: String(currentRoom?.createdBy).trim(),
-      userIdString: String(authUser?.id).trim(),
-      isOwner: currentRoom && authUser && String(currentRoom.createdBy).trim() === String(authUser.id).trim()
-    });
+    // console.log('🏠 RoomLobby - currentRoom updated:', currentRoom);
+    // console.log('👤 Raw authUser:', authUser);
+    // console.log('🆔 User ID:', authUser?.id);
+    // console.log('📝 Username:', authUser?.username);
+    // console.log('👑 isOwner check:', {
+    //   createdBy: currentRoom?.createdBy,
+    //   userId: authUser?.id,
+    //   createdByString: String(currentRoom?.createdBy).trim(),
+    //   userIdString: String(authUser?.id).trim(),
+    //   isOwner: currentRoom && authUser && String(currentRoom.createdBy).trim() === String(authUser.id).trim()
+    // });
     
     // Since Room doesn't have players property, always add user if room exists
     if (currentRoom && authUser) {
       // Add the current user to player list
-      console.log('⚠️ RoomLobby - adding self to player list. User data:', authUser);
-      console.log('🏠 Room createdBy:', currentRoom.createdBy, 'User ID:', authUser.id);
+      // console.log('⚠️ RoomLobby - adding self to player list. User data:', authUser);
+      // console.log('🏠 Room createdBy:', currentRoom.createdBy, 'User ID:', authUser.id);
       setPlayerList([{
         userId: String(authUser.id),
         username: authUser.username,
@@ -101,14 +73,14 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
       }]);
       
       // Force refresh to get latest member data from server
-      console.log('🔄 Attempting to fetch fresh member data...');
+      // console.log('🔄 Attempting to fetch fresh member data...');
       if (currentRoom.code) {
         apiService.getRoomByCode(currentRoom.code).then(freshData => {
-          console.log('🆕 Fresh room data received:', freshData);
-          console.log('🆕 Fresh members array:', freshData?.room?.members);
-          console.log('🆕 Room created by:', freshData?.room?.createdBy);
+          // console.log('🆕 Fresh room data received:', freshData);
+          // console.log('🆕 Fresh members array:', freshData?.room?.members);
+          // console.log('🆕 Room created by:', freshData?.room?.createdBy);
           if (freshData?.room?.members && freshData.room.members.length > 0) {
-            console.log('✅ Updating playerList with fresh data:', freshData.room.members);
+            // console.log('✅ Updating playerList with fresh data:', freshData.room.members);
             // Map server data to include role information
             const mappedMembers = freshData.room.members.map((member: any) => ({
               userId: String(member.id),
@@ -118,7 +90,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
             }));
             setPlayerList(mappedMembers);
           } else {
-            console.log('⚠️ Fresh data has empty members array, keeping current user in list');
+            // console.log('⚠️ Fresh data has empty members array, keeping current user in list');
             // If server doesn't return members, keep at least current user
             setPlayerList([{
               userId: String(authUser.id),
@@ -139,7 +111,6 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
     if (!currentRoom?.code) return;
 
     const handleMemberJoined = (data: any) => {
-      console.log('🆕 Member joined room:', data);
       // Refresh room data when someone joins
       if (currentRoom.code) {
         apiService.getRoomByCode(currentRoom.code).then(freshData => {
@@ -167,15 +138,11 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
 
   useEffect(() => {
     const handleMemberJoined = (data: any) => {
-      console.log('📥 Member joined event:', data);
-      
       // If backend provides proper member list, use it
       if (data.room?.members && Array.isArray(data.room.members) && data.room.members.length > 0) {
-        console.log('🎯 Using backend member list from join event:', data.room.members);
         setPlayerList(data.room.members);
       } else if (data.user) {
         // Otherwise, manually add the user
-        console.log('📝 Manually adding user to member list');
         setPlayerList(prev => {
           const exists = prev.some(member => member.userId === String(data.user.id));
           if (!exists) {
@@ -185,7 +152,6 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
               role: 'member' as const,
               joinedAt: new Date().toISOString()
             }];
-            console.log('👥 Updated player list:', newList);
             return newList;
           }
           return prev;
@@ -193,9 +159,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
         
         // Also trigger a refresh to get latest data from server
         if (currentRoom?.code) {
-          console.log('🔄 Fetching fresh data after member join...');
           apiService.getRoomByCode(currentRoom.code).then(freshData => {
-            console.log('🆕 Fresh data after join:', freshData);
             // Backend returns { room: { members: [...] } }
             const members = freshData?.room?.members || freshData?.members;
             if (members && members.length > 0) {
@@ -213,25 +177,20 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
     };
 
     const handleRoomLeft = (data: any) => {
-      console.log('📤 Room left event:', data);
       if (data?.user?.id) {
         setPlayerList(prev => prev.filter(member => member.userId !== String(data.user.id)));
       }
     };
 
     const handleRoomUpdated = (data: any) => {
-      console.log('🔄 Room updated event:', data);
       if (data.room?.members && Array.isArray(data.room.members)) {
-        console.log('🔄 Updating member list from room update:', data.room.members);
         setPlayerList(data.room.members);
       }
     };
 
     // Listen for our own join confirmation with full member list
     const handleRoomJoined = (data: any) => {
-      console.log('✅ Room joined confirmation:', data);
       if (data.room?.members && Array.isArray(data.room.members) && data.room.members.length > 0) {
-        console.log('✅ Setting member list from join confirmation:', data.room.members);
         setPlayerList(data.room.members);
       }
     };
@@ -245,7 +204,6 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
     let syncInterval: NodeJS.Timeout;
     if (currentRoom?.code) {
       syncInterval = setInterval(() => {
-        console.log('🔄 Periodic member sync...');
         apiService.getRoomByCode(currentRoom.code).then(freshData => {
           // Backend returns { room: { members: [...] } }
           const members = freshData?.room?.members || freshData?.members;
@@ -263,7 +221,6 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
               const freshIds = mappedMembers.map((m: any) => m.userId).sort();
               
               if (JSON.stringify(currentIds) !== JSON.stringify(freshIds)) {
-                console.log('👥 Periodic sync: Member list changed, updating...', mappedMembers);
                 return mappedMembers;
               }
               return prev;
@@ -283,27 +240,11 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   }, [currentRoom]);
 
   const handleStartGame = async () => {
-    console.log('🎯 handleStartGame called!', {
-      currentRoom: !!currentRoom,
-      canStartGame,
-      playerListLength: playerList.length,
-      isOwner,
-      isStarting,
-      isLoading
-    });
-    
     if (!currentRoom || !canStartGame) {
-      console.log('❌ Start game blocked:', {
-        hasRoom: !!currentRoom,
-        canStart: canStartGame,
-        reason: !currentRoom ? 'No room' : 'Not enough players'
-      });
       return;
     }
     
     try {
-      console.log('✅ Starting game for room:', currentRoom.id);
-      console.log('🏠 Room status before start:', currentRoom.status);
       setIsStarting(true);
       await startGame(currentRoom.id);
       onStartGame();
@@ -324,13 +265,9 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
     if (!currentRoom) return;
     
     try {
-      console.log('🔄 Resetting room to waiting status...');
-      console.log('🏠 Room code:', currentRoom.code);
-      console.log('🔑 Auth token exists:', !!localStorage.getItem('token'));
       setIsResetting(true);
       
       const url = `/api/rooms/${currentRoom.code}/reset`;
-      console.log('📍 Reset URL:', url);
       
       const response = await fetch(url, {
         method: 'POST',
@@ -340,10 +277,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
         }
       });
       
-      console.log('📊 Reset response status:', response.status);
-      
       if (response.ok) {
-        console.log('✅ Room reset successful');
         alert('Room has been reset to waiting status!');
         // Refresh room data
         window.location.reload();
@@ -397,11 +331,11 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
         <div className="settings-grid">
           <div className="setting-item">
             <span className="setting-label">Rutstorlek:</span>
-            <span className="setting-value">{currentRoom.settings?.grid_size || 4}×{currentRoom.settings?.grid_size || 4}</span>
+            <span className="setting-value">{currentRoom.settings?.grid_size || 5}×{currentRoom.settings?.grid_size || 5}</span>
           </div>
           <div className="setting-item">
             <span className="setting-label">Max spelare:</span>
-            <span className="setting-value">{currentRoom.settings?.max_players || 4}</span>
+            <span className="setting-value">{currentRoom.settings?.max_players || 6}</span>
           </div>
           <div className="setting-item">
             <span className="setting-label">Bokstavstid:</span>
@@ -415,72 +349,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
       </div>
 
       <div className="players-section">
-        <h3>Spelare ({playerList.length}/{currentRoom.settings?.max_players || 4})</h3>
-        
-        {/* Force refresh button for debugging */}
-        <button 
-          onClick={async () => {
-            if (currentRoom?.code) {
-              console.log('🔄 Force refreshing room data...');
-              try {
-                const freshRoomData = await apiService.getRoomByCode(currentRoom.code);
-                console.log('Fresh room data:', freshRoomData);
-                // Backend returns { room: { members: [...] } }
-                const members = freshRoomData?.room?.members || freshRoomData?.members;
-                if (members && members.length > 0) {
-                  const mappedMembers = members.map((m: any) => ({
-                    userId: String(m.id || m.userId),
-                    username: m.username,
-                    role: (m.id || m.userId) === freshRoomData?.room?.createdBy ? 'owner' : 'member',
-                    joinedAt: new Date().toISOString()
-                  }));
-                  console.log('Setting player list to:', mappedMembers);
-                  setPlayerList(mappedMembers);
-                }
-              } catch (err) {
-                console.error('Failed to refresh room data:', err);
-              }
-            }
-          }}
-          style={{background: 'blue', color: 'white', padding: '5px', marginBottom: '10px', fontSize: '12px'}}
-        >
-          🔄 Force Refresh Members
-        </button>
-        
-        {/* Backend debug button */}
-        <button 
-          onClick={async () => {
-            if (currentRoom?.code) {
-              console.log('🔍 Fetching backend debug data...');
-              try {
-                const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
-                const token = localStorage.getItem('auth_token');
-                const response = await fetch(`${serverUrl}/api/rooms/${currentRoom.code}/debug`, {
-                  headers: {
-                    'Authorization': `Bearer ${token}`
-                  }
-                });
-                const debugData = await response.json();
-                console.log('🔍 BACKEND DEBUG DATA:', debugData);
-                alert('Check console for backend debug data!\n\nRaw members in DB: ' + debugData.rawMembers?.length + '\nMembers: ' + debugData.memberCount);
-              } catch (err) {
-                console.error('Failed to get debug data:', err);
-              }
-            }
-          }}
-          style={{background: 'purple', color: 'white', padding: '5px', marginBottom: '10px', fontSize: '12px', marginLeft: '5px'}}
-        >
-          🔍 Backend Debug
-        </button>
-        
-        {/* Debug info */}
-        <details style={{marginBottom: '10px', fontSize: '12px', color: '#666'}}>
-          <summary>Debug Info</summary>
-          <pre style={{background: '#f5f5f5', padding: '10px', fontSize: '11px'}}>
-            playerList: {JSON.stringify(playerList, null, 2)}
-            user: {JSON.stringify(authUser, null, 2)}
-          </pre>
-        </details>
+        <h3>Spelare ({playerList.length}/{currentRoom.settings?.max_players || 6})</h3>        
         <div className="players-list">
           {playerList.map((member, index) => (
             <div key={`player-${member.userId || index}-${member.username}`} className="player-item">
@@ -494,7 +363,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
           ))}
           
           {/* Show empty slots */}
-          {Array.from({ length: (currentRoom.settings?.max_players || 4) - playerList.length }, (_, i) => (
+          {Array.from({ length: (currentRoom.settings?.max_players || 6) - playerList.length }, (_, i) => (
             <div key={`empty-slot-${playerList.length + i}`} className="player-item empty">
               <div className="player-info">
                 <span className="player-name">Väntar på spelare...</span>
