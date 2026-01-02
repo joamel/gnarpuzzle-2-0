@@ -93,8 +93,8 @@ router.post('/', AuthService.authenticateToken, async (req, res) => {
       settings: {
         max_players,
         grid_size: board_size,
-        placement_timer: turn_duration || 30, // Increased from 15 to 30 seconds
-        letter_timer: 20,  // Increased from 10 to 20 seconds
+        placement_timer: turn_duration || 15, // Increased from 15 to 30 seconds
+        letter_timer: 10,  // Increased from 10 to 20 seconds
         is_private: false
       }
     });

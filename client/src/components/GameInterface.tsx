@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { GridCell } from '../types/game';
 import { useGame } from '../contexts/GameContext';
 
@@ -130,8 +130,86 @@ const GameInterface: React.FC = () => {
 
   const [temporaryPlacement, setTemporaryPlacement] = useState<{ x: number; y: number; letter: string } | null>(null);
   const [placingLetter, setPlacingLetter] = useState<boolean>(false);
+  const [submitInProgress, setSubmitInProgress] = useState<boolean>(false);
 
   const swedishLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'Å', 'Ä', 'Ö'];
+
+  // Single function to submit current placement - used by both OK button and timeout
+  const submitPlacement = async () => {
+    if (!temporaryPlacement) {
+      console.log('❌ No temporary placement to submit');
+      return;
+    }
+    
+    if (submitInProgress) {
+      console.log('⚠️ Submit already in progress, skipping...');
+      return;
+    }
+    
+    console.log('📤 submitPlacement called with position:', temporaryPlacement);
+    console.log('📤 Current gamePhase:', gamePhase);
+    console.log('📤 Current gameTimer:', gameTimer?.remainingSeconds);
+    
+    try {
+      setSubmitInProgress(true);
+      setPlacingLetter(true);
+      console.log('📤 Calling placeLetter with coordinates:', temporaryPlacement.x, temporaryPlacement.y);
+      await placeLetter(temporaryPlacement.x, temporaryPlacement.y);
+      console.log('📤 Calling confirmPlacement...');
+      await confirmPlacement();
+      console.log('✅ Placement submitted successfully at position:', temporaryPlacement);
+      setTemporaryPlacement(null);
+    } catch (err) {
+      console.error('❌ Failed to submit placement:', err);
+    } finally {
+      setPlacingLetter(false);
+      setSubmitInProgress(false);
+    }
+  };
+
+  // Auto-submit when timeout is imminent
+  useEffect(() => {
+    if (gamePhase === 'letter_placement' && gameTimer && gameTimer.remainingSeconds <= 1 && temporaryPlacement) {
+      console.log('⏰ 1 second left - auto-submitting placement:', temporaryPlacement);
+      submitPlacement();
+    }
+  }, [gameTimer?.remainingSeconds, gamePhase, temporaryPlacement]);
+
+  // Emergency save when phase changes away from letter_placement
+  const previousGamePhaseRef = useRef(gamePhase);
+  useEffect(() => {
+    // Only trigger if we're leaving letter_placement phase (not entering it)
+    if (previousGamePhaseRef.current === 'letter_placement' && gamePhase !== 'letter_placement' && temporaryPlacement) {
+      console.log('⏰ Phase changed away from letter_placement - emergency saving:', temporaryPlacement);
+      submitPlacement();
+    }
+    previousGamePhaseRef.current = gamePhase;
+  }, [gamePhase, temporaryPlacement]);
+
+  // Create random initial placement when letter_placement phase starts
+  useEffect(() => {
+    if (gamePhase === 'letter_placement' && selectedLetter && !temporaryPlacement) {
+      console.log('🎯 Letter placement phase started, creating random initial placement for:', selectedLetter);
+      
+      const getRandomEmptyCell = () => {
+        const emptyCells = [];
+        for (let y = 0; y < currentPlayer!.grid.length; y++) {
+          for (let x = 0; x < currentPlayer!.grid[y].length; x++) {
+            if (!currentPlayer!.grid[y][x].letter) {
+              emptyCells.push({ x, y });
+            }
+          }
+        }
+        return emptyCells[Math.floor(Math.random() * emptyCells.length)];
+      };
+
+      const randomCell = getRandomEmptyCell();
+      if (randomCell) {
+        setTemporaryPlacement({ x: randomCell.x, y: randomCell.y, letter: selectedLetter });
+        console.log(`🎲 Random initial placement: ${selectedLetter} at (${randomCell.x}, ${randomCell.y})`);
+      }
+    }
+  }, [gamePhase, selectedLetter, temporaryPlacement, currentPlayer]);
 
   const handleLetterSelect = async (letter: string) => {
     // Check if it's the player's turn
@@ -146,40 +224,52 @@ const GameInterface: React.FC = () => {
 
     try {
       await selectLetter(letter);
+      console.log(`✅ Letter selected: ${letter}`);
+      
+      // Set random initial placement for the selected letter
+      const getRandomEmptyCell = () => {
+        const emptyCells = [];
+        for (let y = 0; y < currentPlayer!.grid.length; y++) {
+          for (let x = 0; x < currentPlayer!.grid[y].length; x++) {
+            if (!currentPlayer!.grid[y][x].letter) {
+              emptyCells.push({ x, y });
+            }
+          }
+        }
+        return emptyCells[Math.floor(Math.random() * emptyCells.length)];
+      };
+
+      const randomCell = getRandomEmptyCell();
+      if (randomCell) {
+        setTemporaryPlacement({ x: randomCell.x, y: randomCell.y, letter });
+        console.log(`🎲 Random initial placement: ${letter} at (${randomCell.x}, ${randomCell.y})`);
+      }
     } catch (err) {
       console.error('Failed to select letter:', err);
     }
   };
 
+  // Move placement when cell is clicked
   const handleCellClick = async (x: number, y: number) => {
     if (!currentPlayer || !selectedLetter || gamePhase !== 'letter_placement') {
+      console.log('❌ Cannot click cell:', { selectedLetter, gamePhase, hasCurrentPlayer: !!currentPlayer });
       return;
     }
 
     const cell = currentPlayer.grid[y][x];
     if (cell.letter) {
+      console.log(`❌ Cell (${x}, ${y}) already occupied with letter: ${cell.letter}`);
       return; // Cell already occupied with permanent letter
     }
-
-    // Set temporary placement - can be moved until confirmed
+    
+    const prevPlacement = temporaryPlacement;
+    // Move temporary placement to clicked cell
     setTemporaryPlacement({ x, y, letter: selectedLetter });
+    console.log(`📍 User moved placement from (${prevPlacement?.x}, ${prevPlacement?.y}) to (${x}, ${y}) for letter ${selectedLetter}`);
   };
 
   const handleConfirmPlacement = async () => {
-    if (!temporaryPlacement) return;
-
-    try {
-      setPlacingLetter(true);
-      // Actually place the letter on server
-      await placeLetter(temporaryPlacement.x, temporaryPlacement.y);
-      // Then confirm the placement
-      await confirmPlacement();
-      setTemporaryPlacement(null);
-    } catch (err) {
-      console.error('Failed to confirm placement:', err);
-    } finally {
-      setPlacingLetter(false);
-    }
+    await submitPlacement();
   };
 
   if (!currentPlayer) {

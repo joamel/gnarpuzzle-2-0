@@ -40,16 +40,6 @@ const GamePage: React.FC = () => {
     setGameStarted(false);
   };
 
-  console.log('🎮 GamePage render decision:', {
-    currentRoom: !!currentRoom,
-    currentGame: !!currentGame, 
-    gamePhase,
-    gameStarted,
-    leaderboard: !!leaderboard,
-    willShowLeaderboard: gamePhase === 'finished' && leaderboard,
-    willShowGame: gameStarted && currentGame,
-    willShowLobby: true // fallback
-  });
 
   if (!currentRoom) {
     return (

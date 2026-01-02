@@ -70,27 +70,6 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   // Only log turn issues when there's an actual problem
   // Removed excessive debug logging for cleaner console
 
-  // Debug logging for currentPlayer calculation  
-  console.log('🔍 GameContext currentPlayer calculation:', {
-    user: user,
-    userId: user?.id,
-    playersCount: players.length,
-    players: players.map(p => ({ userId: p.userId, username: p.username, position: p.position })),
-    currentPlayer: currentPlayer ? { userId: currentPlayer.userId, username: currentPlayer.username, position: currentPlayer.position } : null
-  });
-
-  // Debug logging for turn calculation
-  console.log('🎯 Turn calculation:', {
-    currentGameCurrentTurn: currentGame?.currentTurn,
-    currentGameCurrentTurnType: typeof currentGame?.currentTurn,
-    playerUserId: playerUserId,
-    playerUserIdType: typeof playerUserId,
-    isMyTurn: isMyTurn,
-    gamePhase: gamePhase,
-    comparison: `${currentGame?.currentTurn} === ${playerUserId} = ${currentGame?.currentTurn === playerUserId}`,
-    strictComparison: `${currentGame?.currentTurn} === ${currentPlayer?.position} (${typeof currentGame?.currentTurn}) === (${typeof currentPlayer?.position})`
-  });
-
   // Timer management
   useEffect(() => {
     if (!gameTimer?.endTime) return;
@@ -120,7 +99,9 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         timer_end: data.timer_end,
         gameId: data.gameId,
         current_turn: data.current_turn,
-        timestamp: new Date().toLocaleTimeString()
+        timestamp: new Date().toLocaleTimeString(),
+        timerValid: !!data.timer_end,
+        remainingMs: data.timer_end ? data.timer_end - Date.now() : 'N/A'
       });
       
       setGamePhase(data.phase);
@@ -128,14 +109,19 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       // Clear selected letter when starting new letter selection phase
       if (data.phase === 'letter_selection') {
         setSelectedLetter(null);
-        console.log('🧹 Cleared selectedLetter for new letter selection phase');
       }
       
-      setGameTimer({
-        endTime: data.timer_end,
-        remainingSeconds: Math.ceil((data.timer_end - Date.now()) / 1000),
-        isWarning: false,
-      });
+      // Only set timer if we have a valid timer_end value
+      if (data.timer_end && data.timer_end > Date.now()) {
+        const remainingSeconds = Math.ceil((data.timer_end - Date.now()) / 1000);
+        setGameTimer({
+          endTime: data.timer_end,
+          remainingSeconds: remainingSeconds,
+          isWarning: remainingSeconds <= 5,
+        });
+      } else {
+        setGameTimer(null);
+      }
       
       // If we don't have a current game yet but get a phase change, create game object
       if (!currentGame && data.gameId) {
@@ -202,12 +188,10 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     };
 
     const handleGameStarted = (data: any) => {
-      console.log('🎮 Game started event received:', data);
-      console.log('📡 Socket data phase:', data.phase, 'gameId:', data.gameId);
       
       // Join the game socket room for receiving game events
+      // Join game socket room
       if (data.gameId) {
-        console.log('🚪 Joining game socket room:', data.gameId);
         socketService.joinGame(data.gameId);
       }
       
@@ -222,7 +206,6 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       
       setCurrentGame(gameState);
       setGamePhase(data.phase as GamePhase);
-      console.log('✅ Set gamePhase from socket to:', data.phase);
       
       // Update room status to playing
       if (currentRoom) {
@@ -583,7 +566,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
           finalScore: 0,
           connected: true
         };
-        console.log('🎮 Setting mock player data:', mockPlayer);
+
         setPlayers([mockPlayer]);
       }
       
@@ -647,11 +630,8 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     }
 
     try {
-      console.log('📡 Calling apiService.selectLetter...');
       await apiService.selectLetter(currentGame.id, currentPlayer.userId, letter);
-      console.log('✅ apiService.selectLetter completed successfully');
       setSelectedLetter(letter);
-      console.log('✅ setSelectedLetter called with:', letter);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to select letter';
       setError(message);
