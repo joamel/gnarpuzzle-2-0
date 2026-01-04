@@ -291,7 +291,7 @@ export class RoomModel {
     `, roomId);
   }
 
-  private static async generateRoomCode(): Promise<string> {
+  static async generateRoomCode(): Promise<string> {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
     

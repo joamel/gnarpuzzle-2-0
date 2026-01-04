@@ -130,6 +130,10 @@ async function startServer() {
     await DatabaseManager.getInstance();
     logger.info('Database connected successfully');
 
+    // Seed database with initial data
+    const { seedDatabase } = await import('./config/seed');
+    await seedDatabase();
+
     // Initialize Socket.IO service
     socketService = new SocketService(io);
     logger.info('Socket.IO service initialized');

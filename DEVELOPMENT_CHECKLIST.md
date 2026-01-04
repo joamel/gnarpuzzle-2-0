@@ -1,26 +1,30 @@
 # GnarPuzzle - Mobile-First Utvecklingschecklista
 
-## 🚀 Current Status: **Phase 5.0 Core Game Logic & Turn System - COMPLETE** 🎉
+## 🚀 Current Status: **Phase 5.1 UI Polish & Modal Improvements - IN PROGRESS** ✨
 
-**✅ Completed**: Core multiplayer gameplay with turn-based logic  
-**🔄 Current Focus**: Game end conditions and leaderboard system  
+**✅ Completed**: Core multiplayer gameplay with turn-based logic, UI polishing  
+**🔄 Current Focus**: Modal styling, header consistency, form improvements  
 **📍 Status**: 
-- **Turn System**: ✅ COMPLETE - User ID based turn logic working correctly
-- **Game Starting**: ✅ COMPLETE - FOREIGN KEY constraints resolved
-- **Letter Selection**: ✅ COMPLETE - Multiplayer turn validation working
-- **Game State Management**: ✅ COMPLETE - Real-time updates via Socket.IO
-- **Frontend-Backend Sync**: ✅ COMPLETE - Turn logic synchronized
-- **Mobile Touch Events**: ✅ COMPLETE - Passive event listener warnings fixed
+- **Modal Positioning**: ✅ FIXED - Centered modal with proper overlay
+- **Modal Header**: ✅ ADDED - Blue gradient header matching app theme
+- **Modal Close Button**: ✅ IMPROVED - White × character, no border
+- **Card Backgrounds**: ✅ REVERTED - Back to white for better contrast
+- **TypeScript Errors**: ✅ FIXED - Test files and config compilation
+- **Header Consistency**: ✅ COMPLETE - Unified gradient across pages
 
-**🎯 Phase 5.0 Recent Achievements**:
-- ✅ Fixed FOREIGN KEY constraint issues in game creation
-- ✅ Implemented user_id based turn system (replaced position-based)
-- ✅ Synchronized frontend turn logic with backend changes
-- ✅ Fixed premature game ending bug (grid_state vs board_state column)
-- ✅ Resolved passive event listener warnings on mobile
-- ✅ Complete multiplayer functionality working end-to-end
-- ✅ Real-time turn updates working correctly between players
-- ✅ **Letter placement timeout handling** - fixed auto-placement preserving manual choices
+**🎯 Phase 5.1 Recent Achievements**:
+- ✅ Fixed modal positioning (align-items: center, symmetric padding)
+- ✅ Added blue gradient header to "Skapa nytt rum" modal (#667eea → #764ba2)
+- ✅ Improved close button styling (white color, removed border, increased size to 32px)
+- ✅ Reverted card backgrounds from blue gradient to white (#ffffff)
+- ✅ Fixed TypeScript errors in GameInterface.test.tsx (selectedLetter: string | null, gamePhase: string)
+- ✅ Fixed vite.config.ts test configuration (as any type assertion)
+- ✅ Consistent header styling across HomePage and GamePage
+- ✅ Better visual hierarchy with improved modal contrast
+
+---
+
+## 🚀 Current Status: **Phase 5.0 Core Game Logic & Turn System - COMPLETE** 🎉
 
 ---
 
@@ -369,57 +373,75 @@
 
 ## 🎮 Fas 4: Mobile Game Experience
 
-### 4.1 Authentication UI
-- [ ] **Login Screen**:
-  - [ ] Username input (auto-focus, validation)
+### 4.1 Authentication UI ✅ (MOSTLY COMPLETE)
+- [x] ✅ **Login Screen**:
+  - [x] ✅ Username input (auto-focus, validation)
+  - [x] ✅ Loading states
+  - [x] ✅ JWT token management
   - [ ] "Kom ihåg mig" checkbox
   - [ ] Quick login för returning users
-  - [ ] Loading states
-- [ ] **Session Management**:
-  - [ ] Auto-login på app start
+- [x] ✅ **Session Management**:
+  - [x] ✅ Auto-login på app start (via token storage)
+  - [x] ✅ Session token storage
   - [ ] Session expiry handling
   - [ ] Offline queue för actions
 
-### 4.2 Room Management UI
-- [ ] **Room List** (mobil-optimerad):
-  - [ ] Card-based layout
+### 4.2 Room Management UI ✅ (MOSTLY COMPLETE)
+- [x] ✅ **Room List** (mobil-optimerad):
+  - [x] ✅ Card-based layout
+  - [x] ✅ Real-time room updates (Socket.IO)
+  - [x] ✅ Room joining functionality
   - [ ] Pull-to-refresh
-  - [ ] Real-time room updates
   - [ ] Search/filter functionality
-- [ ] **Room Creation**:
+- [x] ✅ **Room Creation**:
+  - [x] ✅ Modal interface for room creation
+  - [x] ✅ Touch-friendly form inputs
+  - [x] ✅ Instant validation feedback
+  - [x] ✅ Room code generation (automatic)
+  - [x] ✅ Modal positioning (centered overlay)
+  - [x] ✅ Modal header (blue gradient styling)
+  - [x] ✅ Close button (white × without border)
+  - [x] ✅ Card backgrounds (white for better contrast)
   - [ ] Bottom sheet modal
-  - [ ] Touch-friendly form inputs
-  - [ ] Instant validation feedback
-  - [ ] Room code generation
-- [ ] **Room Lobby**:
-  - [ ] Player list med join animation
+- [x] ✅ **Room Lobby**:
+  - [x] ✅ Player list med real-time updates
+  - [x] ✅ Start game button (för room creator)
+  - [x] ✅ Leave room functionality
   - [ ] "Redo att spela" toggle
   - [ ] Chat (optional, enkel implementation)
-  - [ ] Start game button (för room creator)
 
 ### 4.3 Game Board (Touch-Optimized)
-- [ ] **Board Layout**:
-  - [ ] Responsive grid (4x4, 5x5, 6x6)
+- [x] ✅ **Board Layout** (PARTIAL):
+  - [x] ✅ Responsive grid (currently 15x15, configurable)
+  - [x] ✅ Touch targets (40px minimum height)
+  - [x] ✅ Visual feedback (hover states with transform)
+  - [x] ✅ Touch optimizations (@media hover: none)
   - [ ] Large touch targets (min 50px)
-  - [ ] Visual feedback (hover states för touch)
   - [ ] Zoom support för småskärmar
-- [ ] **Letter Placement**:
+- [x] ✅ **Letter Placement** (PARTIAL):
+  - [x] ✅ Tap-to-place implementation (handleCellClick)
+  - [x] ✅ Placement preview (temporary-placement class)
+  - [x] ✅ Visual feedback for temporary placements
+  - [x] ✅ Auto-submit on timeout (dual safety mechanism)
   - [ ] Drag & drop med touch events
-  - [ ] Tap-to-place alternativ
-  - [ ] Placement preview
   - [ ] Undo funktionalitet
-- [ ] **Timer Component**:
+- [x] ✅ **Timer Component**:
+  - [x] ✅ Timer display with seconds countdown
+  - [x] ✅ Color coding (normal → warning on isWarning)
+  - [x] ✅ Visual warning state with pulse animation
+  - [x] ✅ Real-time countdown with remainingSeconds
   - [ ] Circular progress ring
-  - [ ] Color coding (green→orange→red)
   - [ ] Vibration på 5s warning
   - [ ] Number countdown sista 5 sekunder
 
 ### 4.4 Game Flow UI
-- [ ] **Turn Management**:
-  - [ ] "Din tur!" notification
-  - [ ] Turn indicator (visuellt tydlig)
-  - [ ] Other players' status
-  - [ ] Auto-advance animation
+- [x] ✅ **Turn Management** (MOSTLY COMPLETE):
+  - [x] ✅ "Din tur!" notification (my-turn indicator)
+  - [x] ✅ Turn indicator (visuellt tydlig med isMyTurn)
+  - [x] ✅ Phase indicator (letter_selection/letter_placement)
+  - [x] ✅ Auto-advance on timeout (phase transitions)
+  - [ ] Other players' status display
+  - [ ] Turn change animation
 - [ ] **Results Screen**:
   - [ ] Score breakdown animation
   - [ ] Word list (scrollbar)

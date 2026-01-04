@@ -120,6 +120,13 @@ export class RoomCleanupService {
    */
   private async shouldCleanupRoom(room: any): Promise<boolean> {
     try {
+      // NEVER cleanup public rooms (they are kept permanently)
+      const settings = typeof room.settings === 'string' ? JSON.parse(room.settings) : room.settings;
+      if (settings?.is_private === false) {
+        logger.debug(`Public room ${room.code} is permanent - skipping cleanup`);
+        return false;
+      }
+
       // Check if room is empty (no members) - delete faster
       const memberCount = await RoomModel.getMemberCount(room.id);
       if (memberCount === 0) {

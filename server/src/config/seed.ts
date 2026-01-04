@@ -1,4 +1,5 @@
-import { UserModel } from '../models';
+import { UserModel, RoomModel } from '../models';
+import { DatabaseManager } from './database';
 
 export async function seedDatabase(): Promise<void> {
   console.log('🌱 Seeding database with test data...');
@@ -19,6 +20,62 @@ export async function seedDatabase(): Promise<void> {
       if (!exists) {
         await UserModel.create(username);
         console.log(`✅ Created test user: ${username}`);
+      }
+    }
+
+    // Create standard public rooms (4x4, 5x5, 6x6) WITHOUT auto-joining the creator
+    const adminUser = await UserModel.findByUsername('GnarMaster');
+    if (adminUser) {
+      const standardRooms = [
+        { name: 'Snabbspel 4×4', board_size: 4, max_players: 4, letter_timer: 15, placement_timer: 20 },
+        { name: 'Klassiskt 5×5', board_size: 5, max_players: 6, letter_timer: 20, placement_timer: 30 },
+        { name: 'Utmaning 6×6', board_size: 6, max_players: 4, letter_timer: 25, placement_timer: 40 }
+      ];
+
+      const dbManager = await DatabaseManager.getInstance();
+      const db = dbManager.getDatabase();
+
+      for (const roomData of standardRooms) {
+        try {
+          // Check if room already exists by name
+          const existingRoom = await db.get(
+            `SELECT id FROM rooms WHERE name = ?`,
+            [roomData.name]
+          );
+          
+          if (!existingRoom) {
+            // Generate unique room code
+            const code = await RoomModel.generateRoomCode();
+            
+            // Insert room directly WITHOUT auto-joining creator
+            const settings = JSON.stringify({
+              grid_size: roomData.board_size,
+              max_players: roomData.max_players,
+              letter_timer: roomData.letter_timer,
+              placement_timer: roomData.placement_timer,
+              is_private: false
+            });
+
+            await db.run(`
+              INSERT INTO rooms (code, name, created_by, max_players, board_size, turn_duration, settings, status)
+              VALUES (?, ?, ?, ?, ?, ?, ?, 'waiting')
+            `,
+              code,
+              roomData.name,
+              adminUser.id,
+              roomData.max_players,
+              roomData.board_size,
+              roomData.placement_timer,
+              settings
+            );
+
+            console.log(`✅ Created standard public room: ${roomData.name}`);
+          } else {
+            console.log(`ℹ️  Standard public room already exists: ${roomData.name}`);
+          }
+        } catch (err) {
+          console.log(`ℹ️  Standard room ${roomData.name} already exists or error creating:`, err);
+        }
       }
     }
 

@@ -52,7 +52,7 @@ router.get('/', AuthService.optionalAuth, async (_req, res) => {
 router.post('/', AuthService.authenticateToken, async (req, res) => {
   try {
     const authReq = req as AuthenticatedRequest;
-    const { name, max_players, board_size, turn_duration } = req.body;
+    const { name, max_players, board_size, turn_duration, letter_timer, placement_timer } = req.body;
 
     // Validation
     if (!name || name.length < 2 || name.length > 30) {
@@ -87,14 +87,30 @@ router.post('/', AuthService.authenticateToken, async (req, res) => {
       return;
     }
 
+    if (letter_timer && (letter_timer < 5 || letter_timer > 60)) {
+      res.status(400).json({
+        error: 'Invalid letter_timer',
+        message: 'Letter timer must be between 5 and 60 seconds'
+      });
+      return;
+    }
+
+    if (placement_timer && (placement_timer < 10 || placement_timer > 60)) {
+      res.status(400).json({
+        error: 'Invalid placement_timer',
+        message: 'Placement timer must be between 10 and 60 seconds'
+      });
+      return;
+    }
+
     const room = await RoomModel.create({
       name,
       created_by: authReq.user!.id,
       settings: {
         max_players,
         grid_size: board_size,
-        placement_timer: turn_duration || 15, // Increased from 15 to 30 seconds
-        letter_timer: 10,  // Increased from 10 to 20 seconds
+        placement_timer: placement_timer || turn_duration || 30,
+        letter_timer: letter_timer || 20,
         is_private: false
       }
     });

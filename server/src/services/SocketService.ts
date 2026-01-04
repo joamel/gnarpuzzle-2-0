@@ -86,6 +86,11 @@ export class SocketService {
         this.handleRoomLeave(socket, data);
       });
 
+      // Player ready status
+      socket.on('player:set_ready', (data: { roomCode: string; isReady: boolean }) => {
+        this.handlePlayerSetReady(socket, data);
+      });
+
       // Game events
       socket.on('game:join', (data: { gameId: number }) => {
         this.handleGameJoin(socket, data);
@@ -309,6 +314,37 @@ export class SocketService {
       });
     } catch (error) {
       logger.error(`Room leave failed: ${roomCode}`, {
+        service: 'gnarpuzzle-server',
+        error: (error as Error).message
+      });
+    }
+  }
+
+  private async handlePlayerSetReady(socket: Socket, data: { roomCode: string; isReady: boolean }): Promise<void> {
+    const { roomCode, isReady } = data;
+    const userData = this.connectedUsers.get(socket.id);
+
+    if (!userData?.userId) {
+      return;
+    }
+
+    try {
+      // Broadcast ready status to all players in the room (including sender)
+      this.io.to(`room:${roomCode}`).emit('player:ready_changed', {
+        userId: String(userData.userId),
+        username: userData.username,
+        isReady,
+        roomCode
+      });
+
+      logger.info(`Player ready status changed: ${userData.username} -> ${isReady}`, {
+        service: 'gnarpuzzle-server',
+        userId: userData.userId,
+        roomCode,
+        isReady
+      });
+    } catch (error) {
+      logger.error(`Player ready status failed: ${roomCode}`, {
         service: 'gnarpuzzle-server',
         error: (error as Error).message
       });
