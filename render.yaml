@@ -3,7 +3,7 @@ services:
     name: gnarpuzzle-backend
     runtime: node
     dir: server
-    buildCommand: npm install && npm run build
+    buildCommand: npm ci && npm run build
     startCommand: node dist/index.js
     envVars:
       - key: NODE_ENV
