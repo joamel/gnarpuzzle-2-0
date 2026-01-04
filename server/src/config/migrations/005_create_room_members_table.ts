@@ -4,7 +4,7 @@ export const migration: Migration = {
   version: 5,
   name: 'create_room_members_table',
   up: `
-    CREATE TABLE room_members (
+    CREATE TABLE IF NOT EXISTS room_members (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       room_id INTEGER NOT NULL,
       user_id INTEGER NOT NULL,
@@ -16,9 +16,9 @@ export const migration: Migration = {
       UNIQUE(room_id, user_id)
     );
 
-    CREATE INDEX idx_room_members_room_id ON room_members(room_id);
-    CREATE INDEX idx_room_members_user_id ON room_members(user_id);
-    CREATE INDEX idx_room_members_joined_at ON room_members(joined_at);
+    CREATE INDEX IF NOT EXISTS idx_room_members_room_id ON room_members(room_id);
+    CREATE INDEX IF NOT EXISTS idx_room_members_user_id ON room_members(user_id);
+    CREATE INDEX IF NOT EXISTS idx_room_members_joined_at ON room_members(joined_at);
   `,
   down: `
     DROP INDEX IF EXISTS idx_room_members_joined_at;

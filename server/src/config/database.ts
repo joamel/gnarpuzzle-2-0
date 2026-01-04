@@ -234,9 +234,17 @@ export class DatabaseManager {
     }
 
     // Try to use SQLite if available, otherwise fallback to mock
+    let useSQLite = false;
     try {
       // Check if better-sqlite3 is available
       require.resolve('better-sqlite3');
+      useSQLite = true;
+    } catch {
+      // better-sqlite3 not installed
+      useSQLite = false;
+    }
+
+    if (useSQLite) {
       this.db = new SQLiteDatabase(dbPath);
       console.log(`✅ Using real SQLite database: ${dbPath}`);
       
@@ -266,9 +274,8 @@ export class DatabaseManager {
           await (this.db as any).resetPlayingRooms();
         }
       }
-      
-    } catch (error) {
-      // Fallback to mock database
+    } else {
+      // Fallback to mock database ONLY if better-sqlite3 is not installed
       this.db = new SimpleDatabaseMock();
       console.log(`📁 Mock Database connected for development: ${dbPath}`);
       console.log(`ℹ️  To use real SQLite, install: npm install better-sqlite3 @types/better-sqlite3`);

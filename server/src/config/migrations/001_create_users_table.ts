@@ -4,7 +4,7 @@ export const migration: Migration = {
   version: 1,
   name: 'create_users_table',
   up: `
-    CREATE TABLE users (
+    CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT NOT NULL UNIQUE,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -13,8 +13,8 @@ export const migration: Migration = {
       CONSTRAINT username_length CHECK (length(username) >= 2 AND length(username) <= 20)
     );
 
-    CREATE INDEX idx_users_username ON users(username);
-    CREATE INDEX idx_users_last_active ON users(last_active);
+    CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+    CREATE INDEX IF NOT EXISTS idx_users_last_active ON users(last_active);
   `,
   down: `
     DROP INDEX IF EXISTS idx_users_last_active;

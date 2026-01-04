@@ -4,7 +4,7 @@ export const migration: Migration = {
   version: 2,
   name: 'create_rooms_table',
   up: `
-    CREATE TABLE rooms (
+    CREATE TABLE IF NOT EXISTS rooms (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       code TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
@@ -24,10 +24,10 @@ export const migration: Migration = {
       FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
     );
 
-    CREATE UNIQUE INDEX idx_rooms_code ON rooms(code);
-    CREATE INDEX idx_rooms_status ON rooms(status);
-    CREATE INDEX idx_rooms_created_by ON rooms(created_by);
-    CREATE INDEX idx_rooms_created_at ON rooms(created_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_rooms_code ON rooms(code);
+    CREATE INDEX IF NOT EXISTS idx_rooms_status ON rooms(status);
+    CREATE INDEX IF NOT EXISTS idx_rooms_created_by ON rooms(created_by);
+    CREATE INDEX IF NOT EXISTS idx_rooms_created_at ON rooms(created_at);
   `,
   down: `
     DROP INDEX IF EXISTS idx_rooms_created_at;

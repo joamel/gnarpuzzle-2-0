@@ -4,7 +4,7 @@ export const migration: Migration = {
   version: 4,
   name: 'create_players_table',
   up: `
-    CREATE TABLE players (
+    CREATE TABLE IF NOT EXISTS players (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       game_id INTEGER NOT NULL,
       user_id INTEGER NOT NULL,
@@ -25,10 +25,10 @@ export const migration: Migration = {
       UNIQUE(game_id, position)
     );
 
-    CREATE INDEX idx_players_game_id ON players(game_id);
-    CREATE INDEX idx_players_user_id ON players(user_id);
-    CREATE INDEX idx_players_position ON players(game_id, position);
-    CREATE INDEX idx_players_score ON players(score);
+    CREATE INDEX IF NOT EXISTS idx_players_game_id ON players(game_id);
+    CREATE INDEX IF NOT EXISTS idx_players_user_id ON players(user_id);
+    CREATE INDEX IF NOT EXISTS idx_players_position ON players(game_id, position);
+    CREATE INDEX IF NOT EXISTS idx_players_score ON players(score);
   `,
   down: `
     DROP INDEX IF EXISTS idx_players_score;

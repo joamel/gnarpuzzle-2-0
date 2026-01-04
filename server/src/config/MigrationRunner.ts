@@ -45,7 +45,22 @@ export class MigrationRunner {
           console.log(`🔄 Running migration ${migrationId} (${migration.name})...`);
           try {
             // Execute the up migration SQL
-            await this.db.exec(migration.up);
+            // Split by semicolon and execute each statement separately
+            // This allows partial success for migrations with multiple statements
+            const statements = migration.up.split(';').map(s => s.trim()).filter(s => s.length > 0);
+            for (const statement of statements) {
+              try {
+                await this.db.exec(statement + ';');
+              } catch (stmtError: any) {
+                // Ignore "table already exists", "index already exists", "duplicate column" errors
+                const errorMsg = stmtError.message || '';
+                if (errorMsg.includes('already exists') || errorMsg.includes('duplicate column')) {
+                  console.log(`⚠️  Skipping (already exists): ${statement.substring(0, 50)}...`);
+                } else {
+                  throw stmtError;
+                }
+              }
+            }
             await this.recordMigration(migrationId);
             console.log(`✅ Migration ${migrationId} completed`);
           } catch (error) {
