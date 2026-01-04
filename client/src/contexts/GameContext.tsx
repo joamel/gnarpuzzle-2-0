@@ -31,6 +31,7 @@ interface GameContextType {
   isLoading: boolean;
   error: string | null;
   leaderboard: Leaderboard[] | null;
+  gameEndReason: string | null;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -59,6 +60,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [leaderboard, setLeaderboard] = useState<Leaderboard[] | null>(null);
+  const [gameEndReason, setGameEndReason] = useState<string | null>(null);
 
   const currentPlayer = players.find(p => p.userId === user?.id) || null;
   
@@ -181,6 +183,11 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       setLeaderboard(data.leaderboard);
       setGamePhase('finished');
       setGameTimer(null);
+      
+      // Store reason if provided (e.g., player_left)
+      if (data.reason) {
+        setGameEndReason(data.reason);
+      }
       
       if (currentGame) {
         setCurrentGame(prev => prev ? { ...prev, status: 'completed' } : null);
@@ -407,6 +414,25 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       }
     };
 
+    const handleGamePlayerLeft = (data: any) => {
+      console.log(`🚪 Player left game: userId ${data.leftUserId}, remaining: ${data.remainingPlayers}`);
+      
+      // Update current turn if it changed
+      if (currentGame && data.newCurrentTurn) {
+        setCurrentGame(prev => prev ? {
+          ...prev,
+          currentTurn: data.newCurrentTurn
+        } : null);
+      }
+      
+      // Refresh player list
+      if (currentRoom) {
+        fetchRoomData(currentRoom.code).catch(err => {
+          console.error('Failed to refresh room data after player left game:', err);
+        });
+      }
+    };
+
     const handleOwnershipTransferred = (data: any) => {
       console.log(`👑 Room ownership transferred to: ${data.newCreator.username}`);
       
@@ -434,6 +460,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     socketService.on('letter:placed', handleLetterPlaced);
     socketService.on('game:ended', handleGameEnded);
     socketService.on('game:started', handleGameStarted);
+    socketService.on('game:player_left', handleGamePlayerLeft);
     socketService.on('room:member_left', handleRoomMemberLeft);
     socketService.on('room:ownership_transferred', handleOwnershipTransferred);
     socketService.on('room:updated', handleRoomUpdated);
@@ -444,6 +471,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       socketService.off('letter:placed', handleLetterPlaced);
       socketService.off('game:ended', handleGameEnded);
       socketService.off('game:started', handleGameStarted);
+      socketService.off('game:player_left', handleGamePlayerLeft);
       socketService.off('room:member_left', handleRoomMemberLeft);
       socketService.off('room:ownership_transferred', handleOwnershipTransferred);
       socketService.off('room:updated', handleRoomUpdated);
@@ -714,6 +742,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       setGameTimer(null);
       setSelectedLetter(null);
       setLeaderboard(null);
+      setGameEndReason(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to leave room';
       setError(message);
@@ -739,6 +768,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     isLoading,
     error,
     leaderboard,
+    gameEndReason,
   };
 
   return (

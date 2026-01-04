@@ -523,22 +523,6 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
             )}
           </div>
         )}
-
-        <button
-          onClick={handleLeaveRoom}
-          disabled={isLoading}
-          className="leave-room-button secondary-button"
-        >
-          Lämna rum
-        </button>
-        
-        <button
-          onClick={() => window.location.href = '/'}
-          className="back-to-home-button secondary-button"
-          style={{marginLeft: '10px'}}
-        >
-          Tillbaka till startsidan
-        </button>
       </div>
       
       {/* Tips Modal */}

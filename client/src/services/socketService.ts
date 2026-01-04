@@ -69,6 +69,14 @@ export interface SocketEvents {
       words: any[];
     }>;
     finalScores: any;
+    reason?: string;
+    message?: string;
+  }) => void;
+  'game:player_left': (data: {
+    gameId: number;
+    leftUserId: number;
+    remainingPlayers: number;
+    newCurrentTurn?: number;
   }) => void;
 }
 

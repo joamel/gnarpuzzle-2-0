@@ -11,7 +11,7 @@ const GameInterface = React.lazy(() => import('../components/GameInterface').the
 
 const GamePage: React.FC = () => {
   const { user } = useAuth();
-  const { currentRoom, currentGame, gamePhase, leaderboard } = useGame();
+  const { currentRoom, currentGame, gamePhase, leaderboard, leaveRoom, gameEndReason } = useGame();
   const navigate = useNavigate();
   const [gameStarted, setGameStarted] = useState(false);
 
@@ -40,8 +40,15 @@ const GamePage: React.FC = () => {
     setGameStarted(true);
   };
 
-  const handleBackToLobby = () => {
-    setGameStarted(false);
+  // Leave room and go back to home
+  const handleLeaveRoom = async () => {
+    try {
+      await leaveRoom();
+      navigate('/');
+    } catch (error) {
+      console.error('Failed to leave room:', error);
+      navigate('/');
+    }
   };
 
 
@@ -62,6 +69,10 @@ const GamePage: React.FC = () => {
       <div className="game-finished">
         <div className="game-finished-content">
           <h2>🏆 Spelet avslutat!</h2>
+          
+          {gameEndReason === 'player_left' && (
+            <p className="game-end-reason">En spelare lämnade spelet</p>
+          )}
           
           <div className="leaderboard">
             <h3>Resultat</h3>
@@ -93,16 +104,10 @@ const GamePage: React.FC = () => {
 
           <div className="game-actions">
             <button 
-              onClick={handleBackToLobby} 
+              onClick={handleLeaveRoom} 
               className="back-to-lobby-button primary-button"
             >
-              Tillbaka till lobby
-            </button>
-            <button 
-              onClick={() => navigate('/')} 
-              className="new-game-button secondary-button"
-            >
-              Nytt spel
+              Lämna spelet
             </button>
           </div>
         </div>
@@ -116,10 +121,10 @@ const GamePage: React.FC = () => {
       <div className="game-page">
         <div className="game-header">
           <button 
-            onClick={handleBackToLobby}
+            onClick={handleLeaveRoom}
             className="back-button"
           >
-            ← Tillbaka till lobby
+            ← Lämna spelet
           </button>
           <h2>🧩 {currentRoom.name}</h2>
           <div className="room-code-display">
@@ -144,10 +149,10 @@ const GamePage: React.FC = () => {
     <div className="game-page">
       <div className="game-header">
         <button 
-          onClick={() => navigate('/')}
+          onClick={handleLeaveRoom}
           className="back-button"
         >
-          ← Hem
+          ← Lämna rummet
         </button>
         <h2>🧩 Rum</h2>
         <div></div>
