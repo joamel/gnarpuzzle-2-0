@@ -48,7 +48,35 @@
 - **Status**: ✅ Kan behållas - hjälpsam för utveckling
 - **Överväg**: Ta bort console.logs innan produktion för prestanda
 
-### �️ DATABASE AUTO-RESET FUNKTIONALITET (UTVECKLING ENDAST)
+### ✅ DATABASE MIGRATION FIX (IF NOT EXISTS)
+- **Problem**: Migreringar kraschade med "table already exists" vid serveromstart
+- **Lösning**:
+  - ✅ Alla CREATE TABLE använder nu IF NOT EXISTS
+  - ✅ Alla CREATE INDEX använder nu IF NOT EXISTS
+  - ✅ MigrationRunner hanterar "already exists" fel graciöst
+  - ✅ Mock DB används ENDAST om better-sqlite3 saknas (inte som fallback vid fel)
+- **Status**: ✅ Permanent fix - migrering fungerar vid omstart
+
+### ✅ SPELARE LÄMNAR MITT I SPEL
+- **Problem**: Om en spelare lämnade mitt i spelet fortsatte spelet för kvarvarande
+- **Lösning**:
+  - ✅ handlePlayerLeft() i GameStateService
+  - ✅ Om 1 spelare kvar → spelet avslutas automatiskt
+  - ✅ Om den som lämnar har turen → byter till nästa spelare
+  - ✅ game:player_left socket event för UI-uppdatering
+  - ✅ Visar "En spelare lämnade spelet" vid spelets slut
+- **Status**: ✅ Permanent fix
+
+### ✅ LEAVE ROOM UI KONSOLIDERING
+- **Problem**: Duplicerade "Lämna rum" knappar, "Tillbaka till lobby" fungerade inte
+- **Lösning**:
+  - ✅ Alla leave-knappar borttagna från RoomLobby
+  - ✅ En knapp i GamePage header: "Lämna rummet" / "Lämna spelet"
+  - ✅ leaveRoom() API anropas korrekt vid alla leave-åtgärder
+  - ✅ Navigerar alltid tillbaka till hemsidan
+- **Status**: ✅ Permanent fix
+
+### 🗄️ DATABASE AUTO-RESET FUNKTIONALITET (UTVECKLING ENDAST)
 - **Tillagt**: Automatisk återställning av rum och spel för smidigare utveckling
 - **Filer ändrade**:
   - `server/src/config/sqlite.ts`: `clearAllRoomsAndGames()`, `resetPlayingRooms()` metoder
@@ -430,14 +458,16 @@
   - [x] ✅ Turn indicator (visuellt tydlig med isMyTurn)
   - [x] ✅ Phase indicator (letter_selection/letter_placement)
   - [x] ✅ Auto-advance on timeout (phase transitions)
+  - [x] ✅ Handle player leaving mid-game (game ends if 1 player, turn switches otherwise)
   - [ ] Other players' status display
   - [ ] Turn change animation
 - [x] ✅ **Results Screen** (COMPLETE):
   - [x] ✅ Score breakdown med leaderboard
   - [x] ✅ Word list med poäng per ord (scrollable)
   - [x] ✅ Leaderboard med position highlight
-  - [x] ✅ "Tillbaka till lobby" / "Nytt spel" buttons
+  - [x] ✅ "Lämna spelet" button (consolidated from multiple buttons)
   - [x] ✅ Player ranking med "Du" highlight för current user
+  - [x] ✅ Game end reason display ("En spelare lämnade spelet")
 
 ---
 
