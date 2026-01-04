@@ -17,9 +17,11 @@ const app = express();
 const server = createServer(app);
 const PORT = process.env.PORT || 3001;
 
-// Mobile-optimized CORS
+// Mobile-optimized CORS - accepts localhost (dev) and configured frontend domains (prod)
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'development' ? true : (process.env.CORS_ORIGIN || 'http://localhost:5173'),
+  origin: process.env.NODE_ENV === 'development' 
+    ? true 
+    : (process.env.CORS_ORIGIN || 'http://localhost:5173'),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

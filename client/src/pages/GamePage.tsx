@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../contexts/GameContext';
 import { useAuth } from '../contexts/AuthContext';
 import RoomLobby from '../components/RoomLobby';
-import { GameInterface } from '../components/GameInterface';
+
+// Lazy load GameInterface for better performance
+const GameInterface = React.lazy(() => import('../components/GameInterface').then(module => ({ 
+  default: module.GameInterface 
+})));
 
 const GamePage: React.FC = () => {
   const { user } = useAuth();
@@ -123,7 +127,14 @@ const GamePage: React.FC = () => {
           </div>
         </div>
         
-        <GameInterface />
+        <Suspense fallback={
+          <div className="loading-game-interface">
+            <div className="loading-spinner"></div>
+            <p>Laddar spelplan...</p>
+          </div>
+        }>
+          <GameInterface />
+        </Suspense>
       </div>
     );
   }

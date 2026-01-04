@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: gnarpuzzle
+    runtime: node
+    buildCommand: bash build.sh
+    startCommand: cd server && npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: DATABASE_URL
+        value: ./data/gnarpuzzle.db
+      - key: CORS_ORIGIN
+        scope: RUN
+      - key: JWT_SECRET
+        scope: RUN
+      - key: LOG_LEVEL
+        value: info

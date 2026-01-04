@@ -5,6 +5,14 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { DatabaseInterface, SQLiteDatabase } from './sqlite';
 
+// Import all migrations
+import m001 from './migrations/001_create_users_table';
+import m002 from './migrations/002_create_rooms_table';
+import m003 from './migrations/003_create_games_table';
+import m004 from './migrations/004_create_players_table';
+import m005 from './migrations/005_create_room_members_table';
+import m006 from './migrations/006_enhance_game_logic_schema';
+
 // For now, we'll use a simple in-memory mock for development
 interface MockDatabase extends DatabaseInterface {
   exec: (query: string) => Promise<void>;
@@ -231,6 +239,22 @@ export class DatabaseManager {
       require.resolve('better-sqlite3');
       this.db = new SQLiteDatabase(dbPath);
       console.log(`✅ Using real SQLite database: ${dbPath}`);
+      
+      // Run migrations to create schema
+      console.log('🔄 Running database migrations...');
+      const { MigrationRunner } = await import('./MigrationRunner');
+      const migrationRunner = new MigrationRunner(this.db as SQLiteDatabase);
+      
+      // Register all migrations in order
+      migrationRunner.registerMigration(m001);
+      migrationRunner.registerMigration(m002);
+      migrationRunner.registerMigration(m003);
+      migrationRunner.registerMigration(m004);
+      migrationRunner.registerMigration(m005);
+      migrationRunner.registerMigration(m006);
+      
+      // Run all pending migrations
+      await migrationRunner.runPendingMigrations();
       
       // Development mode: Clear/reset rooms on startup
       if (process.env.NODE_ENV !== 'production') {

@@ -301,3 +301,34 @@ input:disabled {
     padding-bottom: max(20px, env(safe-area-inset-bottom));
   }
 }
+
+/* Loading states for lazy components */
+.loading-game-interface {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #667eea;
+  text-align: center;
+}
+
+.loading-game-interface p {
+  margin-top: 16px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #4c63d2;
+}
+
+/* Performance optimizations */
+.lazy-content {
+  contain: layout style paint;
+}
+
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}

@@ -22,6 +22,7 @@ export class WordValidationService {
   private static instance: WordValidationService;
   private swedishWords: Set<string> = new Set();
   private isLoaded = false;
+  private isFallbackMode = false;
 
   private constructor() {}
 
@@ -40,23 +41,37 @@ export class WordValidationService {
 
     try {
       const dictPath = path.join(process.cwd(), 'data', 'swedish.json');
-      const dictData = await fs.promises.readFile(dictPath, 'utf-8');
-      const words: string[] = JSON.parse(dictData);
       
-      // Add all words to Set for O(1) lookup, normalize to uppercase
-      words.forEach(word => {
-        if (word && word.length >= 2) {
-          this.swedishWords.add(word.toUpperCase().trim());
-        }
-      });
+      try {
+        const dictData = await fs.promises.readFile(dictPath, 'utf-8');
+        const words: string[] = JSON.parse(dictData);
+        
+        // Add all words to Set for O(1) lookup, normalize to uppercase
+        words.forEach(word => {
+          if (word && word.length >= 2) {
+            this.swedishWords.add(word.toUpperCase().trim());
+          }
+        });
 
-      console.log(`📖 Swedish dictionary loaded: ${this.swedishWords.size} words`);
+        console.log(`📖 Swedish dictionary loaded: ${this.swedishWords.size} words`);
+      } catch (fileError: any) {
+        // If file doesn't exist, use fallback mode
+        if (fileError.code === 'ENOENT') {
+          console.warn('⚠️  Swedish dictionary file not found, using fallback mode (accept any 2+ char word)');
+          this.isFallbackMode = true;
+        } else {
+          throw fileError;
+        }
+      }
+      
       this.isLoaded = true;
     } catch (error) {
       console.error('Failed to load Swedish dictionary:', error);
       throw new Error('Could not load word dictionary');
     }
   }
+
+
 
   /**
    * Check if a word exists in the Swedish dictionary
@@ -67,6 +82,12 @@ export class WordValidationService {
     }
     
     if (!word || word.length < 2) return false;
+    
+    // In fallback mode, accept any word 2+ characters (no dictionary validation)
+    if (this.isFallbackMode) {
+      return true;
+    }
+    
     return this.swedishWords.has(word.toUpperCase().trim());
   }
 

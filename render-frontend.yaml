@@ -1,0 +1,10 @@
+# Render Frontend Static Site Configuration
+# Deploy the built Vite bundle as a static site
+
+sites:
+  - name: gnarpuzzle
+    buildCommand: cd client && npm install && npm run build
+    publishDirectory: client/dist
+    envVars:
+      - key: VITE_SERVER_URL
+        value: https://gnarpuzzle-backend.onrender.com

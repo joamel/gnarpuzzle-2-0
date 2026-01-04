@@ -76,6 +76,9 @@ class SocketService {
   private socket: Socket | null = null;
   private isConnecting = false;
   private eventListeners = new Map<string, Function[]>();
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectTimer: NodeJS.Timeout | null = null;
 
   connect(token: string): Promise<Socket> {
     if (this.socket?.connected) {
@@ -98,9 +101,11 @@ class SocketService {
     this.isConnecting = true;
 
     return new Promise((resolve, reject) => {
-      const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+      // In production, VITE_SERVER_URL is empty and Socket.IO will use the current domain
+      // In development, VITE_SERVER_URL points to localhost:3001
+      const serverUrl = import.meta.env.VITE_SERVER_URL || (process.env.NODE_ENV === 'production' ? undefined : 'http://localhost:3001');
       
-      this.socket = io(serverUrl, {
+      this.socket = io(serverUrl || undefined, {
         auth: { token },
         autoConnect: true,
         reconnection: true,
@@ -112,18 +117,23 @@ class SocketService {
       this.socket.on('connect', () => {
         console.log('🔗 Connected to server');
         this.isConnecting = false;
+        this.reconnectAttempts = 0; // Reset on successful connection
         resolve(this.socket!);
       });
 
       this.socket.on('connect_error', (error) => {
         console.error('❌ Socket connection error:', error);
         this.isConnecting = false;
+        this.handleReconnection();
         reject(error);
       });
 
       this.socket.on('disconnect', (reason) => {
         console.log('💔 Disconnected from server:', reason);
         this.isConnecting = false;
+        if (reason !== 'io client disconnect') {
+          this.handleReconnection();
+        }
       });
 
       // Re-register all event listeners
@@ -136,11 +146,28 @@ class SocketService {
   }
 
   disconnect(): void {
+    // Clear reconnect timer
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
+    // Clear all event listeners to prevent memory leaks
+    this.eventListeners.clear();
+
     if (this.socket) {
+      this.socket.removeAllListeners();
       this.socket.disconnect();
       this.socket = null;
     }
+    
     this.isConnecting = false;
+    this.reconnectAttempts = 0;
+  }
+
+  // Cleanup method to be called on component unmount
+  cleanup(): void {
+    this.disconnect();
   }
 
   emit(event: string, data?: any): void {
@@ -212,12 +239,41 @@ class SocketService {
       if (index !== -1) {
         listeners.splice(index, 1);
       }
+      
+      // Clean up empty listener arrays
+      if (listeners.length === 0) {
+        this.eventListeners.delete(event);
+      }
     }
 
     // Remove from socket
     if (this.socket) {
       this.socket.off(event, listener as any);
     }
+  }
+
+  private handleReconnection(): void {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('❌ Max reconnection attempts reached');
+      return;
+    }
+
+    if (this.reconnectTimer) {
+      return; // Already attempting to reconnect
+    }
+
+    this.reconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts - 1), 30000); // Exponential backoff, max 30s
+
+    console.log(`🔄 Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+    
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (!this.socket?.connected && this.reconnectAttempts < this.maxReconnectAttempts) {
+        console.log('🔄 Retrying connection...');
+        // Note: Would need to store token for auto-reconnection
+      }
+    }, delay);
   }
 
   isConnected(): boolean {

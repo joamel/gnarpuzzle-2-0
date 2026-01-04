@@ -1,0 +1,26 @@
+# Render Backend Service Configuration
+# Deploy the GnarPuzzle API and WebSocket server
+
+services:
+  - type: web
+    name: gnarpuzzle-backend
+    runtime: node
+    buildCommand: cd server && npm install && npm run build
+    startCommand: cd server && node dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: DATABASE_URL
+        value: ./data/gnarpuzzle.db
+      - key: CORS_ORIGIN
+        scope: RUN
+      - key: JWT_SECRET
+        scope: RUN
+      - key: LOG_LEVEL
+        value: info
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: 100

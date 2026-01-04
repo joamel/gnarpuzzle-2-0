@@ -45,6 +45,8 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 *.db
+/data/gnarpuzzle.db
+/data/swedish.json
 
 # Logs
 logs
