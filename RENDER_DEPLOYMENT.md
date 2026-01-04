@@ -34,8 +34,9 @@ Fill in:
 
 - **Name**: `gnarpuzzle-backend`
 - **Environment**: `Node`
-- **Build Command**: `npm install --prefix server && npm run build --prefix server`
-- **Start Command**: `cd server && node dist/index.js`
+- **Root Directory**: `server`
+- **Build Command**: `npm install && npm run build`
+- **Start Command**: `node dist/index.js`
 - **Node Version**: `18` or higher
 
 ### 1.3 Set Backend Environment Variables

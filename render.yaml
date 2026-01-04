@@ -2,8 +2,9 @@ services:
   - type: web
     name: gnarpuzzle-backend
     runtime: node
-    buildCommand: npm install --prefix server && npm run build --prefix server
-    startCommand: cd server && node dist/index.js
+    dir: server
+    buildCommand: npm install && npm run build
+    startCommand: node dist/index.js
     envVars:
       - key: NODE_ENV
         value: production
