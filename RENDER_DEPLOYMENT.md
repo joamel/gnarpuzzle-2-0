@@ -34,7 +34,7 @@ Fill in:
 
 - **Name**: `gnarpuzzle-backend`
 - **Environment**: `Node`
-- **Build Command**: `bash build.sh`
+- **Build Command**: `npm install --prefix server && npm run build --prefix server`
 - **Start Command**: `cd server && node dist/index.js`
 - **Node Version**: `18` or higher
 
