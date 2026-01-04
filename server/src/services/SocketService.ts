@@ -604,6 +604,7 @@ export class SocketService {
       if (userData.roomCode && userData.userId) {
         try {
           const RoomModel = (await import('../models/RoomModel')).RoomModel;
+          const GameModel = (await import('../models/GameModel')).GameModel;
           const room = await RoomModel.findByCode(userData.roomCode);
           
           if (room) {
@@ -616,6 +617,15 @@ export class SocketService {
             }
             
             const roomId = room.id as number; // Force cast since we validated it exists
+
+            // Check if there's an active game - handle player leaving mid-game
+            const activeGame = await GameModel.findByRoomId(roomId);
+            if (activeGame && activeGame.state !== 'finished') {
+              logger.info(`Player ${userData.username} (${userData.userId}) disconnected from active game ${activeGame.id}`);
+              const { GameStateService } = await import('./GameStateService');
+              const gameStateService = GameStateService.getInstance(this);
+              await gameStateService.handlePlayerLeft(activeGame.id, userData.userId);
+            }
             
             // Notify room BEFORE removing user (while socket is still connected to room)
             socket.to(`room:${userData.roomCode}`).emit('room:member_left', {

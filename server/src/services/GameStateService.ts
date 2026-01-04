@@ -847,6 +847,90 @@ export class GameStateService {
     console.log(`🏁 Game ${gameId} ended. Winner: ${players[0]?.username} (${players[0]?.final_score} pts)`);
   }
 
+  /**
+   * Handle a player leaving the game
+   * - If only 1 player left: end the game
+   * - If more players but leaving player had turn: switch to next player
+   */
+  async handlePlayerLeft(gameId: number, leavingUserId: number): Promise<void> {
+    const dbManager = await DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+
+    const game = await this.getGameById(gameId);
+    if (!game || game.state === 'finished') {
+      console.log(`🚪 Player ${leavingUserId} left but game ${gameId} already finished or not found`);
+      return;
+    }
+
+    // Remove player from the game
+    await db.run(`DELETE FROM players WHERE game_id = ? AND user_id = ?`, gameId, leavingUserId);
+    console.log(`🚪 Removed player ${leavingUserId} from game ${gameId}`);
+
+    // Get remaining players
+    const remainingPlayers = await db.all(`
+      SELECT user_id, position FROM players WHERE game_id = ? ORDER BY position ASC
+    `, gameId) as { user_id: number; position: number }[];
+
+    // If only 1 or fewer players left, end the game
+    if (remainingPlayers.length <= 1) {
+      console.log(`🏁 Only ${remainingPlayers.length} player(s) left - ending game ${gameId}`);
+      
+      // Clear any active timers
+      this.clearGameTimer(gameId);
+      
+      // Update game state to finished
+      await db.run(`UPDATE games SET state = 'finished', current_phase = 'finished' WHERE id = ?`, gameId);
+      
+      // Notify all players that game ended due to player leaving
+      this.socketService.broadcastToRoom(`game:${gameId}`, 'game:ended', {
+        gameId,
+        reason: 'player_left',
+        message: 'Spelet avslutades eftersom en spelare lämnade',
+        leaderboard: remainingPlayers.length === 1 ? [{
+          userId: remainingPlayers[0].user_id,
+          username: 'Winner',
+          score: 0,
+          words: []
+        }] : [],
+        finalScores: {}
+      });
+      
+      return;
+    }
+
+    // If the leaving player had the turn, switch to next player
+    if (game.current_turn === leavingUserId) {
+      console.log(`🔄 Leaving player ${leavingUserId} had the turn - switching to next player`);
+      
+      // Find next player
+      const nextPlayer = remainingPlayers[0]; // First remaining player gets the turn
+      
+      await db.run(`
+        UPDATE games SET current_turn = ?, current_letter = NULL WHERE id = ?
+      `, nextPlayer.user_id, gameId);
+
+      // Clear player letters
+      await db.run(`
+        UPDATE players SET current_letter = NULL, placement_confirmed = 0 WHERE game_id = ?
+      `, gameId);
+
+      // Restart current phase with new player
+      if (game.current_phase === 'letter_selection') {
+        await this.startLetterSelectionPhase(gameId);
+      } else if (game.current_phase === 'letter_placement') {
+        await this.startLetterPlacementPhase(gameId);
+      }
+    }
+
+    // Notify remaining players about the player leaving
+    this.socketService.broadcastToRoom(`game:${gameId}`, 'game:player_left', {
+      gameId,
+      leftUserId: leavingUserId,
+      remainingPlayers: remainingPlayers.length,
+      newCurrentTurn: game.current_turn === leavingUserId ? remainingPlayers[0].user_id : game.current_turn
+    });
+  }
+
   private generateSwedishLetters(): string[] {
     // Swedish alphabet with frequency distribution
     return [

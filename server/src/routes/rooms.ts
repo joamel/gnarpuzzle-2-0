@@ -1,5 +1,5 @@
 import express from 'express';
-import { RoomModel } from '../models';
+import { RoomModel, GameModel } from '../models';
 import { AuthService, AuthenticatedRequest } from '../services/AuthService';
 import { getSocketService } from '../index';
 import { logger } from '../utils/logger';
@@ -417,6 +417,18 @@ router.delete('/:code/leave', AuthService.authenticateToken, async (req, res) =>
 
     const userId = authReq.user!.id;
     const isCreator = room.created_by === userId;
+
+    // Check if there's an active game - handle player leaving mid-game
+    const activeGame = await GameModel.findByRoomId(room.id);
+    if (activeGame && activeGame.state !== 'finished') {
+      logger.info(`Player ${authReq.user!.username} (${userId}) leaving active game ${activeGame.id}`);
+      const socketService = getSocketService();
+      if (socketService) {
+        const { GameStateService } = await import('../services/GameStateService');
+        const gameStateService = GameStateService.getInstance(socketService);
+        await gameStateService.handlePlayerLeft(activeGame.id, userId);
+      }
+    }
 
     const success = await RoomModel.removeMember(room.id, userId);
     if (!success) {
