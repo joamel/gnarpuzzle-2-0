@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import { vi, describe, test, expect, beforeEach } from 'vitest';
 import { GameInterface } from './GameInterface';
 
@@ -7,12 +7,12 @@ const mockUseGame = {
   currentPlayer: {
     userId: 1,
     username: 'TestUser',
-    grid: Array(15).fill(null).map(() => Array(15).fill({ letter: null }))
+    grid: Array(15).fill(null).map(() => Array(15).fill(null).map(() => ({ letter: undefined, isPlaced: false })))
   },
   currentGame: { id: 1 },
-  gamePhase: 'letter_selection',
+  gamePhase: 'letter_selection' as string,
   isMyTurn: true,
-  selectedLetter: null,
+  selectedLetter: null as string | null,
   selectLetter: vi.fn(),
   placeLetter: vi.fn(),
   confirmPlacement: vi.fn(),
@@ -40,11 +40,11 @@ describe('GameInterface Letter Placement Logic', () => {
     mockUseGame.gamePhase = 'letter_selection';
     mockUseGame.selectedLetter = 'A';
     
-    const { rerender } = render(<GameInterface />);
+    render(<GameInterface />);
     
     // Now change to letter_placement phase (this should trigger random initial placement)
     mockUseGame.gamePhase = 'letter_placement';
-    rerender(<GameInterface />);
+    render(<GameInterface />);
     
     // The useEffect should have triggered and created a random placement
     // We can't test the exact position (it's random) but we can verify the logging
@@ -56,13 +56,7 @@ describe('GameInterface Letter Placement Logic', () => {
     mockUseGame.gamePhase = 'letter_placement';
     mockUseGame.selectedLetter = 'B';
     
-    const { rerender } = render(<GameInterface />);
-    
-    // Simulate that a temporary placement exists (would be set by letter selection)
-    // This is harder to test directly since it's internal state
-    // We'll test the cell click behavior
-    
-    rerender(<GameInterface />);
+    render(<GameInterface />);
     
     // Note: Testing cell clicks requires more complex setup due to grid rendering
     // This test shows the structure needed
@@ -90,7 +84,7 @@ describe('GameInterface Letter Placement Logic', () => {
     mockUseGame.selectedLetter = 'D';
     mockUseGame.gameTimer = 1;
     
-    const { rerender } = render(<GameInterface />);
+    render(<GameInterface />);
     
     // The initial render should trigger auto-submit because gameTimer ≤ 1
     await waitFor(() => {
@@ -152,7 +146,7 @@ describe('GameInterface Letter Placement Logic', () => {
 // Integration test helper
 export const testPlacementFlow = {
   // Helper to simulate full placement flow
-  async simulateLetterPlacement(letter: string, targetX: number, targetY: number) {
+  async simulateLetterPlacement(_letter: string, targetX: number, targetY: number) {
     // 1. Select letter (should set random initial placement)
     // 2. Click on target cell (should move placement to targetX, targetY)
     // 3. Either click OK or let timer run out
