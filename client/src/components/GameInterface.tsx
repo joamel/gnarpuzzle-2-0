@@ -321,12 +321,25 @@ const GameInterface: React.FC = () => {
       </div>
 
       {gamePhase === 'letter_selection' && isMyTurn && (
-        <LetterSelector
-          availableLetters={swedishLetters}
-          selectedLetter={selectedLetter || undefined}
-          onLetterSelect={handleLetterSelect}
-          disabled={!isMyTurn}
-        />
+        <>
+          <LetterSelector
+            availableLetters={swedishLetters}
+            selectedLetter={selectedLetter || undefined}
+            onLetterSelect={handleLetterSelect}
+            disabled={!isMyTurn}
+          />
+          
+          {/* Show current board while selecting letter for strategic planning */}
+          <div className="current-board-section">
+            <h3>📋 Ditt nuvarande spelbord</h3>
+            <p>Planera var du vill placera nästa bokstav:</p>
+            <GameBoard
+              grid={currentPlayer.grid}
+              onCellClick={() => {}} 
+              disabled={true}
+            />
+          </div>
+        </>
       )}
 
       {gamePhase === 'letter_placement' && selectedLetter && (
