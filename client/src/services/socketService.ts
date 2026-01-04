@@ -79,6 +79,7 @@ class SocketService {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectTimer: NodeJS.Timeout | null = null;
+  private pendingRoomJoins: string[] = [];
 
   connect(token: string): Promise<Socket> {
     if (this.socket?.connected) {
@@ -118,6 +119,18 @@ class SocketService {
         console.log('🔗 Connected to server');
         this.isConnecting = false;
         this.reconnectAttempts = 0; // Reset on successful connection
+        
+        // Process any pending room joins
+        if (this.pendingRoomJoins.length > 0) {
+          console.log(`🔗 Processing ${this.pendingRoomJoins.length} pending room joins`);
+          const pending = [...this.pendingRoomJoins];
+          this.pendingRoomJoins = [];
+          pending.forEach(roomCode => {
+            console.log(`🚪 Processing pending room join: ${roomCode}`);
+            this.socket?.emit('room:join', { roomCode });
+          });
+        }
+        
         resolve(this.socket!);
       });
 
@@ -181,7 +194,12 @@ class SocketService {
   // Join a room for real-time updates
   joinRoom(roomCode: string): void {
     if (!this.socket?.connected) {
-      console.warn('⚠️ Socket not connected, cannot join room:', roomCode);
+      console.warn('⚠️ Socket not connected yet, queueing room join:', roomCode);
+      // Queue the join to be processed when socket connects
+      if (!this.pendingRoomJoins.includes(roomCode)) {
+        this.pendingRoomJoins.push(roomCode);
+        console.log(`📝 Room join queued. Pending joins:`, this.pendingRoomJoins);
+      }
       return;
     }
     console.log(`🚪 Joining Socket.IO room: ${roomCode}`);

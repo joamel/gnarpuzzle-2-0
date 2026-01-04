@@ -57,6 +57,8 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   // Join the Socket.IO room when entering the lobby
   useEffect(() => {
     if (currentRoom?.code) {
+      console.log('🟢 RoomLobby: currentRoom changed, code:', currentRoom.code);
+      console.log('🟢 RoomLobby: socketService.isConnected():', socketService.isConnected());
       socketService.joinRoom(currentRoom.code);
       
       // Listen for ready status changes

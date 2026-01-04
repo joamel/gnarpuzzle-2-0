@@ -688,6 +688,10 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       console.log('🏠 Room object keys:', Object.keys(room));
       setCurrentRoom(room);
       
+      // Also join the Socket.IO room immediately
+      console.log('🏠 GameContext: Calling socketService.joinRoom for room:', code);
+      socketService.joinRoom(code);
+      
       return room;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to join room';

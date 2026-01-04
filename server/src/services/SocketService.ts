@@ -207,6 +207,8 @@ export class SocketService {
     const { roomCode } = data;
     const userData = this.connectedUsers.get(socket.id);
 
+    console.log(`🚪 handleRoomJoin called: roomCode=${roomCode}, userId=${userData?.userId}, username=${userData?.username}`);
+
     if (!userData?.userId) {
       socket.emit('error', { message: 'Not authenticated' });
       return;
