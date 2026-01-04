@@ -123,6 +123,24 @@ export class RoomModel {
     }
   }
 
+  static async isMember(roomId: number, userId: number): Promise<boolean> {
+    const dbManager = await DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+    
+    try {
+      const member = await db.get(`
+        SELECT 1 FROM room_members 
+        WHERE room_id = ? AND user_id = ? 
+        LIMIT 1
+      `, roomId, userId);
+      
+      return member !== null && member !== undefined;
+    } catch (error) {
+      console.error(`❌ RoomModel.isMember: Error checking membership:`, error);
+      return false;
+    }
+  }
+
   static async removeMember(roomId: number, userId: number): Promise<boolean> {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();

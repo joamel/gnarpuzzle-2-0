@@ -222,7 +222,21 @@ export class SocketService {
       // Get room info from database
       const { RoomModel } = await import('../models');
       const room = await RoomModel.findByCode(roomCode);
-      const members = room ? await RoomModel.getRoomMembers(room.id) : [];
+      
+      if (!room) {
+        socket.emit('error', { message: 'Room not found' });
+        return;
+      }
+
+      // Add user to room_members table (if not already there)
+      const isMember = await RoomModel.isMember(room.id, userData.userId);
+      if (!isMember) {
+        await RoomModel.addMember(room.id, userData.userId);
+        logger.info(`User ${userData.username} added to room_members for room ${roomCode}`);
+      }
+
+      // NOW get members (after adding the user)
+      const members = await RoomModel.getRoomMembers(room.id);
 
       // Notify others in the room
       socket.to(`room:${roomCode}`).emit('room:member_joined', {
@@ -230,7 +244,7 @@ export class SocketService {
           id: userData.userId,
           username: userData.username
         },
-        room: room ? {
+        room: {
           id: room.id,
           code: room.code,
           name: room.name,
@@ -239,7 +253,7 @@ export class SocketService {
             username: m.username,
             role: m.id === room.created_by ? 'owner' : 'member'
           }))
-        } : null,
+        },
         memberCount: members.length,
         roomCode
       });
@@ -248,7 +262,7 @@ export class SocketService {
       socket.emit('room:joined', {
         success: true,
         roomCode,
-        room: room ? {
+        room: {
           id: room.id,
           code: room.code,
           name: room.name,
@@ -257,7 +271,7 @@ export class SocketService {
             username: m.username,
             role: m.id === room.created_by ? 'owner' : 'member'
           }))
-        } : null
+        }
       });
 
       logger.info(`User joined Socket.IO room: ${userData.username} -> room:${roomCode}`, {
