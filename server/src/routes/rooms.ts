@@ -476,12 +476,21 @@ router.post('/:id/start', AuthService.authenticateToken, async (req, res) => {
       return;
     }
 
-    // Check if user is room creator (fix type coercion)
-    if (String(room.created_by) !== String(authReq.user!.id)) {
+    // Check if user is room creator OR if room is public (allow any member to start)
+    // For public rooms without an "active" owner, any member can start
+    const isRoomCreator = String(room.created_by) === String(authReq.user!.id);
+    
+    // Check if this is a public standard room (created_by is a seed user like GnarMaster)
+    const isPublicStandardRoom = [1, 2, 3, 4, 5, 6].includes(room.created_by);
+    const canStartRoom = isRoomCreator || isPublicStandardRoom;
+    
+    if (!canStartRoom) {
       logger.info(`Start game denied: User ${authReq.user!.id} (${authReq.user!.username}) tried to start room ${roomId} owned by ${room.created_by}`, {
         requestingUser: authReq.user!.id,
         roomOwner: room.created_by,
-        roomId: roomId
+        roomId: roomId,
+        isRoomCreator,
+        isPublicStandardRoom
       });
       res.status(403).json({
         error: 'Unauthorized',
@@ -492,7 +501,9 @@ router.post('/:id/start', AuthService.authenticateToken, async (req, res) => {
 
     logger.info(`Start game authorized: User ${authReq.user!.username} (${authReq.user!.id}) starting room ${roomId}`, {
       roomOwner: room.created_by,
-      requestingUser: authReq.user!.id
+      requestingUser: authReq.user!.id,
+      isRoomCreator,
+      isPublicStandardRoom
     });
 
     // Check if room is in correct state to start

@@ -127,6 +127,8 @@ export class RoomModel {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
     
+    console.log(`🔍 isMember check: roomId=${roomId} (${typeof roomId}), userId=${userId} (${typeof userId})`);
+    
     try {
       const member = await db.get(`
         SELECT 1 FROM room_members 
@@ -134,7 +136,10 @@ export class RoomModel {
         LIMIT 1
       `, roomId, userId);
       
-      return member !== null && member !== undefined;
+      const result = member !== null && member !== undefined;
+      console.log(`🔍 isMember result: ${result} for room ${roomId}, user ${userId}`);
+      
+      return result;
     } catch (error) {
       console.error(`❌ RoomModel.isMember: Error checking membership:`, error);
       return false;
