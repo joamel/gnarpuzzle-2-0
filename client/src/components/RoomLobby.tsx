@@ -152,9 +152,11 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
     if (!currentRoom?.code) return;
 
     const handleMemberJoined = (_data: any) => {
+      console.log('🟦 room:member_joined event:', _data);
       // Refresh room data when someone joins
       if (currentRoom.code) {
         apiService.getRoomByCode(currentRoom.code).then(freshData => {
+          console.log('🟨 Fresh room data after member join:', freshData?.room?.members);
           if (freshData?.room?.members && freshData.room.members.length > 0) {
             const mappedMembers = freshData.room.members.map((member: any) => ({
               userId: String(member.id),
@@ -162,6 +164,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
               role: String(member.id) === String(freshData.room.createdBy) ? 'owner' : 'member',
               joinedAt: new Date().toISOString()
             }));
+            console.log('🟩 Setting playerList:', mappedMembers);
             setPlayerList(mappedMembers);
           }
         }).catch(err => {
@@ -408,6 +411,8 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
             const isCurrentUser = member.userId === String(authUser?.id);
             const isOwner = member.role === 'owner';
             const isPlayerReady = readyPlayers.has(member.userId);
+            
+            console.log(`🟧 Rendering player: ${member.username} (userId: ${member.userId}, authId: ${String(authUser?.id)}, isCurrentUser: ${isCurrentUser})`);
             
             return (
               <div key={`player-${member.userId || index}-${member.username}`} className="player-item">
