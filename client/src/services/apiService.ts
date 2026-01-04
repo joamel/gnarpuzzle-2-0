@@ -80,14 +80,16 @@ class ApiService {
     return response.rooms || [];
   }
 
-  async createRoom(name: string, options?: { max_players?: number; board_size?: number; turn_duration?: number }): Promise<any> {
+  async createRoom(name: string, options?: { max_players?: number; board_size?: number; turn_duration?: number; letter_timer?: number; placement_timer?: number }): Promise<any> {
     const response = await this.request<{ success: boolean; room: any }>('/api/rooms', {
       method: 'POST',
       body: JSON.stringify({ 
         name, 
         max_players: options?.max_players,
         board_size: options?.board_size,
-        turn_duration: options?.turn_duration
+        turn_duration: options?.turn_duration,
+        letter_timer: options?.letter_timer,
+        placement_timer: options?.placement_timer
       }),
     });
     // Backend returns { success: true, room: {...} }

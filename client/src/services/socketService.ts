@@ -25,6 +25,14 @@ export interface SocketEvents {
     newCreator: { id: number; username: string }; 
   }) => void;
 
+  // Ready status events
+  'player:ready_changed': (data: {
+    userId: string;
+    username: string;
+    isReady: boolean;
+    roomCode: string;
+  }) => void;
+
   // Game events
   'game:started': (data: {
     gameId: number;
@@ -171,6 +179,16 @@ class SocketService {
     }
     console.log(`🎮 Joining Socket.IO game: ${gameId}`);
     this.socket.emit('game:join', { gameId });
+  }
+
+  // Set player ready status
+  setPlayerReady(roomCode: string, isReady: boolean): void {
+    if (!this.socket?.connected) {
+      console.warn('⚠️ Socket not connected, cannot set ready status');
+      return;
+    }
+    console.log(`✅ Setting ready status: ${isReady} for room: ${roomCode}`);
+    this.socket.emit('player:set_ready', { roomCode, isReady });
   }
 
   on<K extends keyof SocketEvents>(event: K, listener: SocketEvents[K]): void {

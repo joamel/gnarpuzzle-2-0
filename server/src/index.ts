@@ -130,6 +130,10 @@ async function startServer() {
     await DatabaseManager.getInstance();
     logger.info('Database connected successfully');
 
+    // Seed database with initial data
+    const { seedDatabase } = await import('./config/seed');
+    await seedDatabase();
+
     // Initialize Socket.IO service
     socketService = new SocketService(io);
     logger.info('Socket.IO service initialized');
@@ -162,10 +166,10 @@ async function startServer() {
       }
     }
 
-    // Initialize and start room cleanup service (temporarily disabled for testing)
-    // roomCleanupService = new RoomCleanupService();
-    // roomCleanupService.start();
-    // logger.info('Room cleanup service started');
+    // Initialize and start room cleanup service with smart empty room deletion
+    roomCleanupService = new RoomCleanupService();
+    roomCleanupService.start();
+    logger.info('Room cleanup service started with empty room deletion enabled');
 
     // Start server
     server.listen(PORT, () => {

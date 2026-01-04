@@ -70,27 +70,6 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   // Only log turn issues when there's an actual problem
   // Removed excessive debug logging for cleaner console
 
-  // Debug logging for currentPlayer calculation  
-  console.log('🔍 GameContext currentPlayer calculation:', {
-    user: user,
-    userId: user?.id,
-    playersCount: players.length,
-    players: players.map(p => ({ userId: p.userId, username: p.username, position: p.position })),
-    currentPlayer: currentPlayer ? { userId: currentPlayer.userId, username: currentPlayer.username, position: currentPlayer.position } : null
-  });
-
-  // Debug logging for turn calculation
-  console.log('🎯 Turn calculation:', {
-    currentGameCurrentTurn: currentGame?.currentTurn,
-    currentGameCurrentTurnType: typeof currentGame?.currentTurn,
-    playerUserId: playerUserId,
-    playerUserIdType: typeof playerUserId,
-    isMyTurn: isMyTurn,
-    gamePhase: gamePhase,
-    comparison: `${currentGame?.currentTurn} === ${playerUserId} = ${currentGame?.currentTurn === playerUserId}`,
-    strictComparison: `${currentGame?.currentTurn} === ${currentPlayer?.position} (${typeof currentGame?.currentTurn}) === (${typeof currentPlayer?.position})`
-  });
-
   // Timer management
   useEffect(() => {
     if (!gameTimer?.endTime) return;
@@ -120,7 +99,9 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         timer_end: data.timer_end,
         gameId: data.gameId,
         current_turn: data.current_turn,
-        timestamp: new Date().toLocaleTimeString()
+        timestamp: new Date().toLocaleTimeString(),
+        timerValid: !!data.timer_end,
+        remainingMs: data.timer_end ? data.timer_end - Date.now() : 'N/A'
       });
       
       setGamePhase(data.phase);
@@ -128,14 +109,19 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       // Clear selected letter when starting new letter selection phase
       if (data.phase === 'letter_selection') {
         setSelectedLetter(null);
-        console.log('🧹 Cleared selectedLetter for new letter selection phase');
       }
       
-      setGameTimer({
-        endTime: data.timer_end,
-        remainingSeconds: Math.ceil((data.timer_end - Date.now()) / 1000),
-        isWarning: false,
-      });
+      // Only set timer if we have a valid timer_end value
+      if (data.timer_end && data.timer_end > Date.now()) {
+        const remainingSeconds = Math.ceil((data.timer_end - Date.now()) / 1000);
+        setGameTimer({
+          endTime: data.timer_end,
+          remainingSeconds: remainingSeconds,
+          isWarning: remainingSeconds <= 5,
+        });
+      } else {
+        setGameTimer(null);
+      }
       
       // If we don't have a current game yet but get a phase change, create game object
       if (!currentGame && data.gameId) {
@@ -202,12 +188,10 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     };
 
     const handleGameStarted = (data: any) => {
-      console.log('🎮 Game started event received:', data);
-      console.log('📡 Socket data phase:', data.phase, 'gameId:', data.gameId);
       
       // Join the game socket room for receiving game events
+      // Join game socket room
       if (data.gameId) {
-        console.log('🚪 Joining game socket room:', data.gameId);
         socketService.joinGame(data.gameId);
       }
       
@@ -222,7 +206,6 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       
       setCurrentGame(gameState);
       setGamePhase(data.phase as GamePhase);
-      console.log('✅ Set gamePhase from socket to:', data.phase);
       
       // Update room status to playing
       if (currentRoom) {
@@ -467,6 +450,55 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     };
   }, [currentGame, currentRoom, user, players.length]);
 
+  // Handle browser refresh/close - warn user and leave room
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (currentRoom && (currentGame || currentRoom.status === 'waiting')) {
+        e.preventDefault();
+        e.returnValue = 'Om du lämnar sidan kommer du att lämna rummet. Är du säker?';
+        return 'Om du lämnar sidan kommer du att lämna rummet. Är du säker?';
+      }
+    };
+
+    const handleUnload = () => {
+      if (currentRoom) {
+        try {
+          // Use sendBeacon for reliable cleanup on page unload
+          const API_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+          const url = `${API_BASE_URL}/api/rooms/${currentRoom.code}/leave`;
+          const data = JSON.stringify({});
+          
+          // Include auth token in the request if available
+          const token = localStorage.getItem('auth_token');
+          const headers = new Headers();
+          headers.append('Content-Type', 'application/json');
+          if (token) {
+            headers.append('Authorization', `Bearer ${token}`);
+          }
+          
+          fetch(url, {
+            method: 'DELETE',
+            headers: headers,
+            body: data,
+            keepalive: true // Important for cleanup on page unload
+          }).catch(() => {
+            // Ignore errors during page unload
+          });
+        } catch (error) {
+          console.warn('Failed to leave room on page unload:', error);
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('unload', handleUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('unload', handleUnload);
+    };
+  }, [currentRoom, currentGame]);
+
   // Game actions
   const startGame = useCallback(async (roomId: number) => {
     console.log('🎮 GameContext.startGame called with roomId:', roomId);
@@ -483,17 +515,24 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       console.log('🎮 Game object structure:', {
         game,
         gameKeys: game ? Object.keys(game) : 'no game',
-        gamePhase: game?.phase,
+        gameState: game?.state,
         gameId: game?.id
       });
-      setCurrentGame(game);
-      console.log('🎮 setCurrentGame called with:', game);
       
-      // Set game phase directly from API response
-      if (game?.phase) {
-        console.log('🎯 Setting gamePhase to:', game.phase);
-        setGamePhase(game.phase as GamePhase);
-      }
+      // Convert Game to GameState format for our context
+      const gameState: GameState = {
+        id: Number(game.id),
+        roomId: Number(game.roomId),
+        phase: 'letter_selection', // Default phase when starting
+        currentTurn: game.currentTurn || 1,
+        status: 'active'
+      };
+      
+      setCurrentGame(gameState);
+      console.log('🎮 setCurrentGame called with:', gameState);
+      
+      // Set game phase 
+      setGamePhase('letter_selection');
       
       // Update room status to 'playing' after successful game start
       if (currentRoom) {
@@ -514,7 +553,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         const mockPlayer: Player = {
           id: user.id,
           userId: user.id,
-          gameId: game.id,
+          gameId: Number(game.id),
           position: 1, // Will be updated when real player data arrives
           username: user.username,
           grid: Array(gridSize).fill(null).map((_, y) => Array(gridSize).fill(null).map((_, x) => ({
@@ -527,7 +566,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
           finalScore: 0,
           connected: true
         };
-        console.log('🎮 Setting mock player data:', mockPlayer);
+
         setPlayers([mockPlayer]);
       }
       
@@ -591,11 +630,8 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     }
 
     try {
-      console.log('📡 Calling apiService.selectLetter...');
       await apiService.selectLetter(currentGame.id, currentPlayer.userId, letter);
-      console.log('✅ apiService.selectLetter completed successfully');
       setSelectedLetter(letter);
-      console.log('✅ setSelectedLetter called with:', letter);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to select letter';
       setError(message);

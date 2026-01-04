@@ -3,8 +3,9 @@ import { RoomModel } from '../models';
 
 export class RoomCleanupService {
   private cleanupInterval: NodeJS.Timeout | null = null;
-  private readonly CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
-  private readonly ROOM_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+  private readonly CLEANUP_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes (more frequent for empty rooms)
+  private readonly ROOM_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes for inactive rooms
+  private readonly EMPTY_ROOM_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes for empty rooms
   private isRunning = false;
 
   /**
@@ -119,14 +120,29 @@ export class RoomCleanupService {
    */
   private async shouldCleanupRoom(room: any): Promise<boolean> {
     try {
-      // Check if room is empty (no members)
-      const memberCount = await RoomModel.getMemberCount(room.id);
-      if (memberCount === 0) {
-        logger.debug(`Room ${room.code} is empty, scheduling for cleanup`);
-        return true;
+      // NEVER cleanup public rooms (they are kept permanently)
+      const settings = typeof room.settings === 'string' ? JSON.parse(room.settings) : room.settings;
+      if (settings?.is_private === false) {
+        logger.debug(`Public room ${room.code} is permanent - skipping cleanup`);
+        return false;
       }
 
-      // Check if room has been inactive for too long
+      // Check if room is empty (no members) - delete faster
+      const memberCount = await RoomModel.getMemberCount(room.id);
+      if (memberCount === 0) {
+        const createdAt = new Date(room.created_at);
+        const now = new Date();
+        const timeSinceCreation = now.getTime() - createdAt.getTime();
+        
+        // Delete empty rooms after 5 minutes instead of 10
+        if (timeSinceCreation > this.EMPTY_ROOM_TIMEOUT_MS) {
+          logger.debug(`Empty room ${room.code} ready for cleanup (${Math.round(timeSinceCreation / 60000)} minutes old)`);
+          return true;
+        }
+        return false;
+      }
+
+      // Check if room has been inactive for too long (for rooms with members)
       const createdAt = new Date(room.created_at);
       const now = new Date();
       const timeSinceCreation = now.getTime() - createdAt.getTime();
