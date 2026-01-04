@@ -144,11 +144,91 @@ export class WordValidationService {
   }
 
   /**
-   * Find all valid words in grid with positions and scoring
+   * Find optimal word partition for a letter sequence.
+   * Uses dynamic programming to find the partition that maximizes score.
+   * Each letter can only be used once (no overlapping words).
+   * 
+   * Example: "LÅSTA" could be ["LÅS", "TA"] or ["LÅ", "STA"] or ["LÅSTA"]
+   * Returns the partition with the highest total points.
+   */
+  private findOptimalPartition(sequence: string): { words: string[]; totalPoints: number } {
+    const n = sequence.length;
+    
+    // dp[i] = { words: string[], totalPoints: number } for optimal partition of sequence[0..i-1]
+    const dp: Array<{ words: string[]; totalPoints: number }> = [];
+    dp[0] = { words: [], totalPoints: 0 };
+
+    for (let i = 1; i <= n; i++) {
+      let best: { words: string[]; totalPoints: number } = { words: [], totalPoints: 0 };
+      
+      // Try all possible last words ending at position i
+      for (let j = 0; j < i; j++) {
+        const word = sequence.substring(j, i);
+        
+        // Only consider words of length 2 or more
+        if (word.length >= 2 && this.isValidWord(word)) {
+          const prevPartition = dp[j];
+          if (prevPartition) {
+            const newPoints = prevPartition.totalPoints + this.calculateWordPoints(word);
+            
+            // Update best if this partition has more points
+            if (newPoints > best.totalPoints) {
+              best = {
+                words: [...prevPartition.words, word],
+                totalPoints: newPoints
+              };
+            }
+          }
+        }
+      }
+      
+      dp[i] = best;
+    }
+
+    return dp[n];
+  }
+
+  /**
+   * Find all valid words in grid with positions and scoring.
+   * Uses optimal partitioning: each letter sequence is split into non-overlapping words
+   * that maximize the score. Each letter can only be used once per line.
    */
   findValidWords(grid: GridCell[][]): WordScore[] {
     const validWords: WordScore[] = [];
     const gridSize = grid.length;
+
+    // Helper to process a letter sequence into optimal partition
+    const processSequence = (
+      letters: string, 
+      startPos: number, 
+      row: number, 
+      direction: 'horizontal' | 'vertical',
+      isLineComplete: boolean
+    ) => {
+      if (letters.length < 2) {
+        return;
+      }
+
+      const partition = this.findOptimalPartition(letters);
+      
+      // If we found at least one valid word partition
+      if (partition.words.length > 0) {
+        let currentPos = startPos;
+        
+        for (const word of partition.words) {
+          validWords.push({
+            word,
+            points: this.calculateWordPoints(word),
+            startX: direction === 'horizontal' ? currentPos : startPos,
+            startY: direction === 'horizontal' ? row : currentPos,
+            direction,
+            // Mark as complete only if this partition uses the entire line
+            isComplete: isLineComplete && partition.words.join('') === letters
+          });
+          currentPos += word.length;
+        }
+      }
+    };
 
     // Find horizontal words
     for (let y = 0; y < gridSize; y++) {
@@ -165,15 +245,8 @@ export class WordValidationService {
           currentWord += cell.letter;
         } else {
           // End of word sequence or end of row
-          if (currentWord.length >= 2 && this.isValidWord(currentWord)) {
-            validWords.push({
-              word: currentWord,
-              points: this.calculateWordPoints(currentWord),
-              startX,
-              startY: y,
-              direction: 'horizontal',
-              isComplete: this.isRowComplete(grid, y)
-            });
+          if (currentWord.length >= 2) {
+            processSequence(currentWord, startX, y, 'horizontal', this.isRowComplete(grid, y));
           }
           currentWord = '';
         }
@@ -195,15 +268,8 @@ export class WordValidationService {
           currentWord += cell.letter;
         } else {
           // End of word sequence or end of column
-          if (currentWord.length >= 2 && this.isValidWord(currentWord)) {
-            validWords.push({
-              word: currentWord,
-              points: this.calculateWordPoints(currentWord),
-              startX: x,
-              startY,
-              direction: 'vertical',
-              isComplete: this.isColumnComplete(grid, x)
-            });
+          if (currentWord.length >= 2) {
+            processSequence(currentWord, startY, x, 'vertical', this.isColumnComplete(grid, x));
           }
           currentWord = '';
         }
@@ -219,21 +285,25 @@ export class WordValidationService {
   calculateGridScore(grid: GridCell[][]): GridScore {
     const validWords = this.findValidWords(grid);
     let totalPoints = 0;
-    let completedRows = 0;
-    let completedCols = 0;
+    const completedRowsSet = new Set<number>();
+    const completedColsSet = new Set<number>();
 
     // Calculate points from valid words
     validWords.forEach(wordScore => {
       totalPoints += wordScore.points;
       
-      // Add bonus for complete rows/columns
+      // Add bonus for complete rows/columns (only once per line)
       if (wordScore.isComplete) {
-        totalPoints += 2; // 2 point bonus for complete line
-        
         if (wordScore.direction === 'horizontal') {
-          completedRows++;
+          if (!completedRowsSet.has(wordScore.startY)) {
+            totalPoints += 2; // 2 point bonus for complete row
+            completedRowsSet.add(wordScore.startY);
+          }
         } else {
-          completedCols++;
+          if (!completedColsSet.has(wordScore.startX)) {
+            totalPoints += 2; // 2 point bonus for complete column
+            completedColsSet.add(wordScore.startX);
+          }
         }
       }
     });
@@ -241,8 +311,8 @@ export class WordValidationService {
     return {
       words: validWords,
       totalPoints,
-      completedRows,
-      completedCols
+      completedRows: completedRowsSet.size,
+      completedCols: completedColsSet.size
     };
   }
 
