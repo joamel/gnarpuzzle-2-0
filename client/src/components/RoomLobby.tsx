@@ -19,7 +19,7 @@ interface LobbyMember {
 
 const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   const { user: authUser } = useAuth();
-  const { currentRoom, startGame, leaveRoom, isLoading, error } = useGame();
+  const { currentRoom, startGame, isLoading, error } = useGame();
   
   // Initialize player list
   const [playerList, setPlayerList] = useState<LobbyMember[]>([]);
@@ -342,14 +342,6 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
       alert(`Failed to reset room: ${err instanceof Error ? err.message : 'Network error'}`);
     } finally {
       setIsResetting(false);
-    }
-  };
-
-  const handleLeaveRoom = async () => {
-    try {
-      await leaveRoom();
-    } catch (err) {
-      console.error('Failed to leave room:', err);
     }
   };
 
