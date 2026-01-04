@@ -5,6 +5,7 @@ import { useGame } from '../contexts/GameContext';
 import { apiService } from '../services/apiService';
 import { socketService } from '../services/socketService';
 import { Room } from '../types/game';
+import '../styles/home.css';
 
 const HomePage: React.FC = () => {
   const { user, logout } = useAuth();
@@ -21,6 +22,8 @@ const HomePage: React.FC = () => {
   const [roomName, setRoomName] = useState('');
   const [maxPlayers, setMaxPlayers] = useState(4);
   const [boardSize, setBoardSize] = useState(5); // Match server default
+  const [letterTimer, setLetterTimer] = useState(20); // Letter selection time
+  const [placementTimer, setPlacementTimer] = useState(30); // Letter placement time
 
   // Load available rooms
   const loadRooms = async () => {
@@ -110,156 +113,160 @@ const HomePage: React.FC = () => {
   };
 
   return (
-    <div className="content-wrapper">
-      {/* Mobile Header */}
-      <header className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-white mb-1">🧩 GnarPuzzle</h1>
-          <p className="text-sm text-gray-300">Hej, {user?.username}!</p>
-        </div>
-        <button 
-          onClick={async () => {
-            localStorage.clear();
-            await logout();
-            window.location.reload();
-          }}
-          className="btn btn-ghost btn-sm"
-          aria-label="Logga ut"
-        >
-          Logga ut
-        </button>
-      </header>
-
-      {error && (
-        <div className="card mb-4" style={{borderColor: '#f44336', background: 'rgba(244, 67, 54, 0.1)'}}>
-          <p className="text-red-400 text-sm">{error}</p>
-        </div>
-      )}
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 gap-4 mb-6">
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Snabbstart</h2>
+    <>
+      <div className="home-page">
+        {/* Mobile Header */}
+        <header>
+          <div>
+            <h1>🧩 GnarPuzzle</h1>
+            <p>Hej, {user?.username}!</p>
           </div>
-          <div className="card-content">
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={() => setIsCreatingRoom(true)}
-                className="btn btn-primary btn-full"
-                disabled={isCreatingRoom}
-              >
-                {isCreatingRoom ? '...' : '🎮 Skapa nytt rum'}
-              </button>
-              
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={roomCode}
-                  onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                  placeholder="Rumskod (t.ex. ABC123)"
-                  className="form-input flex-1"
-                  maxLength={6}
-                  style={{textTransform: 'uppercase'}}
-                />
-                <button
-                  onClick={() => joinRoomByCode(roomCode)}
-                  disabled={!roomCode.trim() || isJoiningRoom}
-                  className="btn btn-secondary px-4"
-                >
-                  {isJoiningRoom ? '...' : 'Gå med'}
-                </button>
+          <button 
+            onClick={async () => {
+              localStorage.clear();
+              await logout();
+              window.location.reload();
+            }}
+            className="btn btn-ghost btn-sm"
+            aria-label="Logga ut"
+          >
+            Logga ut
+          </button>
+        </header>
+
+        <div className="home-content">
+          {error && (
+            <div className="card mb-4" style={{borderColor: '#f44336', background: 'rgba(244, 67, 54, 0.1)'}}>
+              <p className="text-red-400 text-sm">{error}</p>
+            </div>
+          )}
+
+          {/* Quick Actions */}
+          <div className="grid grid-cols-1 gap-4 mb-6">
+            <div className="card">
+              <div className="card-header">
+                <h2 className="card-title">Snabbstart</h2>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Available Rooms */}
-      <div className="card">
-        <div className="card-header">
-          <div className="flex items-center justify-between">
-            <h2 className="card-title">Tillgängliga rum ({availableRooms.length})</h2>
-            <button
-              onClick={loadRooms}
-              className="btn btn-ghost btn-sm"
-              aria-label="Uppdatera rumslista"
-            >
-              🔄
-            </button>
-          </div>
-        </div>
-        <div className="card-content">
-          {availableRooms.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="text-4xl mb-4 opacity-50">🎲</div>
-              <p className="text-gray-400 mb-4">Inga rum tillgängliga</p>
-              <button 
-                onClick={() => setIsCreatingRoom(true)}
-                className="btn btn-primary"
-              >
-                Skapa det första rummet
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-3">
-              {availableRooms.map((room) => (
-                <div 
-                  key={room.id} 
-                  className="card p-4"
-                  style={{background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)'}}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-white truncate">{room.name}</h3>
-                        <span className="text-xs bg-green-600 text-white px-2 py-1 rounded-full font-medium">
-                          {room.code}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4 text-xs text-gray-400">
-                        <span>👥 {room.member_count || 0}/{room.max_players || 6}</span>
-                        <span>📏 {room.board_size || 5}×{room.board_size || 5}</span>
-                      </div>
-                    </div>
+              <div className="card-content">
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={() => setIsCreatingRoom(true)}
+                    className="btn btn-primary btn-full"
+                    disabled={isCreatingRoom}
+                  >
+                    {isCreatingRoom ? '...' : '🎮 Skapa nytt rum'}
+                  </button>
+                  
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={roomCode}
+                      onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                      placeholder="Rumskod (t.ex. ABC123)"
+                      className="form-input flex-1"
+                      maxLength={6}
+                      style={{textTransform: 'uppercase'}}
+                    />
                     <button
-                      onClick={() => joinRoomByCode(room.code)}
-                      disabled={isJoiningRoom || (room.member_count || 0) >= (room.max_players || 4)}
-                      className={`btn btn-sm ${
-                        (room.member_count || 0) >= (room.max_players || 4) 
-                          ? 'btn-secondary opacity-50' 
-                          : 'btn-primary'
-                      }`}
+                      onClick={() => joinRoomByCode(roomCode)}
+                      disabled={!roomCode.trim() || isJoiningRoom}
+                      className="btn btn-secondary px-4"
                     >
-                      {(room.member_count || 0) >= (room.max_players || 4) ? 'Fullt' : 'Gå med'}
+                      {isJoiningRoom ? '...' : 'Gå med'}
                     </button>
                   </div>
                 </div>
-              ))}
+              </div>
             </div>
-          )}
+          </div>
+
+          {/* Available Rooms */}
+          <div className="card">
+            <div className="card-header">
+              <div className="flex items-center justify-between">
+                <h2 className="card-title">Tillgängliga rum ({availableRooms.length})</h2>
+                <button
+                  onClick={loadRooms}
+                  className="btn btn-ghost btn-sm"
+                  aria-label="Uppdatera rumslista"
+                >
+                  🔄
+                </button>
+              </div>
+            </div>
+            <div className="card-content">
+              {availableRooms.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-4xl mb-4 opacity-50">🎲</div>
+                  <p className="text-gray-400 mb-4">Inga rum tillgängliga</p>
+                  <button 
+                    onClick={() => setIsCreatingRoom(true)}
+                    className="btn btn-primary"
+                  >
+                    Skapa det första rummet
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3">
+                  {availableRooms.map((room) => (
+                    <div 
+                      key={room.id} 
+                      className="card p-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold text-white truncate">{room.name}</h3>
+                            <span className="text-xs bg-green-600 text-white px-2 py-1 rounded-full font-medium">
+                              {room.code}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4 text-xs text-gray-400">
+                            <span>👥 {room.member_count || 0}/{room.max_players || 6}</span>
+                            <span>📏 {room.board_size || 5}×{room.board_size || 5}</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => joinRoomByCode(room.code)}
+                          disabled={isJoiningRoom || (room.member_count || 0) >= (room.max_players || 4)}
+                          className={`btn btn-sm ${
+                            (room.member_count || 0) >= (room.max_players || 4) 
+                              ? 'btn-secondary opacity-50' 
+                              : 'btn-primary'
+                          }`}
+                        >
+                          {(room.member_count || 0) >= (room.max_players || 4) ? 'Fullt' : 'Gå med'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Room Creation Modal */}
+      {/* Room Creation Modal - Outside home-page div */}
       {isCreatingRoom && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-end justify-center z-50 p-4">
-          <div className="bg-gray-900 rounded-2xl w-full max-w-md p-6 transform transition-transform">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">Skapa nytt rum</h2>
+        <div className="create-room-modal-overlay">
+          <div className="create-room-modal">
+            <div className="create-room-modal-header">
+              <h2>Skapa nytt rum</h2>
               <button
                 onClick={() => {
                   setIsCreatingRoom(false);
                   setRoomName('');
+                  setError('');
                 }}
-                className="btn btn-ghost btn-sm"
+                className="close-button"
                 aria-label="Stäng"
               >
-                ✖️
+                ×
               </button>
             </div>
             
-            <div className="space-y-4">
+            <div>
               <div className="form-group">
                 <label className="form-label">Rumnamn</label>
                 <input
@@ -273,7 +280,7 @@ const HomePage: React.FC = () => {
                 />
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px'}}>
                 <div className="form-group">
                   <label className="form-label">Max spelare</label>
                   <select 
@@ -300,77 +307,107 @@ const HomePage: React.FC = () => {
                   </select>
                 </div>
               </div>
-              
-              <button
-                type="button"
-onClick={async () => {
-                  if (!roomName.trim()) {
-                    setError('Rumnamn får inte vara tomt');
-                    return;
-                  }
-                  
-                  if (creatingRoom) {
-                    return;
-                  }
-                  
-                  setCreatingRoom(true);
-                  setError('');
-                  
-                  try {
-                    const roomData = await apiService.createRoom(roomName.trim(), {
-                      max_players: maxPlayers,
-                      board_size: boardSize
-                    });
-                    
-                    console.log('✅ Room created successfully:', roomData);
-                    
-                    // Room creation automatically joins the user, so just navigate
-                    if (roomData?.room?.code || roomData?.code) {
-                      const roomCode = roomData.room?.code || roomData.code;
-                      console.log(`🎯 Navigating directly to room ${roomCode}`);
-                      
-                      // Join the room using its code
-                      await joinRoom(roomCode);
-                      
-                      setIsCreatingRoom(false);
-                      setRoomName('');
-                      shouldNavigate.current = true;
-                    } else {
-                      throw new Error('Ingen rumskod returnerades från servern');
-                    }
-                  } catch (err: any) {
-                    setError(err.message || 'Kunde inte skapa rum');
-                  } finally {
-                    setCreatingRoom(false);
-                  }
-                }}
-disabled={!roomName.trim() || creatingRoom}
-                className="btn btn-primary btn-full btn-lg"
-              >
-                {creatingRoom ? 'Skapar rum...' : 'Skapa rum'}
-              </button>
-              
-              {/* Quick debug */}
-              <small style={{color: '#666', display: 'block', marginTop: '5px'}}>
-                Debug: creatingRoom={creatingRoom.toString()}, roomName="{roomName}", disabled={((!roomName.trim() || creatingRoom).toString())}
-              </small>
 
-              
-              {creatingRoom && (
-                <button
-                  onClick={() => setCreatingRoom(false)}
-                  className="btn btn-secondary btn-full"
-                  style={{ marginTop: '10px' }}
-                >
-                  Avbryt / Återställ
-                </button>
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px'}}>
+                <div className="form-group">
+                  <label className="form-label">Bokstavstid (sek)</label>
+                  <input
+                    type="number"
+                    value={letterTimer}
+                    onChange={(e) => setLetterTimer(Math.max(5, Math.min(60, Number(e.target.value))))}
+                    className="form-input"
+                    min={5}
+                    max={60}
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label className="form-label">Placeringstid (sek)</label>
+                  <input
+                    type="number"
+                    value={placementTimer}
+                    onChange={(e) => setPlacementTimer(Math.max(10, Math.min(60, Number(e.target.value))))}
+                    className="form-input"
+                    min={10}
+                    max={60}
+                  />
+                </div>
+              </div>
+
+              {error && (
+                <div style={{background: 'rgba(244, 67, 54, 0.1)', border: '1px solid #f44336', color: '#f44336', padding: '10px 12px', borderRadius: '6px', marginBottom: '16px', fontSize: '14px'}}>
+                  {error}
+                </div>
               )}
               
+              <div className="create-room-modal-actions">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!roomName.trim()) {
+                      setError('Rumnamn får inte vara tomt');
+                      return;
+                    }
+                    
+                    if (creatingRoom) {
+                      return;
+                    }
+                    
+                    setCreatingRoom(true);
+                    setError('');
+                    
+                    try {
+                      const roomData = await apiService.createRoom(roomName.trim(), {
+                        max_players: maxPlayers,
+                        board_size: boardSize,
+                        letter_timer: letterTimer,
+                        placement_timer: placementTimer
+                      });
+                      
+                      console.log('✅ Room created successfully:', roomData);
+                      
+                      // Room creation automatically joins the user, so just navigate
+                      if (roomData?.room?.code || roomData?.code) {
+                        const roomCode = roomData.room?.code || roomData.code;
+                        console.log(`🎯 Navigating directly to room ${roomCode}`);
+                        
+                        // Join the room using its code
+                        await joinRoom(roomCode);
+                        
+                        setIsCreatingRoom(false);
+                        setRoomName('');
+                        shouldNavigate.current = true;
+                      } else {
+                        throw new Error('Ingen rumskod returnerades från servern');
+                      }
+                    } catch (err: any) {
+                      setError(err.message || 'Kunde inte skapa rum');
+                    } finally {
+                      setCreatingRoom(false);
+                    }
+                  }}
+                  disabled={!roomName.trim() || creatingRoom}
+                  className="btn-primary"
+                >
+                  {creatingRoom ? 'Skapar rum...' : 'Skapa rum'}
+                </button>
+                
+                <button
+                  onClick={() => {
+                    setIsCreatingRoom(false);
+                    setRoomName('');
+                    setError('');
+                  }}
+                  className="btn-secondary"
+                >
+                  Avbryt
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 
