@@ -186,7 +186,7 @@ export class AuthService {
   }
 
   // Middleware to authenticate requests
-  static authenticateToken(req: Request, res: Response, next: any): void {
+  static async authenticateToken(req: Request, res: Response, next: any): Promise<void> {
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
@@ -203,6 +203,17 @@ export class AuthService {
       res.status(403).json({
         error: 'Invalid token',
         message: 'Token verification failed'
+      });
+      return;
+    }
+
+    // Verify user still exists in database
+    const user = await UserModel.findById(decoded.userId);
+    if (!user) {
+      logger.warn(`Token references non-existent user: ${decoded.userId} (${decoded.username})`);
+      res.status(403).json({
+        error: 'Invalid token',
+        message: 'User no longer exists. Please log in again.'
       });
       return;
     }
