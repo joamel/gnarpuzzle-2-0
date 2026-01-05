@@ -60,6 +60,11 @@ export interface SocketEvents {
     x: number; 
     y: number; 
   }) => void;
+  'turn:skipped': (data: {
+    gameId: number;
+    skippedPlayerId: number;
+    nextPlayerId: number;
+  }) => void;
   'game:ended': (data: { 
     gameId: number; 
     leaderboard: Array<{

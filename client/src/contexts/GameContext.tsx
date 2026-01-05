@@ -101,6 +101,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         timer_end: data.timer_end,
         gameId: data.gameId,
         current_turn: data.current_turn,
+        current_letter: data.current_letter,
         timestamp: new Date().toLocaleTimeString(),
         timerValid: !!data.timer_end,
         remainingMs: data.timer_end ? data.timer_end - Date.now() : 'N/A'
@@ -111,6 +112,12 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       // Clear selected letter when starting new letter selection phase
       if (data.phase === 'letter_selection') {
         setSelectedLetter(null);
+      }
+      
+      // Set selected letter when entering placement phase (robustness for missed letter:selected events)
+      if (data.phase === 'letter_placement' && data.current_letter) {
+        console.log('📝 Setting letter from phase change:', data.current_letter);
+        setSelectedLetter(data.current_letter);
       }
       
       // Only set timer if we have a valid timer_end value
@@ -454,6 +461,16 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       }
     };
 
+    const handleTurnSkipped = (data: any) => {
+      console.log(`⏭️ Turn skipped: player ${data.skippedPlayerId} timed out, now player ${data.nextPlayerId}'s turn`);
+      
+      // Update game state with new current turn
+      setCurrentGame(prev => {
+        if (!prev) return null;
+        return { ...prev, currentTurn: data.nextPlayerId };
+      });
+    };
+
     // Register socket events
     socketService.on('game:phase_changed', handleGamePhaseChanged);
     socketService.on('letter:selected', handleLetterSelected);
@@ -464,6 +481,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     socketService.on('room:member_left', handleRoomMemberLeft);
     socketService.on('room:ownership_transferred', handleOwnershipTransferred);
     socketService.on('room:updated', handleRoomUpdated);
+    socketService.on('turn:skipped', handleTurnSkipped);
 
     return () => {
       socketService.off('game:phase_changed', handleGamePhaseChanged);
@@ -475,6 +493,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       socketService.off('room:member_left', handleRoomMemberLeft);
       socketService.off('room:ownership_transferred', handleOwnershipTransferred);
       socketService.off('room:updated', handleRoomUpdated);
+      socketService.off('turn:skipped', handleTurnSkipped);
     };
   }, [currentGame, currentRoom, user, players.length]);
 

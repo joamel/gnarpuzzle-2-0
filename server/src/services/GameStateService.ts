@@ -229,20 +229,23 @@ export class GameStateService {
       WHERE game_id = ?
     `, gameId);
 
-    // Get updated game state to include current_turn
+    // Get updated game state to include current_turn and current_letter
     const updatedGame = await this.getGameById(gameId);
     
-    // Emit phase change
+    // Emit phase change with current letter for robustness
+    // This ensures clients have the letter even if they miss the letter:selected event
     const phaseData = {
       gameId,
       phase: 'letter_placement',
       timer_end: phaseEndTime,
-      current_turn: updatedGame?.current_turn
+      current_turn: updatedGame?.current_turn,
+      current_letter: updatedGame?.current_letter
     };
     
     console.log(`📡 Sending placement phase change:`, {
       phase: phaseData.phase,
       timer_end: phaseData.timer_end,
+      current_letter: phaseData.current_letter,
       current_time: Date.now(),
       remaining_ms: phaseData.timer_end - Date.now()
     });
@@ -441,16 +444,43 @@ export class GameStateService {
     // Clear the timer since we're handling it now
     this.clearGameTimer(gameId);
     
-    // Auto-select random letter
-    const letters = this.generateSwedishLetters();
-    const randomLetter = letters[Math.floor(Math.random() * letters.length)];
+    // Pass turn to next player instead of auto-selecting random letter
+    console.log(`⏰ Letter selection timeout - passing turn from player ${game.current_turn} to next player`);
 
-    console.log(`⏰ Letter selection timeout - auto-selecting "${randomLetter}" for player ${game.current_turn}`);
+    const dbManager = await DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
 
-    const currentPlayer = await this.getCurrentPlayer(gameId, game.current_turn!);
-    if (currentPlayer) {
-      await this.selectLetter(gameId, currentPlayer.user_id, randomLetter, true);
-    }
+    // Get all players ordered by position
+    const players = await db.all(`
+      SELECT p.user_id, p.position 
+      FROM players p 
+      WHERE p.game_id = ? 
+      ORDER BY p.position ASC
+    `, gameId) as { user_id: number; position: number }[];
+
+    if (players.length === 0) return;
+
+    // Find current player index and move to next
+    const currentIndex = players.findIndex(p => p.user_id === game.current_turn);
+    const nextIndex = (currentIndex + 1) % players.length;
+    const nextUserId = players[nextIndex].user_id;
+
+    // Update game with new current turn (don't increment turn_number since no letter was placed)
+    await db.run(`
+      UPDATE games 
+      SET current_turn = ?
+      WHERE id = ?
+    `, nextUserId, gameId);
+
+    // Notify about skipped turn
+    this.socketService.broadcastToRoom(`game:${gameId}`, 'turn:skipped', {
+      gameId,
+      skippedPlayerId: game.current_turn,
+      nextPlayerId: nextUserId
+    });
+
+    // Start new letter selection phase for next player
+    await this.startLetterSelectionPhase(gameId);
   }
 
   async handlePlacementTimeout(gameId: number): Promise<void> {
