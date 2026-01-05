@@ -167,10 +167,11 @@ const GameInterface: React.FC = () => {
     }
   };
 
-  // Auto-submit when timeout is imminent
+  // Auto-submit when timeout is imminent - only if player has actively chosen a position
+  // This saves the player's choice if they clicked a cell but didn't press "Bekräfta" in time
   useEffect(() => {
     if (gamePhase === 'letter_placement' && gameTimer && gameTimer.remainingSeconds <= 1 && temporaryPlacement) {
-      console.log('⏰ 1 second left - auto-submitting placement:', temporaryPlacement);
+      console.log('⏰ 1 second left - auto-submitting player choice:', temporaryPlacement);
       submitPlacement();
     }
   }, [gameTimer?.remainingSeconds, gamePhase, temporaryPlacement]);
@@ -186,33 +187,9 @@ const GameInterface: React.FC = () => {
     previousGamePhaseRef.current = gamePhase;
   }, [gamePhase, temporaryPlacement]);
 
-  // Helper function to get a random empty cell
-  const getRandomEmptyCell = () => {
-    if (!currentPlayer) return null;
-    const emptyCells = [];
-    for (let y = 0; y < currentPlayer.grid.length; y++) {
-      for (let x = 0; x < currentPlayer.grid[y].length; x++) {
-        if (!currentPlayer.grid[y][x].letter) {
-          emptyCells.push({ x, y });
-        }
-      }
-    }
-    return emptyCells.length > 0 ? emptyCells[Math.floor(Math.random() * emptyCells.length)] : null;
-  };
-
-  // Create random placement only when timeout is imminent (3 seconds left) and player hasn't placed yet
-  useEffect(() => {
-    if (gamePhase === 'letter_placement' && selectedLetter && !temporaryPlacement && gameTimer) {
-      if (gameTimer.remainingSeconds <= 3) {
-        console.log('⏰ Only 3 seconds left - creating fallback random placement for:', selectedLetter);
-        const randomCell = getRandomEmptyCell();
-        if (randomCell) {
-          setTemporaryPlacement({ x: randomCell.x, y: randomCell.y, letter: selectedLetter });
-          console.log(`🎲 Fallback placement: ${selectedLetter} at (${randomCell.x}, ${randomCell.y})`);
-        }
-      }
-    }
-  }, [gamePhase, selectedLetter, temporaryPlacement, currentPlayer, gameTimer?.remainingSeconds]);
+  // Note: No automatic random placement is created on client side.
+  // If the player doesn't place their letter in time, the server handles 
+  // auto-placement via handlePlacementTimeout -> autoPlaceLetter
 
   const handleLetterSelect = async (letter: string) => {
     // Check if it's the player's turn
