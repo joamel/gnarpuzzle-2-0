@@ -53,7 +53,8 @@ export class GameStateService {
       throw new Error('No members found in room');
     }
 
-    // Create initial game state
+    // Create initial game state - use 'starting' as initial phase
+    // so that startLetterSelectionPhase can properly initialize the timer
     const result = await db.run(`
       INSERT INTO games (
         room_id, state, current_phase, current_turn, turn_number, 
@@ -62,7 +63,7 @@ export class GameStateService {
     `, 
       roomId, 
       'starting', 
-      'letter_selection',
+      'starting',  // Changed from 'letter_selection' to allow startLetterSelectionPhase to work
       firstMember.user_id, // Use actual user_id for current_turn
       1,
       JSON.stringify([]),
