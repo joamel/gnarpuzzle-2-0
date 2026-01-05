@@ -310,14 +310,24 @@ router.post('/:code/join', AuthService.authenticateToken, async (req, res) => {
       return;
     }
 
+    logger.info(`Attempting to add user ${authReq.user!.id} (${authReq.user!.username}) to room ${room.id} (${code})`);
+    
     const success = await RoomModel.addMember(room.id, authReq.user!.id);
     if (!success) {
+      logger.error(`Failed to add member to room`, {
+        roomId: room.id,
+        roomCode: code,
+        userId: authReq.user!.id,
+        username: authReq.user!.username
+      });
       res.status(500).json({
         error: 'Failed to join room',
-        message: 'Unable to add you to the room'
+        message: 'Unable to add you to the room. Please try again.'
       });
       return;
     }
+
+    logger.info(`Successfully added user ${authReq.user!.username} to room ${code}`);
 
     // Check if room needs a new owner (orphaned room)
     const roomMembers = await RoomModel.getRoomMembers(room.id);

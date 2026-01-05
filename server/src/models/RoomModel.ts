@@ -116,8 +116,10 @@ export class RoomModel {
       console.log(`👥 RoomModel.addMember: Changes:`, result.changes);
       
       return result.changes > 0;
-    } catch (error) {
+    } catch (error: any) {
       console.error(`❌ RoomModel.addMember: Error adding member:`, error);
+      console.error(`❌ RoomModel.addMember: Error message:`, error?.message);
+      console.error(`❌ RoomModel.addMember: Error code:`, error?.code);
       // Handle unique constraint violation (user already in room)
       return false;
     }

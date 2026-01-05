@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { WordValidationService } from './WordValidationService';
 import { GridCell } from '../models/types';
 
-describe('WordValidationService - Scoring', () => {
+describe('WordValidationService Scoring', () => {
   let service: WordValidationService;
 
   beforeAll(async () => {
@@ -10,8 +10,7 @@ describe('WordValidationService - Scoring', () => {
     await service.loadDictionary();
   });
 
-  describe('Optimal Word Partitioning', () => {
-    it('should partition LÅSTA into LÅS + TA with complete row bonus', () => {
+  it('Complete row LÅSTA scores correctly with optimal partition', () => {
       const grid: GridCell[][] = [
         [
           { letter: 'L', x: 0, y: 0 },
@@ -48,7 +47,7 @@ describe('WordValidationService - Scoring', () => {
         [{ letter: null, x: 0, y: 1 }, { letter: null, x: 1, y: 1 }, { letter: null, x: 2, y: 1 }, { letter: null, x: 3, y: 1 }, { letter: 'Ä', x: 4, y: 1 }],
         [{ letter: null, x: 0, y: 2 }, { letter: null, x: 1, y: 2 }, { letter: null, x: 2, y: 2 }, { letter: null, x: 3, y: 2 }, { letter: 'R', x: 4, y: 2 }],
         [{ letter: null, x: 0, y: 3 }, { letter: null, x: 1, y: 3 }, { letter: null, x: 2, y: 3 }, { letter: null, x: 3, y: 3 }, { letter: null, x: 4, y: 3 }],
-        [{{ letter: null, x: 0, y: 4 }, { letter: null, x: 1, y: 4 }, { letter: null, x: 2, y: 4 }, { letter: null, x: 3, y: 4 }, { letter: null, x: 4, y: 4 }}]
+        [{ letter: null, x: 0, y: 4 }, { letter: null, x: 1, y: 4 }, { letter: null, x: 2, y: 4 }, { letter: null, x: 3, y: 4 }, { letter: null, x: 4, y: 4 }]
       ];
 
       const score = service.calculateGridScore(grid);
@@ -67,7 +66,7 @@ describe('WordValidationService - Scoring', () => {
       const grid: GridCell[][] = [
         [
           { letter: 'A', x: 0, y: 0 },
-          {{ letter: null, x: 1, y: 0 },
+          { letter: null, x: 1, y: 0 },
           { letter: null, x: 2, y: 0 },
           { letter: null, x: 3, y: 0 },
           { letter: null, x: 4, y: 0 }
@@ -85,4 +84,3 @@ describe('WordValidationService - Scoring', () => {
       expect(score.words.length).toBe(0);
     });
   });
-});
