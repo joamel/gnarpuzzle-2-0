@@ -112,12 +112,15 @@ export class GameStateService {
       WHERE id = ?
     `, 'letter_selection', phaseEndTime, gameId);
 
+    // Fetch updated game state to get current_turn (may have changed during turn skip)
+    const updatedGame = await this.getGameById(gameId);
+
     // Emit phase change to all players
     const phaseData = {
       gameId,
       phase: 'letter_selection',
       timer_end: phaseEndTime,
-      current_turn: game.current_turn
+      current_turn: updatedGame?.current_turn || game.current_turn
     };
     
     console.log(`📡 Sending phase change:`, {
@@ -466,9 +469,10 @@ export class GameStateService {
     const nextUserId = players[nextIndex].user_id;
 
     // Update game with new current turn (don't increment turn_number since no letter was placed)
+    // Also temporarily set phase to allow restarting letter_selection
     await db.run(`
       UPDATE games 
-      SET current_turn = ?
+      SET current_turn = ?, current_phase = 'turn_transition'
       WHERE id = ?
     `, nextUserId, gameId);
 
@@ -479,7 +483,7 @@ export class GameStateService {
       nextPlayerId: nextUserId
     });
 
-    // Start new letter selection phase for next player
+    // Start new letter selection phase for next player (now allowed since phase is 'turn_transition')
     await this.startLetterSelectionPhase(gameId);
   }
 
