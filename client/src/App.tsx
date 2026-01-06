@@ -1,4 +1,4 @@
-import React, { useEffect, Suspense } from 'react';
+import React, { useEffect, Suspense, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { GameProvider } from './contexts/GameContext';
@@ -17,8 +17,25 @@ const LoginPage = React.lazy(() => import('./pages/LoginPage'));
 const HomePage = React.lazy(() => import('./pages/HomePage'));
 const GamePage = React.lazy(() => import('./pages/GamePage'));
 const GameTestPage = React.lazy(() => import('./pages/GameTestPage'));
+const DebugResultsPage = React.lazy(() => import('./pages/DebugResultsPage'));
 
 function App() {
+  const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    setIsOnline(navigator.onLine);
+
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
   // Unregister any existing Service Workers in development
   useEffect(() => {
     if ('serviceWorker' in navigator && import.meta.env.DEV) {
@@ -160,15 +177,25 @@ function App() {
                 </div>
               } 
             />
+            <Route 
+              path="/debug/results" 
+              element={
+                <Suspense fallback={<div>Loading...</div>}>
+                  <DebugResultsPage />
+                </Suspense>
+              } 
+            />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Router>
       </AuthProvider>
       
       {/* Offline Indicator */}
-      <div className="offline-indicator">
-        📱 Du är offline - Vissa funktioner är begränsade
-      </div>
+      {!isOnline && (
+        <div className="offline-indicator">
+          📱 Du är offline - Vissa funktioner är begränsade
+        </div>
+      )}
     </div>
   );
 }
