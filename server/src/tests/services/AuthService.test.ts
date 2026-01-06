@@ -136,7 +136,7 @@ describe('AuthService', () => {
   });
 
   describe('Token Authentication Middleware', () => {
-    it('should authenticate valid tokens', () => {
+    it('should authenticate valid tokens', async () => {
       const user = { id: 1, username: 'testuser' };
       const token = AuthService.generateToken(user);
       
@@ -153,7 +153,15 @@ describe('AuthService', () => {
       
       const mockNext = vi.fn();
 
-      AuthService.authenticateToken(mockRequest as any, mockResponse as any, mockNext);
+      // Mock DatabaseManager to return the user exists
+      const mockDb = {
+        get: vi.fn().mockResolvedValue({ id: 1, username: 'testuser' })
+      };
+      vi.spyOn(DatabaseManager, 'getInstance').mockResolvedValue({
+        getDatabase: () => mockDb
+      } as any);
+
+      await AuthService.authenticateToken(mockRequest as any, mockResponse as any, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
       expect((mockRequest as any).user).toMatchObject({
@@ -162,7 +170,7 @@ describe('AuthService', () => {
       });
     });
 
-    it('should reject requests without tokens', () => {
+    it('should reject requests without tokens', async () => {
       const mockRequest = {
         headers: {}
       };
@@ -174,7 +182,7 @@ describe('AuthService', () => {
       
       const mockNext = vi.fn();
 
-      AuthService.authenticateToken(mockRequest as any, mockResponse as any, mockNext);
+      await AuthService.authenticateToken(mockRequest as any, mockResponse as any, mockNext);
 
       expect(mockResponse.status).toHaveBeenCalledWith(401);
       expect(mockResponse.json).toHaveBeenCalledWith(
@@ -185,7 +193,7 @@ describe('AuthService', () => {
       expect(mockNext).not.toHaveBeenCalled();
     });
 
-    it('should reject invalid tokens', () => {
+    it('should reject invalid tokens', async () => {
       const mockRequest = {
         headers: {
           authorization: 'Bearer invalid.token'
@@ -199,7 +207,7 @@ describe('AuthService', () => {
       
       const mockNext = vi.fn();
 
-      AuthService.authenticateToken(mockRequest as any, mockResponse as any, mockNext);
+      await AuthService.authenticateToken(mockRequest as any, mockResponse as any, mockNext);
 
       expect(mockResponse.status).toHaveBeenCalledWith(403);
       expect(mockResponse.json).toHaveBeenCalledWith(

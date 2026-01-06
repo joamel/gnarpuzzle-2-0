@@ -148,6 +148,7 @@ router.post('/', AuthService.authenticateToken, async (req, res) => {
         max_players: room.max_players,
         board_size: room.board_size,
         turn_duration: room.turn_duration,
+        settings: room.settings, // Include room settings
         status: room.status,
         created_at: room.created_at,
         createdBy: authReq.user!.id,
@@ -201,6 +202,7 @@ router.get('/:code', AuthService.optionalAuth, async (req, res) => {
         max_players: room.max_players,
         board_size: room.board_size,
         turn_duration: room.turn_duration,
+        settings: room.settings, // Include room settings
         status: room.status,
         member_count: members.length,
         createdBy: room.created_by, // Include owner information
@@ -264,7 +266,7 @@ router.post('/:code/join', AuthService.authenticateToken, async (req, res) => {
       return;
     }
 
-    // Check if user is already in room
+    // Check if user is already in THIS room
     const isAlreadyMember = await RoomModel.isUserInRoom(room.id, authReq.user!.id);
     if (isAlreadyMember) {
       // User is already in room - return success with room data
@@ -283,6 +285,7 @@ router.post('/:code/join', AuthService.authenticateToken, async (req, res) => {
           max_players: room.max_players,
           board_size: room.board_size,
           turn_duration: room.turn_duration,
+          settings: room.settings, // Include room settings
           status: room.status,
           created_at: room.created_at,
           createdBy: room.created_by,
@@ -290,6 +293,33 @@ router.post('/:code/join', AuthService.authenticateToken, async (req, res) => {
         }
       });
       return;
+    }
+
+    // Remove user from any OTHER rooms they might be in (can only be in one room at a time)
+    const previousRooms = await RoomModel.getUserRooms(authReq.user!.id);
+    if (previousRooms.length > 0) {
+      logger.info(`User ${authReq.user!.username} is in ${previousRooms.length} other room(s), removing them first`, {
+        userId: authReq.user!.id,
+        previousRoomCodes: previousRooms.map(r => r.code)
+      });
+      
+      const { getSocketService } = await import('../index');
+      const socketService = getSocketService();
+      
+      for (const prevRoom of previousRooms) {
+        await RoomModel.removeMember(prevRoom.id, authReq.user!.id);
+        
+        // Notify the old room that user left
+        if (socketService) {
+          socketService.emitToRoom(prevRoom.code, 'room:member_left', {
+            roomId: prevRoom.id,
+            roomCode: prevRoom.code,
+            userId: authReq.user!.id,
+            username: authReq.user!.username,
+            reason: 'joined_another_room'
+          });
+        }
+      }
     }
 
     // Check room capacity
@@ -390,6 +420,7 @@ router.post('/:code/join', AuthService.authenticateToken, async (req, res) => {
         max_players: room.max_players,
         board_size: room.board_size,
         turn_duration: room.turn_duration,
+        settings: room.settings, // Include room settings
         status: room.status,
         created_at: room.created_at,
         createdBy: room.created_by, // This will have the correct ownership after transfer

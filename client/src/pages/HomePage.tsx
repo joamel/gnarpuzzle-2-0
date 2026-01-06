@@ -9,7 +9,7 @@ import '../styles/home.css';
 
 const HomePage: React.FC = () => {
   const { user, logout } = useAuth();
-  const { joinRoom, currentRoom } = useGame();
+  const { joinRoom, currentRoom, leaveRoom } = useGame();
   const navigate = useNavigate();
   const shouldNavigate = useRef(false);
   
@@ -42,6 +42,17 @@ const HomePage: React.FC = () => {
     const interval = setInterval(loadRooms, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  // Auto-leave room when arriving at lobby (HomePage)
+  // This ensures clean state when user navigates back from game
+  useEffect(() => {
+    if (currentRoom) {
+      console.log('📤 User arrived at lobby while in room, auto-leaving:', currentRoom.code);
+      leaveRoom().catch(err => {
+        console.error('Failed to auto-leave room:', err);
+      });
+    }
+  }, []); // Only run once on mount
 
   // Handle navigation to game if already in a room
   useEffect(() => {
@@ -211,7 +222,12 @@ const HomePage: React.FC = () => {
                   {availableRooms.map((room) => (
                     <div 
                       key={room.id} 
-                      className="card p-4"
+                      className="card p-4 cursor-pointer"
+                      onClick={() => {
+                        if ((room.member_count || 0) < (room.max_players || 4) && !isJoiningRoom) {
+                          joinRoomByCode(room.code);
+                        }
+                      }}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
@@ -226,17 +242,9 @@ const HomePage: React.FC = () => {
                             <span>📏 {room.board_size || 5}×{room.board_size || 5}</span>
                           </div>
                         </div>
-                        <button
-                          onClick={() => joinRoomByCode(room.code)}
-                          disabled={isJoiningRoom || (room.member_count || 0) >= (room.max_players || 4)}
-                          className={`btn btn-sm ${
-                            (room.member_count || 0) >= (room.max_players || 4) 
-                              ? 'btn-secondary opacity-50' 
-                              : 'btn-primary'
-                          }`}
-                        >
-                          {(room.member_count || 0) >= (room.max_players || 4) ? 'Fullt' : 'Gå med'}
-                        </button>
+                        <div className="text-xs font-semibold text-gray-500">
+                          {(room.member_count || 0) >= (room.max_players || 4) ? 'Fullt' : ''}
+                        </div>
                       </div>
                     </div>
                   ))}

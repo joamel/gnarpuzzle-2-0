@@ -71,10 +71,10 @@ describe('WordValidationService Scoring', () => {
           { letter: null, x: 3, y: 0 },
           { letter: null, x: 4, y: 0 }
         ],
-        [{{ letter: null, x: 0, y: 1 }, { letter: null, x: 1, y: 1 }, { letter: null, x: 2, y: 1 }, { letter: null, x: 3, y: 1 }, { letter: null, x: 4, y: 1 }}],
-        [{{ letter: null, x: 0, y: 2 }, { letter: null, x: 1, y: 2 }, { letter: null, x: 2, y: 2 }, { letter: null, x: 3, y: 2 }, { letter: null, x: 4, y: 2 }}],
-        [{{ letter: null, x: 0, y: 3 }, { letter: null, x: 1, y: 3 }, { letter: null, x: 2, y: 3 }, { letter: null, x: 3, y: 3 }, { letter: null, x: 4, y: 3 }}],
-        [{{ letter: null, x: 0, y: 4 }, { letter: null, x: 1, y: 4 }, { letter: null, x: 2, y: 4 }, { letter: null, x: 3, y: 4 }, { letter: null, x: 4, y: 4 }}]
+        [{ letter: null, x: 0, y: 1 }, { letter: null, x: 1, y: 1 }, { letter: null, x: 2, y: 1 }, { letter: null, x: 3, y: 1 }, { letter: null, x: 4, y: 1 }],
+        [{ letter: null, x: 0, y: 2 }, { letter: null, x: 1, y: 2 }, { letter: null, x: 2, y: 2 }, { letter: null, x: 3, y: 2 }, { letter: null, x: 4, y: 2 }],
+        [{ letter: null, x: 0, y: 3 }, { letter: null, x: 1, y: 3 }, { letter: null, x: 2, y: 3 }, { letter: null, x: 3, y: 3 }, { letter: null, x: 4, y: 3 }],
+        [{ letter: null, x: 0, y: 4 }, { letter: null, x: 1, y: 4 }, { letter: null, x: 2, y: 4 }, { letter: null, x: 3, y: 4 }, { letter: null, x: 4, y: 4 }]
       ];
 
       const score = service.calculateGridScore(grid);

@@ -4,26 +4,33 @@ import express from 'express';
 import { roomRoutes } from '../../routes/rooms';
 import { RoomModel } from '../../models/RoomModel';
 import { AuthService } from '../../services/AuthService';
+import { GameStateService } from '../../services/GameStateService';
 
 // Mock dependencies
 vi.mock('../../models/RoomModel');
 vi.mock('../../services/AuthService');
-vi.mock('../../services/GameStateService', () => ({
-  GameStateService: {
-    getInstance: vi.fn(() => ({
-      startGame: vi.fn().mockResolvedValue({
-        id: 1,
-        room_id: 1,
-        state: 'starting',
-        current_phase: 'letter_selection',
-        phase_timer_end: Date.now() + 10000
-      })
-    }))
-  }
-}));
+vi.mock('../../services/GameStateService', () => {
+  const mockStartGame = vi.fn().mockResolvedValue({
+    id: 1,
+    room_id: 1,
+    state: 'starting',
+    current_phase: 'letter_selection',
+    phase_timer_end: Date.now() + 10000
+  });
+  
+  return {
+    GameStateService: {
+      getInstance: vi.fn(() => ({
+        startGame: mockStartGame,
+        handlePlayerLeft: vi.fn().mockResolvedValue(undefined)
+      }))
+    }
+  };
+});
 vi.mock('../../index', () => ({
   getSocketService: vi.fn(() => ({
-    emitToRoom: vi.fn()
+    emitToRoom: vi.fn(),
+    broadcastToRoom: vi.fn()
   }))
 }));
 
@@ -38,7 +45,7 @@ describe('Room Routes - Start Game Integration', () => {
     vi.clearAllMocks();
     
     // Mock AuthService.authenticateToken to add user to request
-    vi.mocked(AuthService.authenticateToken).mockImplementation((req: any, res: any, next: any) => {
+    vi.mocked(AuthService.authenticateToken).mockImplementation(async (req: any, res: any, next: any) => {
       req.user = mockUser;
       next();
     });

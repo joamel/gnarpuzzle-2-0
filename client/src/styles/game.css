@@ -1,19 +1,24 @@
 /* Game Interface Styles */
 .game-interface {
-  max-width: 480px;
+  width: 100%;
+  max-width: 500px;
   margin: 0 auto;
-  padding: 12px; /* More compact padding */
-  background: transparent; /* Use global gradient */
-  min-height: 100vh;
+  padding: 6px;
+  background: transparent;
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Game Status */
 .game-status {
   background: white;
-  border-radius: 8px; /* Smaller radius */
-  padding: 12px; /* More compact padding */
-  margin-bottom: 12px; /* More compact margin */
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1); /* Blue shadow */
+  border-radius: 6px;
+  padding: 6px;
+  margin-bottom: 6px;
+  box-shadow: 0 1px 4px rgba(102, 126, 234, 0.1);
+  flex-shrink: 0;
 }
 
 .phase-indicator {
@@ -78,51 +83,54 @@
 .letter-placement-info {
   background: linear-gradient(135deg, #e3f2fd, #bbdefb);
   border: 2px solid #2196f3;
-  border-radius: 8px; /* Smaller radius */
-  padding: 10px; /* More compact padding */
-  margin: 8px 0; /* More compact margin */
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin: 4px 0;
   text-align: center;
-  box-shadow: 0 3px 6px rgba(33, 150, 243, 0.2); /* Smaller shadow */
+  box-shadow: 0 2px 4px rgba(33, 150, 243, 0.15);
 }
 
 .letter-placement-info h3 {
-  margin: 0 0 4px 0; /* More compact margin */
+  margin: 0;
   color: #1976d2;
-  font-size: 16px; /* Smaller font */
+  font-size: 14px;
 }
 
 .letter-placement-info .selected-letter {
   background: #2196f3;
   color: white;
-  padding: 4px 12px;
-  border-radius: 8px;
+  padding: 2px 8px;
+  border-radius: 4px;
   font-weight: bold;
-  font-size: 20px;
+  font-size: 16px;
 }
 
 .letter-placement-info p {
-  margin: 0;
+  margin: 2px 0 0 0;
   color: #1565c0;
-  font-size: 14px;
+  font-size: 12px;
+  display: none; /* Hide the redundant text */
 }
 
 .placement-hint {
   background: rgba(255, 193, 7, 0.1);
-  border-left: 4px solid #ffc107;
-  padding: 8px 12px;
-  margin: 10px 0 !important;
+  border-left: 3px solid #ffc107;
+  padding: 4px 8px;
+  margin: 4px 0 !important;
   border-radius: 4px;
   font-style: italic;
   color: #e65100 !important;
+  font-size: 12px;
 }
 
 /* Letter Selector */
 .letter-selector {
   background: white;
   border-radius: 8px; /* Smaller radius */
-  padding: 12px; /* More compact padding */
-  margin-bottom: 12px; /* More compact margin */
+  padding: 8px; /* More compact padding */
+  margin-bottom: 8px; /* More compact margin */
   box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1); /* Blue shadow */
+  flex-shrink: 0;
 }
 
 .letter-selector h3 {
@@ -180,11 +188,12 @@
   display: grid;
   grid-template-columns: repeat(var(--grid-size), 1fr);
   gap: 4px;
-  max-width: 320px;
-  margin: 0 auto 20px;
-  padding: 16px;
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto 10px;
+  padding: 12px;
   background: white;
-  border-radius: 12px;
+  border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 }
 
@@ -302,73 +311,81 @@
 /* Placement Section */
 .placement-section {
   text-align: center;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .selected-letter-display {
   background: white;
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 20px;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
 }
 
 .selected-letter-display h3 {
-  margin: 0 0 8px 0;
+  margin: 0;
   color: #333;
-  font-size: 18px;
+  font-size: 14px;
 }
 
 .selected-letter-display strong {
   color: #667eea;
   background: #f0f4ff;
-  padding: 4px 8px;
-  border-radius: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 .selected-letter-display p {
-  margin: 0;
+  margin: 2px 0 0 0;
   color: #666;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 /* Confirm Section */
 .confirm-section {
   background: white;
-  border-radius: 12px;
-  padding: 20px;
+  border-radius: 8px;
+  padding: 10px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   text-align: center;
+  flex-shrink: 0;
 }
 
 .confirm-section p {
-  margin: 0 0 16px 0;
+  margin: 0 0 8px 0;
   color: #333;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .confirm-buttons {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   justify-content: center;
 }
 
 .confirm-button {
   background: #28a745;
   color: white;
-  border-radius: 8px;
-  padding: 12px 20px;
+  border-radius: 6px;
+  padding: 8px 16px;
   font-weight: 600;
-  min-width: 120px;
+  min-width: 100px;
+  font-size: 14px;
 }
 
 .cancel-button {
   background: white;
   color: #666;
   border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 12px 20px;
+  border-radius: 6px;
+  padding: 8px 16px;
   font-weight: 600;
-  min-width: 120px;
+  min-width: 80px;
+  font-size: 14px;
 }
 
 .cancel-button:hover:not(:disabled) {
@@ -460,32 +477,34 @@
 .current-board-section {
   background: #f8f9fa;
   border: 2px dashed #dee2e6;
-  border-radius: 12px;
-  padding: 16px;
-  margin: 20px 0;
+  border-radius: 8px;
+  padding: 8px;
+  margin: 8px 0;
   text-align: center;
+  flex: 1;
+  min-height: 0; /* Allow shrinking */
 }
 
 .current-board-section h3 {
-  margin: 0 0 8px 0;
+  margin: 0 0 4px 0;
   color: #495057;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
 }
 
 .current-board-section p {
-  margin: 0 0 16px 0;
+  margin: 0 0 8px 0;
   color: #6c757d;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 /* Make board slightly smaller in preview mode */
 .current-board-section .game-board {
   opacity: 0.9;
-  transform: scale(0.95);
-  transition: transform 0.2s ease;
+  transform: scale(0.9);
+  margin: 0 auto;
 }
 
 .current-board-section .game-board:hover {
-  transform: scale(0.98);
+  transform: scale(0.92);
 }

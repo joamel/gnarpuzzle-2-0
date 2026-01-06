@@ -48,6 +48,7 @@ export class SocketService {
   private io: SocketServer;
   private connectedUsers: Map<string, { userId?: number; username?: string; roomCode?: string }> = new Map();
   private gameStateService: GameStateService;
+  private roomPlayerReadyStatus: Map<string, Set<number>> = new Map(); // Maps roomCode -> Set of ready userIds
 
   constructor(io: SocketServer) {
     this.io = io;
@@ -273,7 +274,8 @@ export class SocketService {
             username: m.username,
             role: m.id === room.created_by ? 'owner' : 'member'
           }))
-        }
+        },
+        readyPlayers: Array.from(this.roomPlayerReadyStatus.get(roomCode) || []).map(String)
       });
 
       logger.info(`User joined Socket.IO room: ${userData.username} -> room:${roomCode}`, {
@@ -308,6 +310,12 @@ export class SocketService {
       
       // Update user data
       this.connectedUsers.set(socket.id, { ...userData, roomCode: undefined });
+
+      // Remove from ready status
+      const readySet = this.roomPlayerReadyStatus.get(roomCode);
+      if (readySet) {
+        readySet.delete(userData.userId);
+      }
 
       // Notify others in the room
       socket.to(`room:${roomCode}`).emit('room:member_left', {
@@ -345,6 +353,18 @@ export class SocketService {
     }
 
     try {
+      // Store ready status in memory
+      if (!this.roomPlayerReadyStatus.has(roomCode)) {
+        this.roomPlayerReadyStatus.set(roomCode, new Set());
+      }
+      
+      const readySet = this.roomPlayerReadyStatus.get(roomCode)!;
+      if (isReady) {
+        readySet.add(userData.userId);
+      } else {
+        readySet.delete(userData.userId);
+      }
+
       // Broadcast ready status to all players in the room (including sender)
       this.io.to(`room:${roomCode}`).emit('player:ready_changed', {
         userId: String(userData.userId),

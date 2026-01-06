@@ -239,6 +239,11 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
       if (data.room?.members && Array.isArray(data.room.members) && data.room.members.length > 0) {
         setPlayerList(data.room.members);
       }
+      
+      // Initialize ready players from server
+      if (data.readyPlayers && Array.isArray(data.readyPlayers)) {
+        setReadyPlayers(new Set(data.readyPlayers));
+      }
     };
 
     socketService.on('room:member_joined', handleMemberJoined);
@@ -389,7 +394,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
           </div>
           <div className="setting-item">
             <span className="setting-label">Bokstavstid:</span>
-            <span className="setting-value">{currentRoom.settings?.letter_timer || 30}s</span>
+            <span className="setting-value">{currentRoom.settings?.letter_timer || 20}s</span>
           </div>
           <div className="setting-item">
             <span className="setting-label">Placeringstid:</span>
@@ -429,12 +434,12 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
                         </label>
                       ) : (
                         <span className={`ready-status ${isPlayerReady ? 'ready' : 'not-ready'}`}>
-                          {isPlayerReady ? '✓ Redo' : 'Väntar...'}
+                          {isPlayerReady ? '✓' : '⏳'}
                         </span>
                       )}
                     </>
                   )}
-                  {isOwner && <div className="player-status online">Spelledare</div>}
+                  {isOwner && <div className="player-status online">🟢</div>}
                 </div>
               </div>
             );
@@ -467,7 +472,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
               className="start-game-button primary-button"
               title={!hasEnoughPlayers ? 'Minst 2 spelare krävs för att starta' : !allPlayersReady ? 'Alla spelare måste vara redo' : 'Starta spelet'}
             >
-              {isStarting ? 'Startar spel...' : !canActuallyStartGame ? `Starta spel (${playerList.length}/2 spelare)` : 'Starta spel'}
+              {isStarting ? 'Startar spel...' : !canActuallyStartGame ? `Väntar på spelare (${playerList.length}/2)` : 'Starta spel'}
             </button>
             
             {/* Reset room button - only show if room status is not waiting */}
@@ -481,37 +486,17 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
                 {isResetting ? 'Återställer...' : 'Återställ rum'}
               </button>
             )}
-            
-            {!hasEnoughPlayers && (
-              <p className="requirement-message">
-                Minst 2 spelare krävs för att starta ({playerList.length}/2)
-              </p>
-            )}
-            {hasEnoughPlayers && !allPlayersReady && (
-              <p className="requirement-message">
-                Väntar på att alla spelare ska vara redo för spel
-              </p>
-            )}
-            {hasEnoughPlayers && allPlayersReady && (
-              <p className="ready-message">
-                ✅ Redo att starta spelet!
-              </p>
-            )}
           </>
         )}
 
         {!isOwner && (
           <div className="waiting-message">
-            <p>Väntar på att {playerList?.find((m: LobbyMember) => m.role === 'owner')?.username || 'spelägaren'} startar spelet</p>
-            {!hasEnoughPlayers && (
-              <p className="requirement-message">
-                Minst 2 spelare krävs för att starta ({playerList.length}/2)
-              </p>
-            )}
-            {hasEnoughPlayers && (
-              <p className="ready-message">
-                ✅ Redo att starta spelet!
-              </p>
+            {!hasEnoughPlayers ? (
+              <p>Väntar på fler spelare för att starta ({playerList.length}/2)</p>
+            ) : !isReady ? (
+              <p>👉 Du måste trycka redo för att starta</p>
+            ) : (
+              <p>Redo! Väntar på {playerList?.find((m: LobbyMember) => m.role === 'owner')?.username || 'spelägaren'} att starta</p>
             )}
           </div>
         )}
@@ -538,7 +523,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
                 <li><strong>Spelare:</strong> Minst 2 spelare krävs för att starta</li>
                 <li><strong>Bjud in:</strong> Dela rumkoden med vänner</li>
                 <li><strong>Poäng:</strong> 1 poäng per bokstav + 2 extra för helrader/kolumner</li>
-                <li><strong>Tidsgränser:</strong> {currentRoom.settings?.letter_timer || 30}s för bokstavsval, {currentRoom.settings?.placement_timer || 30}s för placering</li>
+                <li><strong>Tidsgränser:</strong> {currentRoom.settings?.letter_timer || 20}s för bokstavsval, {currentRoom.settings?.placement_timer || 30}s för placering</li>
                 <li><strong>Strategi:</strong> Försök bilda längre ord för mer poäng</li>
                 <li><strong>Bonus:</strong> Fyll en hel rad eller kolumn för extra poäng</li>
               </ul>

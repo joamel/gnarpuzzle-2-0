@@ -109,6 +109,7 @@ export interface Leaderboard {
   score: number;
   words: ValidWord[];
   rank: number;
+  grid?: Array<Array<{ letter: string | null }>>;
 }
 
 // Socket event types

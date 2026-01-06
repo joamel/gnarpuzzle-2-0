@@ -295,8 +295,7 @@ const GameInterface: React.FC = () => {
           
           {/* Show current board while selecting letter for strategic planning */}
           <div className="current-board-section">
-            <h3>📋 Ditt nuvarande spelbord</h3>
-            <p>Planera var du vill placera nästa bokstav:</p>
+            <h3>📋 Ditt spelbord</h3>
             <GameBoard
               grid={currentPlayer.grid}
               onCellClick={() => {}} 
@@ -308,11 +307,6 @@ const GameInterface: React.FC = () => {
 
       {gamePhase === 'letter_placement' && selectedLetter && (
         <div className="placement-section">
-          <div className="selected-letter-display">
-            <h3>Placera bokstav: <strong>{selectedLetter}</strong></h3>
-            <p>Klicka på en tom ruta för att placera bokstaven</p>
-          </div>
-
           <GameBoard
             grid={currentPlayer.grid}
             onCellClick={handleCellClick}
@@ -323,8 +317,7 @@ const GameInterface: React.FC = () => {
 
           {temporaryPlacement && selectedLetter && (
             <div className="confirm-section">
-              <p>Placera "{selectedLetter}" på position {temporaryPlacement.x}, {temporaryPlacement.y}?</p>
-              <p className="placement-hint">💡 Klicka på en annan ruta för att flytta bokstaven</p>
+              <p>📍 Placera <strong>{selectedLetter}</strong> här?</p>
               <div className="confirm-buttons">
                 <button 
                   onClick={handleConfirmPlacement}

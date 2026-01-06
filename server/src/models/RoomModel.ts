@@ -270,6 +270,42 @@ export class RoomModel {
     return !!result;
   }
 
+  /**
+   * Get all rooms a user is currently a member of
+   */
+  static async getUserRooms(userId: number): Promise<Room[]> {
+    const dbManager = await DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+    
+    const rooms = await db.all(`
+      SELECT r.* FROM rooms r
+      INNER JOIN room_members rm ON r.id = rm.room_id
+      WHERE rm.user_id = ? AND r.status != 'abandoned' AND r.status != 'deleted'
+    `, userId) as Room[];
+    
+    return rooms.map(room => this.parseRoomSettings(room));
+  }
+
+  /**
+   * Remove user from all rooms they are currently in
+   * Returns the room codes they were removed from
+   */
+  static async removeUserFromAllRooms(userId: number): Promise<string[]> {
+    const dbManager = await DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+    
+    // Get rooms user is in before removing
+    const rooms = await this.getUserRooms(userId);
+    const roomCodes = rooms.map(r => r.code);
+    
+    // Remove from all rooms
+    await db.run(`
+      DELETE FROM room_members WHERE user_id = ?
+    `, userId);
+    
+    return roomCodes;
+  }
+
   // Cleanup-related methods
   static async getInactiveRooms(timeoutMs: number): Promise<Room[]> {
     const dbManager = await DatabaseManager.getInstance();

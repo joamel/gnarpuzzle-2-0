@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useGame } from '../contexts/GameContext';
 import { useAuth } from '../contexts/AuthContext';
 import RoomLobby from '../components/RoomLobby';
+import GameResultBoard from '../components/GameResultBoard';
 
 // Lazy load GameInterface for better performance
 const GameInterface = React.lazy(() => import('../components/GameInterface').then(module => ({ 
@@ -11,9 +12,10 @@ const GameInterface = React.lazy(() => import('../components/GameInterface').the
 
 const GamePage: React.FC = () => {
   const { user } = useAuth();
-  const { currentRoom, currentGame, gamePhase, leaderboard, leaveRoom, gameEndReason } = useGame();
+  const { currentRoom, currentGame, gamePhase, leaderboard, leaveRoom, gameEndReason, boardSize } = useGame();
   const navigate = useNavigate();
   const [gameStarted, setGameStarted] = useState(false);
+  const [selectedPlayerBoard, setSelectedPlayerBoard] = useState<number | null>(null);
 
   useEffect(() => {
     console.log('🎮 GamePage useEffect triggered:', {
@@ -65,6 +67,11 @@ const GamePage: React.FC = () => {
 
   // Show leaderboard if game is finished
   if (gamePhase === 'finished' && leaderboard) {
+    const currentPlayer = leaderboard.find(p => p.userId === user?.id);
+    const selectedPlayer = selectedPlayerBoard ? leaderboard.find(p => p.userId === selectedPlayerBoard) : null;
+
+    console.log('🏆 Leaderboard data:', { leaderboard, currentPlayer, selectedPlayer });
+
     return (
       <div className="game-finished">
         <div className="game-finished-content">
@@ -77,7 +84,12 @@ const GamePage: React.FC = () => {
           <div className="leaderboard">
             <h3>Resultat</h3>
             {leaderboard.map((player, index) => (
-              <div key={player.userId} className={`leaderboard-item ${player.userId === user?.id ? 'current-player' : ''}`}>
+              <div 
+                key={player.userId} 
+                className={`leaderboard-item ${player.userId === user?.id ? 'current-player' : ''}`}
+                onClick={() => setSelectedPlayerBoard(player.userId)}
+                style={{ cursor: 'pointer' }}
+              >
                 <div className="rank">#{index + 1}</div>
                 <div className="player-info">
                   <span className="username">{player.username}</span>
@@ -88,17 +100,14 @@ const GamePage: React.FC = () => {
             ))}
           </div>
 
-          {leaderboard.find(p => p.userId === user?.id) && (
-            <div className="player-words">
-              <h4>Dina ord:</h4>
-              <div className="words-list">
-                {leaderboard.find(p => p.userId === user?.id)!.words.map((word, index) => (
-                  <div key={index} className="word-item">
-                    <span className="word">{word.word}</span>
-                    <span className="points">{word.points}p</span>
-                  </div>
-                ))}
-              </div>
+          {currentPlayer && (
+            <div className="player-board-section">
+              <h3>Din bräde:</h3>
+              <GameResultBoard 
+                grid={currentPlayer.grid || Array(boardSize).fill(null).map(() => Array(boardSize).fill({ letter: null }))}
+                words={currentPlayer.words}
+                boardSize={boardSize}
+              />
             </div>
           )}
 
@@ -111,6 +120,34 @@ const GamePage: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Modal for viewing other player's board */}
+        {selectedPlayer && selectedPlayer.userId !== user?.id && (
+          <>
+            <div 
+              className="modal-backdrop" 
+              onClick={() => setSelectedPlayerBoard(null)}
+            />
+            <div className="board-modal">
+              <div className="modal-header">
+                <h3>{selectedPlayer.username}s bräde</h3>
+                <button 
+                  onClick={() => setSelectedPlayerBoard(null)}
+                  className="modal-close"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="modal-content">
+                <GameResultBoard 
+                  grid={selectedPlayer.grid || Array(boardSize).fill(null).map(() => Array(boardSize).fill({ letter: null }))}
+                  words={selectedPlayer.words}
+                  boardSize={boardSize}
+                />
+              </div>
+            </div>
+          </>
+        )}
       </div>
     );
   }

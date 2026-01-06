@@ -72,7 +72,7 @@ export class GameStateService {
     );
 
     const gameId = result.lastInsertRowid as number;
-    const game = await this.getGameById(gameId);
+    let game = await this.getGameById(gameId);
 
     if (!game) throw new Error('Failed to create game');
 
@@ -84,6 +84,10 @@ export class GameStateService {
 
     // Start first letter selection phase
     await this.startLetterSelectionPhase(gameId);
+
+    // Fetch updated game state with timer info
+    game = await this.getGameById(gameId);
+    if (!game) throw new Error('Failed to fetch updated game');
 
     return game;
   }
@@ -850,31 +854,49 @@ export class GameStateService {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
 
-    // Update game status - COMMENTED OUT: games table doesn't have status column
-    // await db.run(`
-    //   UPDATE games SET status = 'completed' WHERE id = ?
-    // `, gameId);
+    // Get room data associated with this game (including board_size)
+    const game = await db.get(`
+      SELECT g.room_id, r.board_size FROM games g
+      JOIN rooms r ON g.room_id = r.id
+      WHERE g.id = ?
+    `, gameId) as any;
+
+    // Update room status back to waiting so players can start a new game
+    if (game?.room_id) {
+      await db.run(`
+        UPDATE rooms SET status = 'waiting' WHERE id = ?
+      `, game.room_id);
+      console.log(`📍 Room ${game.room_id} reset to waiting status`);
+    }
 
     // Calculate final scores
     const scores = await this.calculateAllPlayerScores(gameId);
 
-    // Get player details for leaderboard
+    // Get player details for leaderboard (use grid_state which is actively updated during game)
     const players = await db.all(`
-      SELECT p.user_id, u.username, p.final_score, p.grid_state
+      SELECT p.user_id, u.username, p.final_score, p.grid_state, p.words_found
       FROM players p
       JOIN users u ON p.user_id = u.id
       WHERE p.game_id = ?
       ORDER BY p.final_score DESC
     `, gameId);
 
-    // Broadcast game end with scores
+    console.log(`🏁 Players at game end:`, players.map(p => ({
+      username: p.username,
+      gridState: p.grid_state,
+      wordsFount: p.words_found
+    })));
+
+    // Broadcast game end with scores and board size
     this.socketService.broadcastToRoom(`game:${gameId}`, 'game:ended', {
       gameId,
+      boardSize: game?.board_size || 5,
       leaderboard: players.map(p => ({
         userId: p.user_id,
         username: p.username,
         score: p.final_score,
-        words: scores[p.user_id]?.words || []
+        words: JSON.parse(p.words_found || '[]'),
+        grid: JSON.parse(p.grid_state || '[]')
       })),
       finalScores: scores
     });

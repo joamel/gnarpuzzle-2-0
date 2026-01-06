@@ -93,10 +93,11 @@ router.get('/:id/leaderboard', AuthService.authenticateToken, async (req, res) =
       success: true,
       leaderboard: leaderboard.map((player, index) => ({
         rank: index + 1,
-        user_id: player.user_id,
+        userId: player.user_id,
         username: player.user.username,
         score: player.score,
-        words_found: player.words_found.length
+        words: player.words_found,
+        grid: player.grid_state
       }))
     });
 
