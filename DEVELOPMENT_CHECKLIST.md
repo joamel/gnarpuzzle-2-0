@@ -468,6 +468,19 @@
   - [x] ✅ "Lämna spelet" button (consolidated from multiple buttons)
   - [x] ✅ Player ranking med "Du" highlight för current user
   - [x] ✅ Game end reason display ("En spelare lämnade spelet")
+  - [x] ✅ **GameResultBoard Component** (NEW):
+    - [x] ✅ Interactive board display med dynamisk grid-sizing (4x4, 5x5, 6x6)
+    - [x] ✅ Click-to-highlight words (gul bakgrund #ffd54f)
+    - [x] ✅ 2-second auto-fade timer för highlights
+    - [x] ✅ Words legend list (clickable items)
+    - [x] ✅ Empty grid handling med fallback message
+    - [x] ✅ boardSize parameter från server (game:ended event)
+    - [x] ✅ Unit test coverage (7 tests, all passing)
+  - [x] ✅ **Debug Page** (/debug/results):
+    - [x] ✅ Mock board data generator
+    - [x] ✅ Board size selector (4x4, 5x5, 6x6)
+    - [x] ✅ Toggle for testing empty/filled states
+    - [x] ✅ Interactive testing without playing full game
 
 ---
 

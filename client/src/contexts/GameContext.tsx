@@ -32,6 +32,7 @@ interface GameContextType {
   error: string | null;
   leaderboard: Leaderboard[] | null;
   gameEndReason: string | null;
+  boardSize: number;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -61,6 +62,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   const [error, setError] = useState<string | null>(null);
   const [leaderboard, setLeaderboard] = useState<Leaderboard[] | null>(null);
   const [gameEndReason, setGameEndReason] = useState<string | null>(null);
+  const [boardSize, setBoardSize] = useState<number>(5);
 
   const currentPlayer = players.find(p => p.userId === user?.id) || null;
   
@@ -187,9 +189,21 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     };
 
     const handleGameEnded = (data: any) => {
-      setLeaderboard(data.leaderboard);
+      // Parse grid and words data if they are JSON strings
+      const parsedLeaderboard = (data.leaderboard || []).map((player: any) => ({
+        ...player,
+        grid: typeof player.grid === 'string' ? JSON.parse(player.grid) : player.grid,
+        words: typeof player.words === 'string' ? JSON.parse(player.words) : player.words
+      }));
+      
+      setLeaderboard(parsedLeaderboard);
       setGamePhase('finished');
       setGameTimer(null);
+      
+      // Store board size from game data
+      if (data.boardSize) {
+        setBoardSize(data.boardSize);
+      }
       
       // Store reason if provided (e.g., player_left)
       if (data.reason) {
@@ -198,6 +212,11 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       
       if (currentGame) {
         setCurrentGame(prev => prev ? { ...prev, status: 'completed' } : null);
+      }
+
+      // Update room status back to waiting
+      if (currentRoom) {
+        setCurrentRoom(prev => prev ? { ...prev, status: 'waiting' } : null);
       }
     };
 
@@ -788,6 +807,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     error,
     leaderboard,
     gameEndReason,
+    boardSize,
   };
 
   return (
