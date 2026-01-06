@@ -192,14 +192,6 @@
 - [ ] Session persistence i databas
 - [ ] **Unit tests** för auth service
 - [ ] **Integration tests** för auth endpoints
-- [ ] **API Endpoints**:
-  - [ ] `POST /auth/login` - Snabb användarregistrering (bara username)
-  - [ ] `POST /auth/refresh` - Session förnyelse
-  - [ ] `DELETE /auth/logout` - Utloggning
-- [ ] JWT med kort expire time för mobil
-- [ ] Session persistence i databas
-- [ ] **Unit tests** för auth service
-- [ ] **Integration tests** för auth endpoints
 
 ### 2.3 Room Management Service ✅
 - [x] **API Endpoints**:
@@ -476,6 +468,11 @@
     - [x] ✅ Empty grid handling med fallback message
     - [x] ✅ boardSize parameter från server (game:ended event)
     - [x] ✅ Unit test coverage (7 tests, all passing)
+    - [x] ✅ **Integration in GamePage**:
+      - [x] ✅ Show current player's board in dedicated section
+      - [x] ✅ Clickable leaderboard items to view other players' boards
+      - [x] ✅ Modal popup for viewing opponent boards
+      - [x] ✅ Modal close button and backdrop
   - [x] ✅ **Debug Page** (/debug/results):
     - [x] ✅ Mock board data generator
     - [x] ✅ Board size selector (4x4, 5x5, 6x6)
