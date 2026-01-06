@@ -50,23 +50,7 @@
   color: rgba(255, 255, 255, 0.8);
 }
 
-/* Logout button styling */
-.home-page .btn-ghost {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 4px;
-  padding: 2px 8px;
-  font-size: 10px;
-  font-weight: 500;
-  min-height: 24px;
-  flex-shrink: 0;
-}
 
-.home-page .btn-ghost:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.3);
-  transform: none;
-}
 
 .home-content {
   width: 100%;

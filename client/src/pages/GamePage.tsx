@@ -135,12 +135,12 @@ const GamePage: React.FC = () => {
   if (gameStarted && currentGame) {
     return (
       <div className="game-page">
-        <div className="game-header">
+        <div className="page-header">
           <button 
             onClick={handleLeaveRoom}
-            className="back-button"
+            className="header-btn"
           >
-            ← Lämna spelet
+            ←
           </button>
           <h2>🧩 {currentRoom.name}</h2>
           <div className="room-code-display">
@@ -163,12 +163,12 @@ const GamePage: React.FC = () => {
   // Show lobby by default
   return (
     <div className="game-page">
-      <div className="game-header">
+      <div className="page-header">
         <button 
           onClick={handleLeaveRoom}
-          className="back-button"
+          className="header-btn"
         >
-          ← Lämna rummet
+          ←
         </button>
         <h2>🧩 Rum</h2>
         <div></div>

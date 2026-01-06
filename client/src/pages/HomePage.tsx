@@ -8,13 +8,12 @@ import { Room } from '../types/game';
 import '../styles/home.css';
 
 const HomePage: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const { joinRoom, currentRoom, leaveRoom } = useGame();
   const navigate = useNavigate();
   const shouldNavigate = useRef(false);
   
   const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
-  const [roomCode, setRoomCode] = useState('');
   const [isCreatingRoom, setIsCreatingRoom] = useState(false); // For modal visibility
   const [creatingRoom, setCreatingRoom] = useState(false); // For actual room creation
   const [isJoiningRoom, setIsJoiningRoom] = useState(false);
@@ -119,7 +118,6 @@ const HomePage: React.FC = () => {
       setError(err.message || 'Kunde inte gå med i rum');
     } finally {
       setIsJoiningRoom(false);
-      setRoomCode('');
     }
   };
 
@@ -127,18 +125,17 @@ const HomePage: React.FC = () => {
     <>
       <div className="home-page">
         {/* Mobile Header */}
-        <header>
-          <div>
-            <h1>🧩 GnarPuzzle</h1>
-            <p>Hej, {user?.username}!</p>
-          </div>
+        <header className="page-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h1 style={{ margin: 0, fontSize: '28px' }}>🧩 GnarPuzzle</h1>
+            </div>
           <button 
             onClick={async () => {
               localStorage.clear();
               await logout();
               window.location.reload();
             }}
-            className="btn btn-ghost btn-sm"
+            className="header-btn"
             aria-label="Logga ut"
           >
             Logga ut
@@ -146,64 +143,29 @@ const HomePage: React.FC = () => {
         </header>
 
         <div className="home-content">
+          {/* Welcome Section */}
+          <div style={{marginBottom: '24px', textAlign: 'center', paddingTop: '8px'}}>
+            <h2 style={{fontSize: '20px', fontWeight: '600', margin: '0 0 8px 0', color: '#4c63d2'}}>Välkommen till GnarPuzzle</h2>
+            <p style={{fontSize: '14px', margin: 0, opacity: 0.7, color: '#666'}}>Skapa eller gå med i ett rum för att spela</p>
+          </div>
+
           {error && (
             <div className="card mb-4" style={{borderColor: '#f44336', background: 'rgba(244, 67, 54, 0.1)'}}>
               <p className="text-red-400 text-sm">{error}</p>
             </div>
           )}
 
-          {/* Quick Actions */}
-          <div className="grid grid-cols-1 gap-4 mb-6">
-            <div className="card">
-              <div className="card-header">
-                <h2 className="card-title">Snabbstart</h2>
-              </div>
-              <div className="card-content">
-                <div className="flex flex-col gap-3">
-                  <button
-                    onClick={() => setIsCreatingRoom(true)}
-                    className="btn btn-primary btn-full"
-                    disabled={isCreatingRoom}
-                  >
-                    {isCreatingRoom ? '...' : '🎮 Skapa nytt rum'}
-                  </button>
-                  
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={roomCode}
-                      onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                      placeholder="Rumskod (t.ex. ABC123)"
-                      className="form-input flex-1"
-                      maxLength={6}
-                      style={{textTransform: 'uppercase'}}
-                    />
-                    <button
-                      onClick={() => joinRoomByCode(roomCode)}
-                      disabled={!roomCode.trim() || isJoiningRoom}
-                      className="btn btn-secondary px-4"
-                    >
-                      {isJoiningRoom ? '...' : 'Gå med'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Available Rooms */}
           <div className="card">
             <div className="card-header">
-              <div className="flex items-center justify-between">
-                <h2 className="card-title">Tillgängliga rum ({availableRooms.length})</h2>
-                <button
-                  onClick={loadRooms}
-                  className="btn btn-ghost btn-sm"
-                  aria-label="Uppdatera rumslista"
-                >
-                  🔄
-                </button>
-              </div>
+              <h2 className="card-title flex-1">Tillgängliga rum ({availableRooms.length})</h2>
+              <button
+                onClick={loadRooms}
+                className="refresh-btn"
+                aria-label="Uppdatera rumslista"
+              >
+                🔄
+              </button>
             </div>
             <div className="card-content">
               {availableRooms.length === 0 ? (
@@ -248,6 +210,17 @@ const HomePage: React.FC = () => {
                       </div>
                     </div>
                   ))}
+                  <div style={{marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(102, 126, 234, 0.2)'}}>
+                    <p style={{fontSize: '10px', margin: '0 0 4px 0', opacity: 0.8, fontWeight: 'bold'}}>Eller skapa ett nytt rum</p>
+                    <button
+                      onClick={() => setIsCreatingRoom(true)}
+                      className="btn btn-primary"
+                      disabled={isCreatingRoom}
+                      style={{padding: '6px 12px', fontSize: '12px', width: 'auto'}}
+                    >
+                      {isCreatingRoom ? '...' : '🎮 Nytt rum'}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

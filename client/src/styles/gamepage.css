@@ -24,29 +24,9 @@
   flex-shrink: 0;
 }
 
-.back-button {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  min-height: auto;
-}
 
-.back-button:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: none;
-}
 
-.game-header h2 {
-  margin: 0;
-  font-size: 14px;
-  text-align: center;
-  flex: 1;
-}
+
 
 .room-code-display {
   background: rgba(255, 255, 255, 0.2);
@@ -271,20 +251,6 @@
 
 /* Mobile Optimizations */
 @media (max-width: 480px) {
-  .game-header h2 {
-    font-size: 16px;
-  }
-  
-  .room-code-display {
-    font-size: 11px;
-    padding: 4px 8px;
-  }
-  
-  .back-button {
-    font-size: 12px;
-    padding: 6px 10px;
-  }
-  
   .game-finished {
     padding: 16px;
   }
