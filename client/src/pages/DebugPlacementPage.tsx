@@ -21,7 +21,6 @@ const DebugPlacementPage: React.FC = () => {
       }))
     )
   );
-  const [submitInProgress, setSubmitInProgress] = useState(false);
   const [placingLetter, setPlacingLetter] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -75,7 +74,7 @@ const DebugPlacementPage: React.FC = () => {
 
     try {
       setPlacingLetter(true);
-      setSubmitInProgress(true);
+
       setMessage('⏳ Bekräftar placering...');
       
       console.log('📤 Confirming placement...');
@@ -103,7 +102,7 @@ const DebugPlacementPage: React.FC = () => {
       setMessage('❌ Fel vid placering!');
     } finally {
       setPlacingLetter(false);
-      setSubmitInProgress(false);
+
     }
   };
 

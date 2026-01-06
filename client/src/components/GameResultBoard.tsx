@@ -3,12 +3,11 @@ import { ValidWord, GridCell } from '../types/game';
 
 interface GameResultBoardProps {
   grid: Array<Array<{ letter: string | null }>> | GridCell[] | any;
-  words: ValidWord[] | string[];
   boardSize?: number;
   playerId?: number;
 }
 
-const GameResultBoard: React.FC<GameResultBoardProps> = ({ grid, words, boardSize = 5 }) => {
+const GameResultBoard: React.FC<GameResultBoardProps> = ({ grid, boardSize = 5 }) => {
   const [selectedWordIndex, setSelectedWordIndex] = useState<number | null>(null);
   const [extractedWords, setExtractedWords] = useState<ValidWord[]>([]);
 
