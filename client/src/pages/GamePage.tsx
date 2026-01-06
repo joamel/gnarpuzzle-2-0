@@ -104,7 +104,6 @@ const GamePage: React.FC = () => {
             <div className="player-board-section">
               <GameResultBoard 
                 grid={selectedPlayer.grid || Array(boardSize).fill(null).map(() => Array(boardSize).fill({ letter: null }))}
-                words={selectedPlayer.words}
                 boardSize={boardSize}
               />
             </div>
@@ -112,7 +111,6 @@ const GamePage: React.FC = () => {
             <div className="player-board-section">
               <GameResultBoard 
                 grid={currentPlayer.grid || Array(boardSize).fill(null).map(() => Array(boardSize).fill({ letter: null }))}
-                words={currentPlayer.words}
                 boardSize={boardSize}
               />
             </div>

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import GameResultBoard from './GameResultBoard';
-import { GridCell, ValidWord } from '../types/game';
+import { GridCell } from '../types/game';
 
 describe('GameResultBoard', () => {
   // Test with a 4x4 board
@@ -33,25 +33,9 @@ describe('GameResultBoard', () => {
       ]
     ];
 
-    const words: ValidWord[] = [
-      {
-        word: 'HA',
-        points: 5,
-        startX: 0,
-        startY: 0,
-        direction: 'horizontal',
-        isComplete: true,
-        letters: [
-          { x: 0, y: 0, letter: 'H' },
-          { x: 1, y: 0, letter: 'A' }
-        ]
-      }
-    ];
-
     render(
       <GameResultBoard
         grid={grid}
-        words={words}
         boardSize={4}
       />
     );
@@ -71,12 +55,12 @@ describe('GameResultBoard', () => {
   // Test with empty grid
   it('shows empty message for empty grid', () => {
     const emptyGrid: GridCell[][] = [];
-    const words: ValidWord[] = [];
+
 
     render(
       <GameResultBoard
         grid={emptyGrid}
-        words={words}
+        
         boardSize={5}
       />
     );
@@ -89,7 +73,7 @@ describe('GameResultBoard', () => {
     render(
       <GameResultBoard
         grid={null as any}
-        words={[]}
+        
         boardSize={5}
       />
     );
@@ -107,40 +91,10 @@ describe('GameResultBoard', () => {
       }))
     );
 
-    const words: ValidWord[] = [
-      {
-        word: 'TEST',
-        points: 10,
-        startX: 0,
-        startY: 0,
-        direction: 'horizontal',
-        isComplete: true,
-        letters: [
-          { x: 0, y: 0, letter: 'T' },
-          { x: 1, y: 0, letter: 'E' },
-          { x: 2, y: 0, letter: 'S' },
-          { x: 3, y: 0, letter: 'T' }
-        ]
-      },
-      {
-        word: 'ORD',
-        points: 8,
-        startX: 1,
-        startY: 1,
-        direction: 'vertical',
-        isComplete: true,
-        letters: [
-          { x: 1, y: 1, letter: 'O' },
-          { x: 1, y: 2, letter: 'R' },
-          { x: 1, y: 3, letter: 'D' }
-        ]
-      }
-    ];
-
     render(
       <GameResultBoard
         grid={grid}
-        words={words}
+        
         boardSize={5}
       />
     );
@@ -171,7 +125,7 @@ describe('GameResultBoard', () => {
     render(
       <GameResultBoard
         grid={grid}
-        words={[]}
+        
         boardSize={5}
       />
     );
@@ -196,7 +150,7 @@ describe('GameResultBoard', () => {
     render(
       <GameResultBoard
         grid={grid}
-        words={[]}
+        
         boardSize={6}
       />
     );
@@ -237,12 +191,12 @@ describe('GameResultBoard', () => {
       ]
     ];
 
-    const words: ValidWord[] = [];
+
 
     const { container } = render(
       <GameResultBoard
         grid={grid}
-        words={words}
+        
         boardSize={4}
       />
     );

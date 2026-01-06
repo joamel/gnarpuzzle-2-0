@@ -135,7 +135,6 @@ const DebugResultsPage: React.FC = () => {
         <h2>Current Player Board</h2>
         <GameResultBoard
           grid={showBoard ? mockGrid : emptyGrid}
-          words={showBoard ? mockWords : []}
           boardSize={boardSize}
         />
       </div>
