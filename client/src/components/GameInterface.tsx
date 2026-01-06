@@ -161,6 +161,10 @@ const GameInterface: React.FC = () => {
       setTemporaryPlacement(null);
     } catch (err) {
       console.error('❌ Failed to submit placement:', err);
+      // Still reset the flags even on error
+      setSubmitInProgress(false);
+      setPlacingLetter(false);
+      throw err;
     } finally {
       setPlacingLetter(false);
       setSubmitInProgress(false);
@@ -260,13 +264,15 @@ const GameInterface: React.FC = () => {
         <div className="turn-indicator">
           {gamePhase === 'letter_selection' ? (
             isMyTurn ? (
-              <span className="my-turn">🎯 Välj en bokstav!</span>
+              <span className="my-turn">🎯 Din tur!</span>
             ) : (
-              <span className="other-turn">⏳ Väntar på bokstavsval</span>
+              <span className="other-turn">⏳ {currentPlayer?.username}s tur</span>
             )
           ) : gamePhase === 'letter_placement' ? (
             selectedLetter ? (
-              <span className="my-turn">📍 Placera bokstaven: <strong>{selectedLetter}</strong></span>
+              <span className="my-turn">📍 Placera: <strong>{selectedLetter}</strong></span>
+            ) : currentPlayer?.placementConfirmed ? (
+              <span className="waiting">⏳ Väntar på resultat...</span>
             ) : (
               <span className="waiting">⌛ Väntar på bokstav...</span>
             )
