@@ -351,8 +351,15 @@ export class GameStateService {
       WHERE game_id = ? AND user_id = ?
     `, gameId, playerId);
 
+    console.log(`✅ Player ${playerId} confirmed placement for game ${gameId}`);
+
     // Calculate current score for this player
-    await this.calculatePlayerScore(gameId, playerId);
+    try {
+      await this.calculatePlayerScore(gameId, playerId);
+    } catch (err) {
+      console.error(`❌ Error calculating score for player ${playerId}:`, err);
+      // Continue even if score calculation fails
+    }
 
     // Check if all players confirmed
     const confirmedCount = await db.get(`
@@ -363,6 +370,8 @@ export class GameStateService {
     const totalPlayers = await db.get(`
       SELECT COUNT(*) as count FROM players WHERE game_id = ?
     `, gameId) as { count: number };
+
+    console.log(`📊 Confirmation check: ${confirmedCount.count}/${totalPlayers.count} players confirmed`);
 
     if (confirmedCount.count === totalPlayers.count) {
       console.log('🎆 All players confirmed - clearing placement timer');
@@ -797,12 +806,12 @@ export class GameStateService {
     const grid: GridCell[][] = JSON.parse(player.grid_state);
     const gridScore = this.wordValidationService.calculateGridScore(grid);
 
-    // Update player's score in database
+    // Update player's score and words_found in database
     await db.run(`
       UPDATE players 
-      SET final_score = ? 
+      SET final_score = ?, words_found = ? 
       WHERE game_id = ? AND user_id = ?
-    `, gridScore.totalPoints, gameId, userId);
+    `, gridScore.totalPoints, JSON.stringify(gridScore.words), gameId, userId);
 
     console.log(`🎯 Player ${userId} score: ${gridScore.totalPoints} (${gridScore.words.length} words)`);
     

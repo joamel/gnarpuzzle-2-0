@@ -18,6 +18,7 @@ const HomePage = React.lazy(() => import('./pages/HomePage'));
 const GamePage = React.lazy(() => import('./pages/GamePage'));
 const GameTestPage = React.lazy(() => import('./pages/GameTestPage'));
 const DebugResultsPage = React.lazy(() => import('./pages/DebugResultsPage'));
+const DebugPlacementPage = React.lazy(() => import('./pages/DebugPlacementPage'));
 
 function App() {
   const [isOnline, setIsOnline] = useState(true);
@@ -182,6 +183,14 @@ function App() {
               element={
                 <Suspense fallback={<div>Loading...</div>}>
                   <DebugResultsPage />
+                </Suspense>
+              } 
+            />
+            <Route 
+              path="/debug/placement" 
+              element={
+                <Suspense fallback={<div>Loading...</div>}>
+                  <DebugPlacementPage />
                 </Suspense>
               } 
             />

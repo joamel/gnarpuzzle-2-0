@@ -86,8 +86,8 @@ const GamePage: React.FC = () => {
             {leaderboard.map((player, index) => (
               <div 
                 key={player.userId} 
-                className={`leaderboard-item ${player.userId === user?.id ? 'current-player' : ''}`}
-                onClick={() => setSelectedPlayerBoard(player.userId)}
+                className={`leaderboard-item ${player.userId === user?.id ? 'current-player' : ''} ${(selectedPlayerBoard === null && player.userId === user?.id) || selectedPlayer?.userId === player.userId ? 'selected' : ''}`}
+                onClick={() => setSelectedPlayerBoard(player.userId === user?.id ? null : player.userId)}
                 style={{ cursor: 'pointer' }}
               >
                 <div className="rank">#{index + 1}</div>
@@ -100,9 +100,16 @@ const GamePage: React.FC = () => {
             ))}
           </div>
 
-          {currentPlayer && (
+          {selectedPlayer && selectedPlayer.userId !== user?.id ? (
             <div className="player-board-section">
-              <h3>Din bräde:</h3>
+              <GameResultBoard 
+                grid={selectedPlayer.grid || Array(boardSize).fill(null).map(() => Array(boardSize).fill({ letter: null }))}
+                words={selectedPlayer.words}
+                boardSize={boardSize}
+              />
+            </div>
+          ) : currentPlayer && (
+            <div className="player-board-section">
               <GameResultBoard 
                 grid={currentPlayer.grid || Array(boardSize).fill(null).map(() => Array(boardSize).fill({ letter: null }))}
                 words={currentPlayer.words}
@@ -121,33 +128,7 @@ const GamePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Modal for viewing other player's board */}
-        {selectedPlayer && selectedPlayer.userId !== user?.id && (
-          <>
-            <div 
-              className="modal-backdrop" 
-              onClick={() => setSelectedPlayerBoard(null)}
-            />
-            <div className="board-modal">
-              <div className="modal-header">
-                <h3>{selectedPlayer.username}s bräde</h3>
-                <button 
-                  onClick={() => setSelectedPlayerBoard(null)}
-                  className="modal-close"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="modal-content">
-                <GameResultBoard 
-                  grid={selectedPlayer.grid || Array(boardSize).fill(null).map(() => Array(boardSize).fill({ letter: null }))}
-                  words={selectedPlayer.words}
-                  boardSize={boardSize}
-                />
-              </div>
-            </div>
-          </>
-        )}
+        {/* Modal removed - board now shows directly above */}
       </div>
     );
   }

@@ -132,11 +132,16 @@
   background: #f8f9fa;
   border-radius: 12px;
   transition: all 0.2s ease;
+  border: 2px solid transparent;
 }
 
 .leaderboard-item.current-player {
-  background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
-  border: 2px solid #667eea;
+  background: #f8f9fa;
+}
+
+.leaderboard-item.selected {
+  border: 2px solid #3B82F6;
+  background: linear-gradient(135deg, #3B82F615 0%, #2563EB15 100%);
 }
 
 .leaderboard-item:first-child {
@@ -316,13 +321,6 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-.player-board-section h3 {
-  margin: 0 0 16px 0;
-  color: #333;
-  font-size: 16px;
-  text-align: center;
-}
-
 .game-result-board {
   display: flex;
   flex-direction: column;
@@ -343,11 +341,14 @@
 .board-grid {
   display: inline-grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 2px;
-  padding: 8px;
-  background: #e3f2fd;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+  gap: 6px;
+  padding: 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  box-shadow: 
+    0 8px 16px rgba(102, 126, 234, 0.25),
+    0 4px 8px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .board-row {
@@ -360,26 +361,56 @@
   justify-content: center;
   width: 50px;
   height: 50px;
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
+  aspect-ratio: 1;
+  background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 100%);
+  border: none;
+  border-radius: 6px;
   font-weight: 600;
   font-size: 16px;
   color: #333;
+  transition: all 0.2s ease;
+  box-shadow: 
+    0 4px 8px rgba(0, 0, 0, 0.08),
+    0 2px 4px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.board-cell:hover:not(.filled) {
+  background: linear-gradient(135deg, #E6C9E6 0%, #D8BFD8 100%);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 6px 12px rgba(102, 126, 234, 0.15),
+    0 3px 6px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .board-cell.filled {
-  background: #fff3cd;
-}
-
-.board-cell.empty {
-  background: #f5f5f5;
+  background: linear-gradient(135deg, #D8BFD8 0%, #E6C9E6 100%);
+  color: #667eea;
+  font-weight: 800;
+  box-shadow: 
+    0 4px 8px rgba(0, 0, 0, 0.08),
+    0 2px 4px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  text-shadow: none;
 }
 
 /* Highlight selected word with darker/more saturated background */
 .board-cell.highlighted-word {
-  background: #ffd54f;
+  background: #C994DD !important;
   font-weight: 600;
+  animation: pulse-highlight 0.3s ease-out;
+}
+
+@keyframes pulse-highlight {
+  0% {
+    background: #E6C9E6;
+    transform: scale(1.05);
+  }
+  100% {
+    background: #C994DD;
+    transform: scale(1);
+  }
 }
 
 .words-legend {
@@ -418,9 +449,10 @@
 }
 
 .word-legend-item.selected {
-  background: #fff9e6;
-  border: 2px solid #666;
+  background: #E0E7FF;
+  border: 2px solid #3B82F6;
   font-weight: 600;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
 .word-color {
