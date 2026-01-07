@@ -22,7 +22,6 @@ export class WordValidationService {
   private static instance: WordValidationService;
   private swedishWords: Set<string> = new Set();
   private isLoaded = false;
-  private isFallbackMode = false;
 
   private constructor() {}
 
@@ -40,7 +39,28 @@ export class WordValidationService {
     if (this.isLoaded) return;
 
     try {
-      const dictPath = path.join(process.cwd(), 'data', 'swedish.json');
+      // Try multiple paths for dictionary file
+      const possiblePaths = [
+        path.join(process.cwd(), 'data', 'swedish.json'),
+        path.join(process.cwd(), 'server', 'data', 'swedish.json'),
+        path.join(__dirname, '..', '..', 'data', 'swedish.json')
+      ];
+      
+      let dictPath: string | null = null;
+      for (const p of possiblePaths) {
+        try {
+          await fs.promises.access(p);
+          dictPath = p;
+          console.log(`✅ Found dictionary at: ${dictPath}`);
+          break;
+        } catch {
+          // Try next path
+        }
+      }
+      
+      if (!dictPath) {
+        throw new Error('Dictionary file not found in any expected location');
+      }
       
       try {
         const dictData = await fs.promises.readFile(dictPath, 'utf-8');
@@ -53,21 +73,17 @@ export class WordValidationService {
           }
         });
 
-        console.log(`📖 Swedish dictionary loaded: ${this.swedishWords.size} words`);
+        console.log(`✅ Swedish dictionary loaded: ${this.swedishWords.size} words`);
       } catch (fileError: any) {
-        // If file doesn't exist, use fallback mode
-        if (fileError.code === 'ENOENT') {
-          console.warn('⚠️  Swedish dictionary file not found, using fallback mode (accept any 2+ char word)');
-          this.isFallbackMode = true;
-        } else {
-          throw fileError;
-        }
+        console.error('❌ Failed to read dictionary file:', fileError);
+        throw fileError;
       }
       
       this.isLoaded = true;
     } catch (error) {
-      console.error('Failed to load Swedish dictionary:', error);
-      throw new Error('Could not load word dictionary');
+      console.error('❌ Failed to load Swedish dictionary:', error);
+      // Don't use fallback mode - require dictionary to be available
+      throw new Error('Could not load word dictionary. Dictionary file must be present at data/swedish.json');
     }
   }
 
@@ -82,11 +98,6 @@ export class WordValidationService {
     }
     
     if (!word || word.length < 2) return false;
-    
-    // In fallback mode, accept any word 2+ characters (no dictionary validation)
-    if (this.isFallbackMode) {
-      return true;
-    }
     
     return this.swedishWords.has(word.toUpperCase().trim());
   }

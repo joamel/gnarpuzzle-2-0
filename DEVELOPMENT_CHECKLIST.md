@@ -12,16 +12,22 @@
 - **CSS Performance**: ✅ COMPLETE - will-change utilities & GPU acceleration
 - **Render Config**: ✅ COMPLETE - Procfile, build.sh, env configuration
 - **Frontend Serving**: ✅ COMPLETE - Express middleware for static file serving
-- **Dictionary Fallback**: ✅ COMPLETE - 378-word fallback dictionary for production
+- **Dictionary Loading**: ✅ FIXED - 122,201 svenska ord från ordlistan laddar korrekt
+- **Word Validation**: ✅ FIXED - Endast giltiga ord från ordlistan får poäng
+- **Room Passwords**: ✅ COMPLETE - Rumskod kan användas som lösenord
 - **Live Deployment**: ✅ COMPLETE - Application successfully deployed to Render
 - **TypeScript Build**: ✅ COMPLETE - All compilation errors resolved for production build
 
-**🎯 Phase 5.3 & Phase 8 Major Achievements**:
+**🎯 Phase 8 & Phase 9 Recent Fixes**:
+- ✅ Uppdaterad WordValidationService för att ladda ordlista från flera möjliga platser
+- ✅ Svenska ordlistan (122,201 ord) laddar korrekt från /data/ eller /server/data/
+- ✅ Fallback-mode helt borttagen - kräv ordlistan för att validering fungerar
+- ✅ Endast ordet från ordlistan får poäng (inte slumpmässiga bokstavssekvenser)
+- ✅ Lösenordsstöd för rum - use room code as password
 - ✅ Implemented React.lazy + Suspense for route-based code splitting
 - ✅ Separate JS chunks: LoginPage (1.3KB), GameInterface (6.8KB), HomePage (7.7KB), GamePage (14.5KB)
 - ✅ Main bundle: 226.15 KB (gzipped 72.24 KB)
 - ✅ Socket.IO exponential backoff reconnection with proper cleanup
-- ✅ Fallback Swedish dictionary (378 common words) for production environments
 - ✅ Created Procfile for Render deployment
 - ✅ Created build.sh script for automated build process
 - ✅ Modified Express server to serve built frontend as static files
@@ -251,9 +257,12 @@
 - [x] **Word Validation** (komplett implementation):
   - [x] ✅ **Ordvalidering strategi beslutad** (svensk ordlista-fil, 2+ bokstäver minimum)
   - [x] ✅ **WordValidationService implementation** (singleton pattern)
-  - [x] ✅ **Svenska ordlista integration** (122,201 svenska ord från JSON-fil)
+  - [x] ✅ **Svenska ordlista integration** (122,201 svenska ord från JSON-fil) 
+  - [x] ✅ **Dictionary loading** - söker på flera möjliga platser (/data/, /server/data/)
+  - [x] ✅ **Fallback mode removed** - kräver ordlistan för att funktionaliteten fungerar
   - [x] ✅ **Poängsystem implementation** (1p/bokstav + 2p bonus helrad/kolumn)
   - [x] ✅ **Grid scoring algorithm** (horizontal/vertical word extraction)
+  - [x] ✅ **Optimal word partitioning** (DP algorithm för att maximera poäng)
   - [x] ✅ **Ordvalidering API endpoints** (via GameController)
 - [x] ✅ **Socket events** (komplett real-time integration): 
   - [x] ✅ **`game:phase_changed`** - övergång letter_selection → letter_placement
