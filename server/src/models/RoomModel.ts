@@ -69,7 +69,13 @@ export class RoomModel {
       SELECT * FROM rooms WHERE code = ?
     `, code) as Room | null;
     
-    return room ? this.parseRoomSettings(room) : null;
+    if (room) {
+      console.log(`🔍 RoomModel.findByCode(${code}): Raw settings from DB:`, room.settings);
+      const parsed = this.parseRoomSettings(room);
+      console.log(`🔍 RoomModel.findByCode(${code}): After parseRoomSettings - require_password:`, parsed.settings?.require_password, `(type: ${typeof parsed.settings?.require_password})`);
+      return parsed;
+    }
+    return null;
   }
 
   static async getActiveRooms(): Promise<RoomWithMembers[]> {
@@ -91,9 +97,11 @@ export class RoomModel {
     
     for (const room of rooms) {
       const members = await this.getRoomMembers(room.id);
+      const parsedRoom = this.parseRoomSettings(room);
       roomsWithMembers.push({
-        ...room,
-        members
+        ...parsedRoom,
+        members,
+        member_count: room.member_count
       });
     }
     
@@ -114,6 +122,10 @@ export class RoomModel {
       
       console.log(`👥 RoomModel.addMember: Insert result:`, result);
       console.log(`👥 RoomModel.addMember: Changes:`, result.changes);
+      
+      // Verify it was actually inserted
+      const verify = await this.isUserInRoom(roomId, userId);
+      console.log(`👥 RoomModel.addMember: Verification - isUserInRoom returned:`, verify);
       
       return result.changes > 0;
     } catch (error: any) {
@@ -372,18 +384,37 @@ export class RoomModel {
         ? JSON.parse(room.settings) 
         : room.settings;
       
+      // Ensure require_password is a boolean (could be string "true"/"false" or boolean)
+      let requirePassword = false;
+      if (settings.require_password !== undefined && settings.require_password !== null) {
+        if (typeof settings.require_password === 'boolean') {
+          requirePassword = settings.require_password;
+        } else if (typeof settings.require_password === 'string') {
+          requirePassword = settings.require_password.toLowerCase() === 'true';
+        } else {
+          requirePassword = Boolean(settings.require_password);
+        }
+      }
+      
+      const completeSettings = {
+        ...settings,
+        require_password: requirePassword
+      };
+      
       return {
         ...room,
-        settings
+        settings: completeSettings
       } as Room;
     } catch (error) {
+      console.error(`❌ Error parsing settings for room ${room.code}:`, error);
       // Fallback to default settings if parsing fails
       const defaultSettings: RoomSettings = {
         grid_size: room.board_size || 5,
         max_players: room.max_players || 6,
-        letter_timer: 20,  // Increased for better UX
-        placement_timer: room.turn_duration || 30,  // Increased from 15 to 30
-        is_private: false
+        letter_timer: 20,
+        placement_timer: room.turn_duration || 30,
+        is_private: false,
+        require_password: false
       };
       
       return {

@@ -24,6 +24,10 @@ const HomePage: React.FC = () => {
   const [boardSize, setBoardSize] = useState(5); // Match server default
   const [letterTimer, setLetterTimer] = useState(20); // Letter selection time
   const [placementTimer, setPlacementTimer] = useState(30); // Letter placement time
+  const [requirePassword, setRequirePassword] = useState(false); // Use room code as password
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [pendingRoomCode, setPendingRoomCode] = useState(''); // Room code waiting for password
 
   // Load available rooms
   const loadRooms = async () => {
@@ -103,23 +107,42 @@ const HomePage: React.FC = () => {
     };
   }, []);
 
-  const joinRoomByCode = async (code: string) => {
+  const joinRoomByCode = async (code: string, password?: string) => {
     if (!code.trim()) return;
 
-    console.log('🚀 joinRoomByCode called with code:', code);
     setIsJoiningRoom(true);
     setError('');
 
     try {
       shouldNavigate.current = true;
-      const roomResult = await joinRoom(code.trim());
-      console.log('✅ joinRoom result:', roomResult);
+      await joinRoom(code.trim(), password);
     } catch (err: any) {
-      console.error('❌ Failed to join room:', err);
-      setError(err.message || 'Kunde inte gå med i rum');
+      // Check if password is required
+      if (err.message && err.message.includes('Password required')) {
+        setPendingRoomCode(code);
+        setShowPasswordPrompt(true);
+        setPasswordInput('');
+      } else if (err.message && err.message.includes('Invalid password')) {
+        setError('Felaktig lösenordskod');
+        setPendingRoomCode(code);
+        setShowPasswordPrompt(true);
+        setPasswordInput('');
+      } else {
+        setError(err.message || 'Kunde inte gå med i rum');
+      }
     } finally {
       setIsJoiningRoom(false);
     }
+  };
+
+  const handlePasswordSubmit = async () => {
+    if (!pendingRoomCode || !passwordInput.trim()) return;
+    
+    console.log('🔐 Submitting password for room:', pendingRoomCode);
+    await joinRoomByCode(pendingRoomCode, passwordInput.trim());
+    setShowPasswordPrompt(false);
+    setPasswordInput('');
+    setPendingRoomCode('');
   };
 
   return (
@@ -188,7 +211,17 @@ const HomePage: React.FC = () => {
                       className="card p-4 cursor-pointer"
                       onClick={() => {
                         if ((room.member_count || 0) < (room.max_players || 4) && !isJoiningRoom) {
-                          joinRoomByCode(room.code);
+                          // Check if room requires password BEFORE attempting to join
+                          const roomSettings = room.settings as any;
+                          if (roomSettings?.require_password === true) {
+                            // Show password prompt immediately
+                            setPendingRoomCode(room.code);
+                            setShowPasswordPrompt(true);
+                            setPasswordInput('');
+                          } else {
+                            // Join directly without password
+                            joinRoomByCode(room.code);
+                          }
                         }
                       }}
                     >
@@ -196,9 +229,6 @@ const HomePage: React.FC = () => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <h3 className="font-semibold text-white truncate">{room.name}</h3>
-                            <span className="text-xs bg-green-600 text-white px-2 py-1 rounded-full font-medium">
-                              {room.code}
-                            </span>
                           </div>
                           <div className="flex items-center gap-4 text-xs text-gray-400">
                             <span>👥 {room.member_count || 0}/{room.max_players || 6}</span>
@@ -239,6 +269,7 @@ const HomePage: React.FC = () => {
                 onClick={() => {
                   setIsCreatingRoom(false);
                   setRoomName('');
+                  setRequirePassword(false);
                   setError('');
                 }}
                 className="close-button"
@@ -316,6 +347,19 @@ const HomePage: React.FC = () => {
                 </div>
               </div>
 
+              <div className="form-group" style={{marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                <input
+                  type="checkbox"
+                  id="requirePassword"
+                  checked={requirePassword}
+                  onChange={(e) => setRequirePassword(e.target.checked)}
+                  style={{width: '16px', height: '16px', cursor: 'pointer'}}
+                />
+                <label htmlFor="requirePassword" style={{margin: 0, cursor: 'pointer', fontSize: '14px'}}>
+                  Använd lösenord för att logga in (rumskod)
+                </label>
+              </div>
+
               {error && (
                 <div style={{background: 'rgba(244, 67, 54, 0.1)', border: '1px solid #f44336', color: '#f44336', padding: '10px 12px', borderRadius: '6px', marginBottom: '16px', fontSize: '14px'}}>
                   {error}
@@ -339,26 +383,31 @@ const HomePage: React.FC = () => {
                     setError('');
                     
                     try {
+                      console.log(`📝 Creating room with requirePassword=${requirePassword} (type: ${typeof requirePassword})`);
                       const roomData = await apiService.createRoom(roomName.trim(), {
                         max_players: maxPlayers,
                         board_size: boardSize,
                         letter_timer: letterTimer,
-                        placement_timer: placementTimer
+                        placement_timer: placementTimer,
+                        require_password: requirePassword
                       });
                       
                       console.log('✅ Room created successfully:', roomData);
                       
-                      // Room creation automatically joins the user, so just navigate
+                      // Room creation automatically joins the user as creator on the server
+                      // We still need to call joinRoom() to set currentRoom in GameContext
                       if (roomData?.room?.code || roomData?.code) {
                         const roomCode = roomData.room?.code || roomData.code;
-                        console.log(`🎯 Navigating directly to room ${roomCode}`);
+                        console.log(`🎯 Joining room ${roomCode} and navigating...`);
                         
-                        // Join the room using its code
+                        // Join the room - creator is already a member on server,
+                        // so this just sets currentRoom in GameContext and joins socket room
+                        shouldNavigate.current = true;
                         await joinRoom(roomCode);
                         
                         setIsCreatingRoom(false);
                         setRoomName('');
-                        shouldNavigate.current = true;
+                        setRequirePassword(false);
                       } else {
                         throw new Error('Ingen rumskod returnerades från servern');
                       }
@@ -385,6 +434,67 @@ const HomePage: React.FC = () => {
                   Avbryt
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password Prompt Modal */}
+      {showPasswordPrompt && (
+        <div className="modal-overlay" onClick={() => {
+          setShowPasswordPrompt(false);
+          setPendingRoomCode('');
+          setPasswordInput('');
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px' }}>Lösenord krävs</h2>
+            <p style={{ fontSize: '14px', marginBottom: '16px', opacity: 0.7 }}>
+              Det här rummet kräver rumskoden som lösenord för att gå med.
+            </p>
+            <input
+              type="password"
+              placeholder="Ange rumskoden"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value.toUpperCase())}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handlePasswordSubmit();
+                }
+              }}
+              maxLength={6}
+              autoFocus
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                marginBottom: '16px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '14px',
+                fontFamily: 'monospace',
+                textTransform: 'uppercase'
+              }}
+            />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={handlePasswordSubmit}
+                disabled={!passwordInput.trim() || isJoiningRoom}
+                className="btn-primary"
+                style={{ flex: 1 }}
+              >
+                {isJoiningRoom ? 'Gå med...' : 'Gå med'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowPasswordPrompt(false);
+                  setPendingRoomCode('');
+                  setPasswordInput('');
+                  setError('');
+                }}
+                className="btn-secondary"
+                style={{ flex: 1 }}
+              >
+                Avbryt
+              </button>
             </div>
           </div>
         </div>

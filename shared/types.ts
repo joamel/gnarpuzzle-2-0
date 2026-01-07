@@ -27,6 +27,7 @@ export interface RoomSettings {
   letter_timer: number; // seconds for letter selection
   placement_timer: number; // seconds for placement
   is_private: boolean;
+  require_password?: boolean;
   password?: string;
 }
 

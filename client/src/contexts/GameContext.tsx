@@ -24,7 +24,7 @@ interface GameContextType {
   confirmPlacement: () => Promise<void>;
   
   // Room actions
-  joinRoom: (code: string) => Promise<Room>;
+  joinRoom: (code: string, password?: string) => Promise<Room>;
   leaveRoom: () => Promise<void>;
   
   // UI state
@@ -742,13 +742,13 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   }, [currentGame, currentPlayer]);
 
   // Room actions
-  const joinRoom = useCallback(async (code: string): Promise<Room> => {
+  const joinRoom = useCallback(async (code: string, password?: string): Promise<Room> => {
     try {
       setIsLoading(true);
       setError(null);
       
       console.log('🏠 GameContext.joinRoom called with code:', code);
-      const room = await apiService.joinRoom(code);
+      const room = await apiService.joinRoom(code, password);
       console.log('🏠 GameContext.joinRoom received room data:', room);
       console.log('🏠 Room ID from server:', room.id);
       console.log('🏠 Room object keys:', Object.keys(room));

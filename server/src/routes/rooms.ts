@@ -26,7 +26,8 @@ router.get('/', AuthService.optionalAuth, async (_req, res) => {
       status: room.status,
       board_size: room.board_size,
       turn_duration: room.turn_duration,
-      created_at: room.created_at
+      created_at: room.created_at,
+      settings: room.settings // Include settings so client knows if password is required
     }));
 
     res.status(200).json({
@@ -52,7 +53,10 @@ router.get('/', AuthService.optionalAuth, async (_req, res) => {
 router.post('/', AuthService.authenticateToken, async (req, res) => {
   try {
     const authReq = req as AuthenticatedRequest;
-    const { name, max_players, board_size, turn_duration, letter_timer, placement_timer } = req.body;
+    const { name, max_players, board_size, turn_duration, letter_timer, placement_timer, require_password } = req.body;
+
+    console.log(`📥 Creating room request:`);
+    console.log(`   - require_password from request: ${require_password} (type: ${typeof require_password})`);
 
     // Validation
     if (!name || name.length < 2 || name.length > 30) {
@@ -111,10 +115,15 @@ router.post('/', AuthService.authenticateToken, async (req, res) => {
         grid_size: board_size,
         placement_timer: placement_timer || turn_duration || 30,
         letter_timer: letter_timer || 20,
-        is_private: false
+        is_private: false,
+        require_password: require_password || false
       }
     });
 
+    console.log(`📝 Room created for code ${room.code}:`);
+    console.log(`   - require_password sent: ${require_password} (${typeof require_password})`);
+    console.log(`   - require_password stored: ${room.settings?.require_password} (${typeof room.settings?.require_password})`);
+    console.log(`   - full settings: ${JSON.stringify(room.settings)}`);
     logger.info(`Room created: ${room.code} by ${authReq.user!.username}`);
 
     // Get room members for response (creator is already added by RoomModel.create)
@@ -232,6 +241,7 @@ router.post('/:code/join', AuthService.authenticateToken, async (req, res) => {
   try {
     const authReq = req as AuthenticatedRequest;
     const { code } = req.params;
+    const { password } = req.body;
 
     if (!code || !/^[A-Z0-9]{6}$/.test(code)) {
       res.status(400).json({
@@ -250,24 +260,19 @@ router.post('/:code/join', AuthService.authenticateToken, async (req, res) => {
       return;
     }
 
-    // Allow joining rooms in 'waiting' or 'playing' status
-    if (room.status !== 'waiting' && room.status !== 'playing') {
-      logger.info(`Join room rejected: Room ${code} has status '${room.status}', must be 'waiting' or 'playing'`, {
-        roomId: room.id,
-        roomCode: code,
-        currentStatus: room.status,
-        userId: authReq.user!.id,
-        username: authReq.user!.username
-      });
-      res.status(400).json({
-        error: 'Room not available',
-        message: `Room is not accepting new members (current status: ${room.status})`
-      });
-      return;
-    }
+    // Debug logging for password check
+    console.log(`🔐 Join room ${code}:`);
+    console.log(`   - room.settings:`, JSON.stringify(room.settings));
+    console.log(`   - require_password value: "${room.settings?.require_password}"`);
+    console.log(`   - require_password type: ${typeof room.settings?.require_password}`);
+    console.log(`   - require_password === true? ${room.settings?.require_password === true}`);
+    console.log(`   - password provided? ${!!password}`);
 
-    // Check if user is already in THIS room
+    // Check if user is already in THIS room (before password check)
+    // Existing members should always be able to rejoin without password
     const isAlreadyMember = await RoomModel.isUserInRoom(room.id, authReq.user!.id);
+    console.log(`🔐 Join room ${code}: isUserInRoom(${room.id}, ${authReq.user!.id}) returned: ${isAlreadyMember}`);
+    
     if (isAlreadyMember) {
       // User is already in room - return success with room data
       console.log(`✅ User ${authReq.user!.username} already member of room ${room.code}`);
@@ -291,6 +296,44 @@ router.post('/:code/join', AuthService.authenticateToken, async (req, res) => {
           createdBy: room.created_by,
           members: members
         }
+      });
+      return;
+    }
+
+    // Check if room requires password - ONLY if explicitly set to true
+    // This check comes AFTER existing member check
+    if (room.settings?.require_password === true && !password) {
+      res.status(403).json({
+        error: 'Password required',
+        message: 'This room requires a password to join'
+      });
+      return;
+    }
+
+    // If password provided and room requires one, verify it matches the room code
+    if (room.settings?.require_password === true && password) {
+      // The password is the room code itself
+      if (password !== room.code) {
+        res.status(403).json({
+          error: 'Invalid password',
+          message: 'The password you entered is incorrect'
+        });
+        return;
+      }
+    }
+
+    // Allow joining rooms in 'waiting' or 'playing' status
+    if (room.status !== 'waiting' && room.status !== 'playing') {
+      logger.info(`Join room rejected: Room ${code} has status '${room.status}', must be 'waiting' or 'playing'`, {
+        roomId: room.id,
+        roomCode: code,
+        currentStatus: room.status,
+        userId: authReq.user!.id,
+        username: authReq.user!.username
+      });
+      res.status(400).json({
+        error: 'Room not available',
+        message: `Room is not accepting new members (current status: ${room.status})`
       });
       return;
     }

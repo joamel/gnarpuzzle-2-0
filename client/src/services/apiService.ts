@@ -80,7 +80,7 @@ class ApiService {
     return response.rooms || [];
   }
 
-  async createRoom(name: string, options?: { max_players?: number; board_size?: number; turn_duration?: number; letter_timer?: number; placement_timer?: number }): Promise<any> {
+  async createRoom(name: string, options?: { max_players?: number; board_size?: number; turn_duration?: number; letter_timer?: number; placement_timer?: number; require_password?: boolean }): Promise<any> {
     const response = await this.request<{ success: boolean; room: any }>('/api/rooms', {
       method: 'POST',
       body: JSON.stringify({ 
@@ -89,7 +89,8 @@ class ApiService {
         board_size: options?.board_size,
         turn_duration: options?.turn_duration,
         letter_timer: options?.letter_timer,
-        placement_timer: options?.placement_timer
+        placement_timer: options?.placement_timer,
+        require_password: options?.require_password
       }),
     });
     // Backend returns { success: true, room: {...} }
@@ -100,8 +101,11 @@ class ApiService {
     return this.request<any>(`/api/rooms/${code}`);
   }
 
-  async joinRoom(code: string): Promise<any> {
-    const response = await this.request<{ success: boolean; message: string; room: any }>(`/api/rooms/${code}/join`, { method: 'POST' });
+  async joinRoom(code: string, password?: string): Promise<any> {
+    const response = await this.request<{ success: boolean; message: string; room: any; error?: string }>(`/api/rooms/${code}/join`, { 
+      method: 'POST',
+      body: password ? JSON.stringify({ password }) : undefined
+    });
     // Backend returns { success: true, message: 'Successfully joined room', room: {...} }
     return response.room || response;
   }

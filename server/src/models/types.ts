@@ -15,6 +15,7 @@ export interface Room {
   turn_duration: number;
   status: 'waiting' | 'playing' | 'finished' | 'abandoned';
   settings: RoomSettings;
+  require_password?: boolean;
   created_at: string;
 }
 
@@ -24,6 +25,7 @@ export interface RoomSettings {
   letter_timer: number;
   placement_timer: number;
   is_private: boolean;
+  require_password?: boolean;
   password?: string;
 }
 
