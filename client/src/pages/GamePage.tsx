@@ -2,6 +2,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../contexts/GameContext';
 import { useAuth } from '../contexts/AuthContext';
+import Logo from '../assets/Logo';
 import RoomLobby from '../components/RoomLobby';
 import GameResultBoard from '../components/GameResultBoard';
 
@@ -136,16 +137,14 @@ const GamePage: React.FC = () => {
     return (
       <div className="game-page">
         <div className="page-header">
+          <Logo size="small" showText={false} />
+          <h2>{currentRoom.name}</h2>
           <button 
             onClick={handleLeaveRoom}
             className="header-btn"
           >
             ←
           </button>
-          <h2>🧩 {currentRoom.name}</h2>
-          <div className="room-code-display">
-            {currentRoom.code}
-          </div>
         </div>
         
         <Suspense fallback={

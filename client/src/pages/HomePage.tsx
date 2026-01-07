@@ -5,6 +5,7 @@ import { useGame } from '../contexts/GameContext';
 import { apiService } from '../services/apiService';
 import { socketService } from '../services/socketService';
 import { Room } from '../types/game';
+import Logo from '../assets/Logo'; // Logo component with TypeScript support
 import '../styles/home.css';
 
 const HomePage: React.FC = () => {
@@ -126,9 +127,9 @@ const HomePage: React.FC = () => {
       <div className="home-page">
         {/* Mobile Header */}
         <header className="page-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <h1 style={{ margin: 0, fontSize: '28px' }}>🧩 GnarPuzzle</h1>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Logo size="small" showText={true} />
+          </div>
           <button 
             onClick={async () => {
               localStorage.clear();

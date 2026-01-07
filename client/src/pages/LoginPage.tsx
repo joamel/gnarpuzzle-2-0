@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import Logo from '../assets/Logo';
 
 const LoginPage: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -31,7 +32,7 @@ const LoginPage: React.FC = () => {
     <div className="login-page">
       <div className="login-container">
         <div className="login-header">
-          <h1>🧩 GnarPuzzle 2.0</h1>
+          <Logo size="medium" showText={true} />
           <p>Multiplayer ordspel för mobilen</p>
         </div>
 

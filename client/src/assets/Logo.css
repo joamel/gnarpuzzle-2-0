@@ -1,0 +1,184 @@
+/* Gnarp Puzzle Logo Styling */
+.gnarp-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+
+/* Puzzle Icon */
+.puzzle-icon {
+  width: 60px;
+  height: 60px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+}
+
+.puzzle-piece {
+  transition: all 0.3s ease;
+}
+
+.main-piece {
+  animation: float 3s ease-in-out infinite;
+}
+
+.connector-piece {
+  animation: float 3s ease-in-out infinite 0.5s;
+}
+
+.accent-piece {
+  animation: sparkle 2s ease-in-out infinite;
+}
+
+/* Logo Text */
+.logo-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.brand-name {
+  font-size: 2rem;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.gnarp {
+  color: #ffffff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.puzzle {
+  background: linear-gradient(135deg, #ffd700 0%, #ff9500 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.tagline {
+  font-size: 0.9rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #ffd700 0%, #ff9500 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.9;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Size Variants */
+.logo-small .puzzle-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.logo-small .brand-name {
+  font-size: 1.5rem;
+}
+
+.logo-small .tagline {
+  font-size: 0.7rem;
+}
+
+.logo-small .logo-container {
+  padding: 0.75rem;
+  gap: 0.75rem;
+}
+
+.logo-medium .puzzle-icon {
+  width: 60px;
+  height: 60px;
+}
+
+.logo-medium .brand-name {
+  font-size: 2rem;
+}
+
+.logo-medium .tagline {
+  font-size: 0.9rem;
+}
+
+.logo-large .puzzle-icon {
+  width: 80px;
+  height: 80px;
+}
+
+.logo-large .brand-name {
+  font-size: 3rem;
+}
+
+.logo-large .tagline {
+  font-size: 1.1rem;
+}
+
+.logo-large .logo-container {
+  padding: 1.5rem;
+  gap: 1.5rem;
+}
+
+/* Animations */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes sparkle {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+/* Icon Only Version */
+.logo-icon-only .logo-container {
+  padding: 0.75rem;
+}
+
+.logo-icon-only .puzzle-icon {
+  width: 50px;
+  height: 50px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .logo-medium {
+    transform: scale(0.9);
+  }
+  
+  .logo-large {
+    transform: scale(0.8);
+  }
+}
+
+@media (max-width: 480px) {
+  .brand-name {
+    font-size: 1.5rem;
+  }
+  
+  .tagline {
+    font-size: 0.7rem;
+  }
+  
+  .puzzle-icon {
+    width: 45px;
+    height: 45px;
+  }
+}
