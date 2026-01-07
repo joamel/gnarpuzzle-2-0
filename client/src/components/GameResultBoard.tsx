@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ValidWord, GridCell } from '../types/game';
+import '../styles/board.css';
 
 interface GameResultBoardProps {
   grid: Array<Array<{ letter: string | null }>> | GridCell[] | any;
@@ -189,8 +190,8 @@ const GameResultBoard: React.FC<GameResultBoardProps> = ({ grid, boardSize = 5 }
         </div>
       ) : (
         <>
-          <div className="board-grid-container" style={{ position: 'relative', display: 'inline-block' }}>
-            <div className="board-grid" style={{ gridTemplateColumns: `repeat(${boardSize}, 1fr)` }}>
+          <div style={{ position: 'relative', display: 'inline-block', width: '100%', textAlign: 'center' }}>
+            <div className="game-board" style={{ '--grid-size': boardSize } as React.CSSProperties}>
               {Array.from({ length: boardSize }).map((_, y) => (
                 <div key={`row-${y}`} className="board-row">
                   {Array.from({ length: boardSize }).map((_, x) => {
@@ -216,14 +217,14 @@ const GameResultBoard: React.FC<GameResultBoardProps> = ({ grid, boardSize = 5 }
                     return (
                       <div
                         key={`cell-${x}-${y}`}
-                        className={`board-cell ${letter ? 'filled' : 'empty'} ${
+                        className={`grid-cell ${letter ? 'filled' : 'empty'} ${
                           isPartOfSelectedWord ? `highlighted-word` : ''
                         }`}
                         onClick={handleCellClick}
                         style={{ cursor: wordIndices.length > 0 ? 'pointer' : 'default' }}
                         title={wordIndices.length > 0 ? `Ord: ${extractedWords[wordIndices[0]]?.word}` : ''}
                       >
-                        {letter || ''}
+                        <span className="cell-letter">{letter || ''}</span>
                       </div>
                     );
                   })}

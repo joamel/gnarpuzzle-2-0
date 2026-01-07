@@ -1,7 +1,10 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { GridCell } from '../types/game';
 import { useGame } from '../contexts/GameContext';
-
+import Brick from './Brick';
+import '../styles/board.css';
+import '../styles/game.css';
+import '../styles/brick.css';
 
 interface GameBoardProps {
   grid: GridCell[][];
@@ -18,34 +21,17 @@ const GameBoard: React.FC<GameBoardProps> = ({
   highlightedCell,
   temporaryLetter
 }) => {
-  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
-
   const handleCellClick = useCallback((x: number, y: number) => {
     if (!disabled) {
       onCellClick(x, y);
     }
   }, [disabled, onCellClick]);
 
-  const handleTouchStart = useCallback((_e: React.TouchEvent, x: number, y: number) => {
-    setTouchStart({ x, y });
-  }, []);
-
-  const handleTouchEnd = useCallback((_e: React.TouchEvent, x: number, y: number) => {
-    if (touchStart && touchStart.x === x && touchStart.y === y) {
-      handleCellClick(x, y);
-    }
-    setTouchStart(null);
-  }, [touchStart, handleCellClick]);
-
-  const getCellClassName = (cell: GridCell, x: number, y: number) => {
-    let className = 'grid-cell';
-    
-    if (cell.letter) {
-      className += ' filled';
-    }
+  const getCellClassName = (x: number, y: number) => {
+    let className = '';
     
     if (disabled) {
-      className += ' disabled';
+      className += 'disabled';
     }
     
     if (highlightedCell && highlightedCell.x === x && highlightedCell.y === y) {
@@ -59,20 +45,15 @@ const GameBoard: React.FC<GameBoardProps> = ({
     <div className="game-board" style={{ '--grid-size': grid.length } as React.CSSProperties}>
       {grid.map((row, y) => 
         row.map((cell, x) => (
-          <div
+          <Brick
             key={`${x}-${y}`}
-            className={getCellClassName(cell, x, y)}
+            letter={cell.letter || (temporaryLetter && temporaryLetter.x === x && temporaryLetter.y === y ? temporaryLetter.letter : '')}
+            variant="board"
+            isSelected={highlightedCell?.x === x && highlightedCell?.y === y}
+            disabled={disabled}
             onClick={() => handleCellClick(x, y)}
-            onTouchStart={(e) => handleTouchStart(e, x, y)}
-            onTouchEnd={(e) => handleTouchEnd(e, x, y)}
-            data-x={x}
-            data-y={y}
-          >
-            <span className="cell-letter">
-              {cell.letter || (temporaryLetter && temporaryLetter.x === x && temporaryLetter.y === y ? temporaryLetter.letter : '')}
-            </span>
-            <div className="cell-coords">{x},{y}</div>
-          </div>
+            className={getCellClassName(x, y)}
+          />
         ))
       )}
     </div>
@@ -95,17 +76,16 @@ const LetterSelector: React.FC<LetterSelectorProps> = ({
 }) => {
   return (
     <div className="letter-selector">
-      <h3>Välj bokstav</h3>
       <div className="letters-grid">
         {availableLetters.map(letter => (
-          <button
+          <Brick
             key={letter}
-            className={`letter-button ${selectedLetter === letter ? 'selected' : ''}`}
+            letter={letter}
+            variant="button"
+            isSelected={selectedLetter === letter}
             onClick={() => onLetterSelect(letter)}
             disabled={disabled}
-          >
-            {letter}
-          </button>
+          />
         ))}
       </div>
     </div>
@@ -269,10 +249,8 @@ const GameInterface: React.FC = () => {
               <span className="other-turn">⏳ {currentPlayer?.username}s tur</span>
             )
           ) : gamePhase === 'letter_placement' ? (
-            selectedLetter ? (
-              <span className="my-turn">📍 Placera: <strong>{selectedLetter}</strong></span>
-            ) : currentPlayer?.placementConfirmed ? (
-              <span className="waiting">⏳ Väntar på resultat...</span>
+            currentPlayer?.placementConfirmed ? (
+              <span className="waiting">🎯 Alla spelare placerar: <span className="selected-letter">{selectedLetter}</span></span>
             ) : (
               <span className="waiting">⌛ Väntar på bokstav...</span>
             )
@@ -280,50 +258,32 @@ const GameInterface: React.FC = () => {
             <span className="other-turn">Väntar på andra spelare</span>
           )}
         </div>
-        
-        {/* Enhanced feedback for letter placement phase */}
-        {gamePhase === 'letter_placement' && selectedLetter && (
-          <div className="letter-placement-info">
-            <h3>🎯 Alla spelare placerar: <span className="selected-letter">{selectedLetter}</span></h3>
-            <p>Klicka på en tom ruta för att placera bokstaven, sedan tryck "Bekräfta" när du är klar.</p>
-          </div>
-        )}
+      </div>
+
+      {/* Game board - always at top */}
+      <div className="board-section">
+        <GameBoard
+          grid={currentPlayer.grid}
+          onCellClick={gamePhase === 'letter_placement' ? handleCellClick : () => {}}
+          disabled={gamePhase !== 'letter_placement' || !selectedLetter}
+          highlightedCell={gamePhase === 'letter_placement' ? temporaryPlacement : null}
+          temporaryLetter={gamePhase === 'letter_placement' ? temporaryPlacement : null}
+        />
       </div>
 
       {gamePhase === 'letter_selection' && isMyTurn && (
-        <>
-          <LetterSelector
-            availableLetters={swedishLetters}
-            selectedLetter={selectedLetter || undefined}
-            onLetterSelect={handleLetterSelect}
-            disabled={!isMyTurn}
-          />
-          
-          {/* Show current board while selecting letter for strategic planning */}
-          <div className="current-board-section">
-            <h3>📋 Ditt spelbord</h3>
-            <GameBoard
-              grid={currentPlayer.grid}
-              onCellClick={() => {}} 
-              disabled={true}
-            />
-          </div>
-        </>
+        <LetterSelector
+          availableLetters={swedishLetters}
+          selectedLetter={selectedLetter || undefined}
+          onLetterSelect={handleLetterSelect}
+          disabled={!isMyTurn}
+        />
       )}
 
       {gamePhase === 'letter_placement' && selectedLetter && (
         <div className="placement-section">
-          <GameBoard
-            grid={currentPlayer.grid}
-            onCellClick={handleCellClick}
-            disabled={!selectedLetter || gamePhase !== 'letter_placement'}
-            highlightedCell={temporaryPlacement}
-            temporaryLetter={temporaryPlacement}
-          />
-
           {temporaryPlacement && selectedLetter && (
             <div className="confirm-section">
-              <p>📍 Placera <strong>{selectedLetter}</strong> här?</p>
               <div className="confirm-buttons">
                 <button 
                   onClick={handleConfirmPlacement}
@@ -347,11 +307,6 @@ const GameInterface: React.FC = () => {
       {gamePhase === 'letter_selection' && !isMyTurn && (
         <div className="waiting-section">
           <p>Väntar på att nuvarande spelare väljer bokstav...</p>
-          <GameBoard
-            grid={currentPlayer.grid}
-            onCellClick={() => {}}
-            disabled={true}
-          />
         </div>
       )}
     </div>
