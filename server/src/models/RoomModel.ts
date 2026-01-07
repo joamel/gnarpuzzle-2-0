@@ -220,9 +220,9 @@ export class RoomModel {
       SELECT COUNT(*) as count 
       FROM room_members 
       WHERE room_id = ?
-    `, roomId) as { count: number };
+    `, roomId) as { count: number } | undefined;
     
-    return result.count;
+    return result?.count ?? 0;
   }
 
   static async updateStatus(id: number, status: Room['status']): Promise<boolean> {

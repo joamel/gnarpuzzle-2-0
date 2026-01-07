@@ -35,6 +35,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true }));
       
+      // Disconnect old socket before logging in with new user
+      socketService.disconnect();
+      
       const response = await apiService.login(username);
       
       apiService.setToken(response.token);
@@ -46,7 +49,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         isLoading: false,
       });
 
-      // Connect socket with token
+      // Connect socket with token for new user
       await socketService.connect(response.token);
       
     } catch (error) {

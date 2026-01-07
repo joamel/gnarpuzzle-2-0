@@ -153,8 +153,8 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   useEffect(() => {
     if (!currentRoom?.code) return;
 
-    const handleMemberJoined = (_data: any) => {
-      console.log('🟦 room:member_joined event:', _data);
+    const handleMemberJoined = (data: any) => {
+      console.log('🟦 room:member_joined event:', data);
       // Refresh room data when someone joins
       if (currentRoom.code) {
         apiService.getRoomByCode(currentRoom.code).then(freshData => {
@@ -181,114 +181,6 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
       socketService.off('room:member_joined', handleMemberJoined);
     };
   }, [currentRoom?.code]);
-
-  useEffect(() => {
-    const handleMemberJoined = (data: any) => {
-      // If backend provides proper member list, use it
-      if (data.room?.members && Array.isArray(data.room.members) && data.room.members.length > 0) {
-        setPlayerList(data.room.members);
-      } else if (data.user) {
-        // Otherwise, manually add the user
-        setPlayerList(prev => {
-          const exists = prev.some(member => member.userId === String(data.user.id));
-          if (!exists) {
-            const newList = [...prev, {
-              userId: String(data.user.id),
-              username: data.user.username,
-              role: 'member' as const,
-              joinedAt: new Date().toISOString()
-            }];
-            return newList;
-          }
-          return prev;
-        });
-        
-        // Also trigger a refresh to get latest data from server
-        if (currentRoom?.code) {
-          apiService.getRoomByCode(currentRoom.code).then(freshData => {
-            // Backend returns { room: { members: [...] } }
-            const members = freshData?.room?.members || freshData?.members;
-            if (members && members.length > 0) {
-              const mappedMembers = members.map((m: any) => ({
-                userId: String(m.id || m.userId),
-                username: m.username,
-                role: (m.id || m.userId) === freshData?.room?.createdBy ? 'owner' : 'member',
-                joinedAt: new Date().toISOString()
-              }));
-              setPlayerList(mappedMembers);
-            }
-          }).catch(err => console.error('❌ Failed to fetch after join:', err));
-        }
-      }
-    };
-
-    const handleRoomLeft = (data: any) => {
-      if (data?.user?.id) {
-        setPlayerList(prev => prev.filter(member => member.userId !== String(data.user.id)));
-      }
-    };
-
-    const handleRoomUpdated = (data: any) => {
-      if (data.room?.members && Array.isArray(data.room.members)) {
-        setPlayerList(data.room.members);
-      }
-    };
-
-    // Listen for our own join confirmation with full member list
-    const handleRoomJoined = (data: any) => {
-      if (data.room?.members && Array.isArray(data.room.members) && data.room.members.length > 0) {
-        setPlayerList(data.room.members);
-      }
-      
-      // Initialize ready players from server
-      if (data.readyPlayers && Array.isArray(data.readyPlayers)) {
-        setReadyPlayers(new Set(data.readyPlayers));
-      }
-    };
-
-    socketService.on('room:member_joined', handleMemberJoined);
-    socketService.on('room:left', handleRoomLeft);
-    socketService.on('room:updated', handleRoomUpdated);
-    socketService.on('room:joined', handleRoomJoined);
-
-    // Periodic sync to ensure member list stays up to date
-    let syncInterval: NodeJS.Timeout;
-    if (currentRoom?.code) {
-      syncInterval = setInterval(() => {
-        apiService.getRoomByCode(currentRoom.code).then(freshData => {
-          // Backend returns { room: { members: [...] } }
-          const members = freshData?.room?.members || freshData?.members;
-          if (members && members.length > 0) {
-            const mappedMembers = members.map((m: any) => ({
-              userId: String(m.id || m.userId),
-              username: m.username,
-              role: (m.id || m.userId) === freshData?.room?.createdBy ? 'owner' : 'member',
-              joinedAt: new Date().toISOString()
-            }));
-            
-            setPlayerList(prev => {
-              // Only update if member list actually changed
-              const currentIds = prev.map(p => p.userId).sort();
-              const freshIds = mappedMembers.map((m: any) => m.userId).sort();
-              
-              if (JSON.stringify(currentIds) !== JSON.stringify(freshIds)) {
-                return mappedMembers;
-              }
-              return prev;
-            });
-          }
-        }).catch(err => console.error('❌ Periodic sync failed:', err));
-      }, 3000); // Sync every 3 seconds for faster updates
-    }
-
-    return () => {
-      socketService.off('room:member_joined', handleMemberJoined);
-      socketService.off('room:left', handleRoomLeft);
-      socketService.off('room:updated', handleRoomUpdated);
-      socketService.off('room:joined', handleRoomJoined);
-      if (syncInterval) clearInterval(syncInterval);
-    };
-  }, [currentRoom]);
 
   const handleStartGame = async () => {
     if (!currentRoom || !canStartGame) {
