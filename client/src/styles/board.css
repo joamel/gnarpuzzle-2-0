@@ -1,0 +1,161 @@
+/* Unified Board Styles - Grid containers only. Cell styling is in brick.css */
+
+.board {
+  display: inline-grid;
+  grid-template-columns: repeat(var(--grid-size, 5), minmax(35px, 1fr));
+  gap: 8px;
+  padding: 16px;
+  background: transparent;
+  border-radius: 8px;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+/* Game board during gameplay */
+.game-board {
+  display: grid;
+  grid-template-columns: repeat(var(--grid-size, 5), 1fr);
+  gap: 4px;
+  width: 100%;
+  max-width: 270px;
+  margin: 0 auto;
+  padding: 12px;
+  background: transparent;
+  border-radius: 8px;
+}
+
+/* Grid cell styling is now in brick.css using .brick.brick-board */
+.board-cell,
+.grid-cell {
+  /* Uses .brick styles from brick.css */
+}
+
+.board-cell.empty,
+.grid-cell.empty {
+  cursor: pointer;
+}
+
+/* Highlighted placement position */
+.grid-cell.highlighted-placement {
+  background: #ffdb9f;
+  border: none;
+  box-shadow: 
+    0 8px 12px rgba(0, 0, 0, 0.18),
+    0 4px 6px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 0 0 3px #667eea;
+  animation: placement-pulse 1s ease-in-out infinite;
+}
+
+/* Temporary placement preview */
+.grid-cell.temporary-placement {
+  background: #f4a261;
+  border: none;
+  box-shadow: 
+    0 10px 15px rgba(0, 0, 0, 0.2),
+    0 5px 8px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 0 0 3px #667eea;
+  animation: temporary-pulse 1.5s ease-in-out infinite;
+  position: relative;
+}
+
+.grid-cell.temporary-placement::after {
+  content: "📍";
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 10px;
+}
+
+.cell-coords {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  font-size: 8px;
+  color: #999;
+  opacity: 0;
+  display: none;
+}
+
+.grid-cell.disabled {
+  cursor: not-allowed;
+}
+
+/* Game result board styles */
+.board-cell.highlighted-word {
+  background: #667eea !important;
+  color: #ffffff !important;
+  font-weight: 600;
+  animation: pulse-highlight 0.3s ease-out;
+  box-shadow: 
+    0 8px 12px rgba(102, 126, 234, 0.4),
+    0 4px 6px rgba(102, 126, 234, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+@keyframes highlight {
+  0% { transform: scale(0.95); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+@keyframes placement-pulse {
+  0%, 100% { 
+    box-shadow: 
+      0 10px 15px rgba(0, 0, 0, 0.2),
+      0 5px 8px rgba(0, 0, 0, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      0 0 0 3px #667eea;
+  }
+  50% { 
+    box-shadow: 
+      0 12px 18px rgba(0, 0, 0, 0.25),
+      0 6px 10px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      0 0 0 5px rgba(102, 126, 234, 0.5);
+  }
+}
+
+@keyframes temporary-pulse {
+  0%, 100% { 
+    transform: scale(1);
+  }
+  50% { 
+    transform: scale(1.02);
+  }
+}
+
+@keyframes pulse-highlight {
+  0% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.empty-board-message {
+  padding: 20px;
+  text-align: center;
+  color: #999;
+  font-size: 14px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  border: 1px dashed #ddd;
+}
+
+.board-row {
+  display: contents;
+}
+
+/* Mobile optimizations */
+@media (max-width: 480px) {
+  .board,
+  .game-board {
+    padding: 12px;
+    gap: 4px;
+    place-items: center;
+    max-width: 220px;
+  }
+}
