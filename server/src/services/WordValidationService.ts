@@ -40,10 +40,14 @@ export class WordValidationService {
 
     try {
       // Try multiple paths for dictionary file
+      // Development: /data/swedish.json or /server/data/swedish.json
+      // Production: ../data/swedish.json from compiled dist/
       const possiblePaths = [
         path.join(process.cwd(), 'data', 'swedish.json'),
         path.join(process.cwd(), 'server', 'data', 'swedish.json'),
-        path.join(__dirname, '..', '..', 'data', 'swedish.json')
+        path.join(__dirname, '..', '..', 'data', 'swedish.json'),
+        // Render production path: app root has data/ folder
+        path.join('/', 'app', 'data', 'swedish.json')
       ];
       
       let dictPath: string | null = null;
