@@ -496,7 +496,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
             ) : !isReady ? (
               <p>👉 Du måste trycka redo för att starta</p>
             ) : (
-              <p>Redo! Väntar på {playerList?.find((m: LobbyMember) => m.role === 'owner')?.username || 'spelägaren'} att starta</p>
+              <p>Väntar på att spelledaren startar spelet.</p>
             )}
           </div>
         )}

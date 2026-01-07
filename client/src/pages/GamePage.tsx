@@ -45,6 +45,12 @@ const GamePage: React.FC = () => {
 
   // Leave room and go back to home
   const handleLeaveRoom = async () => {
+    // Confirm before leaving if game is in progress
+    if (gamePhase && gamePhase !== 'finished') {
+      const confirmed = window.confirm('Är du säker på att du vill lämna spelet? Du kommer att försvinna från rummet.');
+      if (!confirmed) return;
+    }
+    
     try {
       await leaveRoom();
       navigate('/');
@@ -137,10 +143,7 @@ const GamePage: React.FC = () => {
     return (
       <div className="game-page">
         <header className="page-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Logo size="small" showText={false} />
-            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#667eea' }}>{currentRoom.name}</h2>
-          </div>
+          <Logo size="small" showText={true} />
           <button 
             onClick={handleLeaveRoom}
             className="header-btn"
@@ -166,10 +169,7 @@ const GamePage: React.FC = () => {
   return (
     <div className="game-page">
       <header className="page-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Logo size="small" showText={false} />
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#667eea' }}>🧩 {currentRoom.name}</h2>
-        </div>
+        <Logo size="small" showText={true} />
         <button 
           onClick={handleLeaveRoom}
           className="header-btn"
