@@ -306,15 +306,16 @@
 
 .board-grid {
   display: inline-grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(var(--grid-size, 5), minmax(40px, 1fr));
   gap: 6px;
-  padding: 16px;
+  padding: 12px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 12px;
   box-shadow: 
     0 8px 16px rgba(102, 126, 234, 0.25),
     0 4px 8px rgba(0, 0, 0, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  max-width: 90vw;
 }
 
 .board-row {
@@ -325,20 +326,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 50px;
-  height: 50px;
   aspect-ratio: 1;
   background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 100%);
   border: none;
   border-radius: 6px;
   font-weight: 600;
-  font-size: 16px;
+  font-size: 14px;
   color: #333;
   transition: all 0.2s ease;
   box-shadow: 
     0 4px 8px rgba(0, 0, 0, 0.08),
     0 2px 4px rgba(0, 0, 0, 0.04),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  min-width: 35px;
 }
 
 .board-cell:hover:not(.filled) {

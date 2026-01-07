@@ -6,9 +6,10 @@
   padding: 6px;
   background: transparent;
   flex: 1;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 /* Game Status */
@@ -19,6 +20,7 @@
   margin-bottom: 4px;
   box-shadow: 0 1px 4px rgba(102, 126, 234, 0.1);
   flex-shrink: 0;
+  order: 0;
 }
 
 .phase-indicator {
@@ -126,100 +128,48 @@
 
 /* Letter Selector */
 .letter-selector {
-  background: white;
-  border-radius: 8px; /* Smaller radius */
-  padding: 8px; /* More compact padding */
-  margin-bottom: 8px; /* More compact margin */
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1); /* Blue shadow */
+  background: transparent;
+  border-radius: 12px;
+  padding: 8px 0;
+  margin: 0 auto;
+  box-shadow: none;
   flex-shrink: 0;
+  order: 2;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .letter-selector h3 {
-  margin: 0 0 6px 0;
-  color: #333;
-  font-size: 13px;
+  margin: 0 0 12px 0;
+  color: white;
+  font-size: 14px;
   text-align: center;
+  font-weight: 600;
 }
 
 .letters-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(26px, 1fr));
-  gap: 1px;
-  max-width: 400px;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 4px;
+  width: 100%;
+  max-width: 380px;
   margin: 0 auto;
-}
-
-.letter-button {
-  aspect-ratio: 1;
-  background: #f8f9fa;
-  border: 2px solid #e9ecef;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #667eea;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  min-height: auto;
-  padding: 0;
-  display: flex;
-  align-items: center;
+  padding: 0 6px;
   justify-content: center;
-  min-width: 24px;
-  max-width: 26px;
+  align-items: center;
 }
 
-.letter-button:hover:not(:disabled) {
-  background: #e9ecef;
-  border-color: #667eea;
-  transform: translateY(-1px);
-}
-
-.letter-button.selected {
-  background: #667eea;
-  border-color: #667eea;
-  color: white;
-}
-
-.letter-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+/* Letter buttons styling is now in brick.css */
 
 /* Game Board */
-.game-board {
-  display: grid;
-  grid-template-columns: repeat(var(--grid-size), 1fr);
-  gap: 6px;
-  width: 100%;
-  max-width: 400px;
-  margin: 0 auto 10px;
-  padding: 16px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 12px;
-  box-shadow: 
-    0 8px 16px rgba(102, 126, 234, 0.25),
-    0 4px 8px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-}
+/* Game Board - Uses unified styles from board.css */
+/* Remove duplicate styles and keep only game-specific overrides if needed */
 
 .grid-cell {
-  aspect-ratio: 1;
-  background: linear-gradient(135deg, #F5F0F9 0%, #E6C9E6 100%);
-  border: none;
-  border-radius: 6px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-  min-height: 32px;
-  font-size: 12px;
-  box-shadow: 
-    0 4px 8px rgba(0, 0, 0, 0.08),
-    0 2px 4px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  /* Base styles from board.css are used */
 }
 
 .grid-cell:hover:not(.disabled):not(.filled) {
@@ -238,52 +188,8 @@
   }
 }
 
-.grid-cell.filled {
-  background: linear-gradient(135deg, #D8BFD8 0%, #E6C9E6 100%);
-  cursor: default;
-  box-shadow: 
-    0 4px 8px rgba(0, 0, 0, 0.08),
-    0 2px 4px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
-}
 
-.grid-cell.filled .cell-letter {
-  color: #667eea;
-  font-weight: 800;
-  text-shadow: none;
-}
-
-.grid-cell.highlighted {
-  background: linear-gradient(135deg, #D8BFD8 0%, #C994DD 100%);
-  animation: highlight 0.5s ease-in-out;
-  box-shadow: 
-    0 6px 12px rgba(102, 126, 234, 0.25),
-    0 3px 6px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-}
-
-.grid-cell.highlighted-placement {
-  background: linear-gradient(135deg, #D8BFD8 0%, #C994DD 100%);
-  border: 2px solid #C994DD;
-  box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
-  animation: placement-pulse 1s ease-in-out infinite;
-}
-
-.grid-cell.temporary-placement {
-  background: linear-gradient(135deg, #D8BFD8 0%, #C994DD 100%);
-  border: 3px solid #C994DD;
-  animation: temporary-pulse 1.5s ease-in-out infinite;
-  box-shadow: 0 0 15px rgba(102, 126, 234, 0.6);
-  position: relative;
-}
-
-.grid-cell.temporary-placement::after {
-  content: "📍";
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  font-size: 10px;
-}
+/* Cell styling moved to board.css for unified consistency across all phases */
 
 .grid-cell.disabled {
   opacity: 0.6;
@@ -334,13 +240,25 @@
   line-height: 1;
 }
 
+/* Board section - always at top */
+.board-section {
+  flex-shrink: 0;
+  text-align: center;
+  order: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
 /* Placement Section */
 .placement-section {
   text-align: center;
-  flex: 1;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  order: 3;
+  margin-top: 8px;
 }
 
 .selected-letter-display {
@@ -422,6 +340,7 @@
 /* Waiting Section */
 .waiting-section {
   text-align: center;
+  order: 2;
 }
 
 .waiting-section p {
@@ -436,13 +355,22 @@
 /* Mobile Optimizations */
 @media (max-width: 480px) {
   .game-interface {
-    padding: 12px;
+    padding: 6px;
+    max-width: 100%;
+    min-height: 0;
+    overflow-y: auto;
   }
   
-  .game-board {
-    max-width: 280px;
-    padding: 12px;
-    gap: 3px;
+  .letter-selector {
+    padding: 8px 0;
+    margin: 0 auto;
+  }
+  
+  .board-section {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
   
   .grid-cell {
@@ -454,13 +382,19 @@
   }
   
   .letters-grid {
-    grid-template-columns: repeat(auto-fit, minmax(36px, 1fr));
-    gap: 1px;
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 4px;
+    width: 100%;
+    max-width: 280px;
+    margin: 0 auto;
+    padding: 0 6px;
+    justify-content: center;
+    align-items: center;
+  }
   }
   
-  .letter-button {
-    font-size: 14px;
-  }
+  /* Letter button mobile styling is now in brick.css @media query */
   
   .confirm-buttons {
     flex-direction: column;
@@ -471,7 +405,6 @@
     width: 100%;
     min-width: auto;
   }
-}
 
 /* Touch optimizations */
 @media (hover: none) {
@@ -480,15 +413,14 @@
     background: #f8f9fa;
   }
   
-  .letter-button:hover {
+  .brick:hover {
     transform: none;
-    background: #f8f9fa;
   }
 }
 
 /* Accessibility */
 .grid-cell:focus,
-.letter-button:focus {
+.brick:focus {
   outline: 3px solid rgba(102, 126, 234, 0.5);
   outline-offset: 2px;
 }
