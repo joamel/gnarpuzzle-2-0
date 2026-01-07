@@ -46,7 +46,7 @@ Thumbs.db
 *.sqlite3
 *.db
 /data/gnarpuzzle.db
-/data/swedish.json
+# Note: swedish.json is kept in repo - it's required for word validation on production
 
 # Logs
 logs
