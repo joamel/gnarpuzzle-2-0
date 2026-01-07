@@ -77,10 +77,18 @@ describe('RoomModel', () => {
       mockDb.get
         .mockResolvedValueOnce({ id: 1 }) // First code exists
         .mockResolvedValueOnce(null) // Second code doesn't exist
-        .mockResolvedValueOnce({ id: 2, code: 'TEST02' }); // Return created room
+        .mockResolvedValueOnce({ // Return created room
+          id: 2,
+          code: 'TEST02',
+          name: 'Test Room',
+          created_by: 123,
+          max_players: 4,
+          board_size: 4,
+          status: 'waiting'
+        })
+        .mockResolvedValueOnce({ count: 1 }); // Member count
 
       mockDb.run.mockResolvedValue({ lastInsertRowid: 2, changes: 1 });
-      mockDb.get.mockResolvedValueOnce({ count: 1 }); // Member count
 
       const roomData = {
         name: 'Test Room',
@@ -203,7 +211,15 @@ describe('RoomModel', () => {
         id: 1,
         code: 'TEST01',
         name: 'Test Room',
-        status: 'waiting'
+        status: 'waiting',
+        settings: {
+          grid_size: 5,
+          max_players: 6,
+          letter_timer: 20,
+          placement_timer: 30,
+          is_private: false,
+          require_password: false
+        }
       };
 
       mockDb.get.mockResolvedValueOnce(mockRoom);
