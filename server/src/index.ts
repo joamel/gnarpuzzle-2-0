@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
-import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
@@ -27,17 +26,9 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
-// Mobile-optimized rate limiting - disabled in development
-const limiter = process.env.NODE_ENV === 'production' ? rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'), // 100 requests
-  message: {
-    error: 'Too many requests from this IP, please try again later.',
-    retryAfter: 15 * 60 // 15 minutes
-  },
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-}) : (_req: any, _res: any, next: any) => next(); // No rate limiting in development
+// Mobile-optimized rate limiting - disabled globally to allow multiple users and polling
+// Rate limiting should be implemented per-user-session via authentication if needed
+const limiter = (_req: any, _res: any, next: any) => next(); // Disabled globally
 
 // Socket.IO Setup with mobile optimization
 const io = new Server(server, {
