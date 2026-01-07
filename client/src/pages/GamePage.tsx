@@ -2,9 +2,9 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../contexts/GameContext';
 import { useAuth } from '../contexts/AuthContext';
-import Logo from '../assets/Logo';
 import RoomLobby from '../components/RoomLobby';
 import GameResultBoard from '../components/GameResultBoard';
+import Logo from '@/assets/Logo';
 
 // Lazy load GameInterface for better performance
 const GameInterface = React.lazy(() => import('../components/GameInterface').then(module => ({ 
@@ -136,16 +136,19 @@ const GamePage: React.FC = () => {
   if (gameStarted && currentGame) {
     return (
       <div className="game-page">
-        <div className="page-header">
-          <Logo size="small" showText={false} />
-          <h2>{currentRoom.name}</h2>
+        <header className="page-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Logo size="small" showText={false} />
+            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#667eea' }}>{currentRoom.name}</h2>
+          </div>
           <button 
             onClick={handleLeaveRoom}
             className="header-btn"
+            aria-label="Tillbaka"
           >
             ←
           </button>
-        </div>
+        </header>
         
         <Suspense fallback={
           <div className="loading-game-interface">
@@ -162,16 +165,19 @@ const GamePage: React.FC = () => {
   // Show lobby by default
   return (
     <div className="game-page">
-      <div className="page-header">
+      <header className="page-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <Logo size="small" showText={false} />
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#667eea' }}>🧩 {currentRoom.name}</h2>
+        </div>
         <button 
           onClick={handleLeaveRoom}
           className="header-btn"
+          aria-label="Tillbaka"
         >
           ←
         </button>
-        <h2>🧩 Rum</h2>
-        <div></div>
-      </div>
+      </header>
       
       <RoomLobby onStartGame={handleStartGame} />
     </div>

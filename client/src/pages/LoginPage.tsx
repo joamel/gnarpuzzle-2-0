@@ -33,7 +33,6 @@ const LoginPage: React.FC = () => {
       <div className="login-container">
         <div className="login-header">
           <Logo size="medium" showText={true} />
-          <p>Multiplayer ordspel för mobilen</p>
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">
