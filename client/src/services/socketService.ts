@@ -1,96 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-
-export interface SocketEvents {
-  // Connection events
-  connect: () => void;
-  disconnect: (reason: string) => void;
-  connect_error: (error: Error) => void;
-
-  // Room events
-  'room:created': (data: { room: any }) => void;
-  'room:joined': (data: { 
-    success: boolean;
-    room: any; 
-    user: any;
-    roomCode: string;
-    readyPlayers?: string[];
-  }) => void;
-  'room:member_joined': (data: { 
-    user: { id: number; username: string }; 
-    room: { id: number; code: string; name: string; members: any[] };
-    memberCount: number;
-    readyPlayers?: string[];
-  }) => void;
-  'room:left': (data: { room: any; user: any }) => void;
-  'room:updated': (data: { room: any }) => void;
-  'room:member_left': (data: { 
-    user: { id: number; username: string }; 
-    roomCode: string;
-  }) => void;
-  'room:ownership_transferred': (data: { 
-    roomCode: string; 
-    newCreator: { id: number; username: string }; 
-  }) => void;
-
-  // Ready status events
-  'player:ready_changed': (data: {
-    userId: string;
-    username: string;
-    isReady: boolean;
-    roomCode: string;
-  }) => void;
-
-  // Game events
-  'game:started': (data: {
-    gameId: number;
-    roomId: number;
-    phase: 'letter_selection' | 'letter_placement';
-    timer_end?: number;
-    message: string;
-  }) => void;
-  'game:phase_changed': (data: { 
-    gameId: number; 
-    phase: 'letter_selection' | 'letter_placement'; 
-    timer_end: number;
-    current_turn?: number;
-  }) => void;
-  'letter:selected': (data: { 
-    gameId: number; 
-    playerId: number; 
-    letter: string; 
-    turn: number; 
-  }) => void;
-  'letter:placed': (data: { 
-    gameId: number; 
-    playerId: number; 
-    letter: string; 
-    x: number; 
-    y: number; 
-  }) => void;
-  'turn:skipped': (data: {
-    gameId: number;
-    skippedPlayerId: number;
-    nextPlayerId: number;
-  }) => void;
-  'game:ended': (data: { 
-    gameId: number; 
-    leaderboard: Array<{
-      userId: number;
-      username: string;
-      score: number;
-      words: any[];
-    }>;
-    finalScores: any;
-    reason?: string;
-    message?: string;
-  }) => void;
-  'game:player_left': (data: {
-    gameId: number;
-    leftUserId: number;
-    remainingPlayers: number;
-    newCurrentTurn?: number;
-  }) => void;
-}
+import { SocketEvents } from '../../../shared/types';
 
 class SocketService {
   private socket: Socket | null = null;
@@ -258,35 +167,37 @@ class SocketService {
 
   on<K extends keyof SocketEvents>(event: K, listener: SocketEvents[K]): void {
     // Store listener for re-registration on reconnect
-    if (!this.eventListeners.has(event)) {
-      this.eventListeners.set(event, []);
+    const eventStr = event as string;
+    if (!this.eventListeners.has(eventStr)) {
+      this.eventListeners.set(eventStr, []);
     }
-    this.eventListeners.get(event)!.push(listener);
+    this.eventListeners.get(eventStr)!.push(listener);
 
     // Register on socket if connected
     if (this.socket) {
-      this.socket.on(event, listener as any);
+      this.socket.on(eventStr, listener as any);
     }
   }
 
   off<K extends keyof SocketEvents>(event: K, listener?: SocketEvents[K]): void {
     // Remove from stored listeners
-    const listeners = this.eventListeners.get(event);
+    const eventStr = event as string;
+    const listeners = this.eventListeners.get(eventStr);
     if (listeners && listener) {
-      const index = listeners.indexOf(listener);
+      const index = listeners.indexOf(listener as any);
       if (index !== -1) {
         listeners.splice(index, 1);
       }
       
       // Clean up empty listener arrays
       if (listeners.length === 0) {
-        this.eventListeners.delete(event);
+        this.eventListeners.delete(eventStr);
       }
     }
 
     // Remove from socket
     if (this.socket) {
-      this.socket.off(event, listener as any);
+      this.socket.off(eventStr, listener as any);
     }
   }
 

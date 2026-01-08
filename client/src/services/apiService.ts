@@ -114,6 +114,13 @@ class ApiService {
     return this.request<any>(`/api/rooms/${code}/leave`, { method: 'DELETE' });
   }
 
+  async updateRoomSettings(roomId: number, settings: { max_players?: number; grid_size?: number; letter_timer?: number; placement_timer?: number }): Promise<any> {
+    return this.request<any>(`/api/rooms/${roomId}/settings`, {
+      method: 'PUT',
+      body: JSON.stringify(settings)
+    });
+  }
+
   // Game endpoints
   async startGame(roomId: number): Promise<Game> {
     console.log('🌐 ApiService.startGame called with roomId:', roomId);
