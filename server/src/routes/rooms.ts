@@ -583,6 +583,126 @@ router.delete('/:code/leave', AuthService.authenticateToken, async (req, res) =>
   }
 });
 
+/**
+ * PUT /api/rooms/:id/settings
+ * Update room settings (only room owner can do this)
+ * Requires authentication
+ */
+router.put('/:id/settings', AuthService.authenticateToken, async (req, res) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const roomId = parseInt(req.params.id);
+    const { max_players, grid_size, letter_timer, placement_timer } = req.body;
+
+    if (!roomId || isNaN(roomId)) {
+      res.status(400).json({
+        error: 'Invalid room ID',
+        message: 'Room ID must be a valid number'
+      });
+      return;
+    }
+
+    const room = await RoomModel.findById(roomId);
+    if (!room) {
+      res.status(404).json({
+        error: 'Room not found',
+        message: 'No room found with that ID'
+      });
+      return;
+    }
+
+    // Check if user is the room owner
+    if (room.created_by !== authReq.user!.id) {
+      res.status(403).json({
+        error: 'Forbidden',
+        message: 'Only the room owner can change settings'
+      });
+      return;
+    }
+
+    // Check if game has already started
+    if (room.status !== 'waiting') {
+      res.status(400).json({
+        error: 'Game in progress',
+        message: 'Cannot change settings after game has started'
+      });
+      return;
+    }
+
+    // Validate settings
+    if (max_players !== undefined && (max_players < 2 || max_players > 6)) {
+      res.status(400).json({
+        error: 'Invalid max_players',
+        message: 'Max players must be between 2 and 6'
+      });
+      return;
+    }
+
+    if (grid_size !== undefined && ![4, 5, 6].includes(grid_size)) {
+      res.status(400).json({
+        error: 'Invalid grid_size',
+        message: 'Grid size must be 4, 5, or 6'
+      });
+      return;
+    }
+
+    if (letter_timer !== undefined && (letter_timer < 5 || letter_timer > 60)) {
+      res.status(400).json({
+        error: 'Invalid letter_timer',
+        message: 'Letter timer must be between 5 and 60 seconds'
+      });
+      return;
+    }
+
+    if (placement_timer !== undefined && (placement_timer < 10 || placement_timer > 60)) {
+      res.status(400).json({
+        error: 'Invalid placement_timer',
+        message: 'Placement timer must be between 10 and 60 seconds'
+      });
+      return;
+    }
+
+    // Update settings
+    const updatedSettings = {
+      ...room.settings,
+      ...(max_players !== undefined && { max_players }),
+      ...(grid_size !== undefined && { grid_size }),
+      ...(letter_timer !== undefined && { letter_timer }),
+      ...(placement_timer !== undefined && { placement_timer })
+    };
+
+    const db = (await DatabaseManager.getInstance()).getDatabase();
+    await db.run(
+      'UPDATE rooms SET settings = ? WHERE id = ?',
+      [JSON.stringify(updatedSettings), roomId]
+    );
+
+    logger.info(`Room ${room.code} settings updated by ${authReq.user!.username}`);
+
+    // Notify room members about settings change
+    const socketService = getSocketService();
+    if (socketService) {
+      socketService.emitToRoom(room.code, 'room:settings_updated', {
+        roomCode: room.code,
+        settings: updatedSettings
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Settings updated successfully',
+      settings: updatedSettings
+    });
+
+  } catch (error) {
+    logger.error('Update room settings error:', error);
+    res.status(500).json({
+      error: 'Unable to update settings',
+      message: 'Internal server error'
+    });
+  }
+});
+
 // Start game endpoint
 router.post('/:id/start', AuthService.authenticateToken, async (req, res) => {
   const authReq = req as AuthenticatedRequest;
