@@ -672,9 +672,16 @@ router.put('/:id/settings', AuthService.authenticateToken, async (req, res) => {
     };
 
     const db = (await DatabaseManager.getInstance()).getDatabase();
+    
+    // Update both the settings JSON and the top-level columns for API compatibility
     await db.run(
-      'UPDATE rooms SET settings = ? WHERE id = ?',
-      [JSON.stringify(updatedSettings), roomId]
+      'UPDATE rooms SET settings = ?, board_size = ?, max_players = ? WHERE id = ?',
+      [
+        JSON.stringify(updatedSettings), 
+        grid_size || room.board_size,
+        max_players || room.max_players,
+        roomId
+      ]
     );
 
     logger.info(`Room ${room.code} settings updated by ${authReq.user!.username}`);
@@ -682,9 +689,17 @@ router.put('/:id/settings', AuthService.authenticateToken, async (req, res) => {
     // Notify room members about settings change
     const socketService = getSocketService();
     if (socketService) {
-      socketService.emitToRoom(room.code, 'room:settings_updated', {
-        roomCode: room.code,
-        settings: updatedSettings
+      // Get updated room data
+      const updatedRoom = await RoomModel.findByCode(room.code);
+      
+      // Notify users in the room with updated room data
+      socketService.emitToRoom(room.code, 'room:updated', {
+        room: updatedRoom
+      });
+      
+      // Notify all lobby users so HomePage can update room cards
+      socketService.broadcastToRoom('lobby', 'room:updated', {
+        room: updatedRoom
       });
     }
 
