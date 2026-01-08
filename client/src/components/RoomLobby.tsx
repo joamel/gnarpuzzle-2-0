@@ -6,6 +6,7 @@ import { socketService } from '../services/socketService';
 import RoomSettings from './RoomSettings';
 import PlayersList from './PlayersList';
 import TipsModal from './TipsModal';
+import { RoomSettingsModal, RoomSettingsData } from './RoomSettingsModal';
 
 interface RoomLobbyProps {
   onStartGame: () => void;
@@ -27,6 +28,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   const [isStarting, setIsStarting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [showTips, setShowTips] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [readyPlayers, setReadyPlayers] = useState<Set<string>>(new Set());
   const [isReady, setIsReady] = useState(false);
 
@@ -92,10 +94,20 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
       socketService.on('room:joined', handleRoomJoined);
       socketService.on('player:ready_changed', handlePlayerReadyChanged);
       
+      // Listen for settings updates
+      const handleSettingsUpdated = (data: { roomCode: string; settings: any }) => {
+        if (data.roomCode === currentRoom.code) {
+          // Refresh the page to show new settings
+          window.location.reload();
+        }
+      };
+      socketService.on('room:settings_updated', handleSettingsUpdated);
+      
       return () => {
         socketService.leaveRoom(currentRoom.code);
         socketService.off('room:joined', handleRoomJoined);
         socketService.off('player:ready_changed', handlePlayerReadyChanged);
+        socketService.off('room:settings_updated', handleSettingsUpdated);
       };
     }
   }, [currentRoom?.code]);
@@ -232,6 +244,19 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
     }
   };
 
+  const handleSaveSettings = async (settings: RoomSettingsData) => {
+    if (!currentRoom) return;
+    
+    try {
+      await apiService.updateRoomSettings(currentRoom.id, settings);
+      // Refresh room data to show updated settings
+      window.location.reload();
+    } catch (err) {
+      console.error('Failed to save settings:', err);
+      throw err;
+    }
+  };
+
   const handleResetRoom = async () => {
     if (!currentRoom) return;
     
@@ -278,18 +303,20 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
     <div className="room-lobby">
       <div className="lobby-header">
         <h2>{currentRoom.name}</h2>
-        <div className="room-code-section">
-          <div className="room-code">
-            <span>Kod: <strong>{currentRoom.code}</strong></span>
+        {(currentRoom.settings as any)?.require_password && (
+          <div className="room-code-section">
+            <div className="room-code">
+              <span>Kod: <strong>{currentRoom.code}</strong></span>
+            </div>
+            <button
+              onClick={() => navigator.clipboard.writeText(currentRoom.code)}
+              className="copy-code-button"
+              title="Kopiera rumkod"
+            >
+              📋
+            </button>
           </div>
-          <button
-            onClick={() => navigator.clipboard.writeText(currentRoom.code)}
-            className="copy-code-button"
-            title="Kopiera rumkod"
-          >
-            📋
-          </button>
-        </div>
+        )}
       </div>
 
       <RoomSettings 
@@ -298,6 +325,8 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
         letterTimer={currentRoom.settings?.letter_timer || 20}
         placementTimer={currentRoom.settings?.placement_timer || 30}
         onShowTips={() => setShowTips(true)}
+        isOwner={isActualOwner}
+        onShowSettings={() => setShowSettings(true)}
       />
 
       <PlayersList 
@@ -370,6 +399,18 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
         gridSize={currentRoom.settings?.grid_size || 5}
         letterTimer={currentRoom.settings?.letter_timer || 20}
         placementTimer={currentRoom.settings?.placement_timer || 30}
+      />
+      
+      <RoomSettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        onSave={handleSaveSettings}
+        currentSettings={{
+          max_players: currentRoom.settings?.max_players || 4,
+          grid_size: currentRoom.settings?.grid_size || 5,
+          letter_timer: currentRoom.settings?.letter_timer || 20,
+          placement_timer: currentRoom.settings?.placement_timer || 30
+        }}
       />
     </div>
   );

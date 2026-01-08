@@ -39,7 +39,6 @@ const PlayersList: React.FC<PlayersListProps> = ({
             <div key={`player-${member.userId || index}-${member.username}`} className="player-item">
               <div className="player-info">
                 <span className="player-name">{member.username}</span>
-                {isOwner && <span className="owner-badge">👑</span>}
                 {isCurrentUser && <span className="you-badge">Du</span>}
               </div>
               <div className="player-actions">
@@ -61,7 +60,7 @@ const PlayersList: React.FC<PlayersListProps> = ({
                     )}
                   </>
                 )}
-                {isOwner && <div className="player-status online">🟢</div>}
+                {isOwner && <span className="ready-status owner" title="Spelledare">👑</span>}
               </div>
             </div>
           );
