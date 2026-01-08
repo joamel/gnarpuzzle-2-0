@@ -166,15 +166,18 @@ export class WordValidationService {
    * Example: "LÅSTA" could be ["LÅS", "TA"] or ["LÅ", "STA"] or ["LÅSTA"]
    * Returns the partition with the highest total points.
    */
-  private findOptimalPartition(sequence: string): { words: string[]; totalPoints: number } {
+  private findOptimalPartition(sequence: string): { words: Array<{ word: string; startPos: number }>; totalPoints: number } {
     const n = sequence.length;
     
-    // dp[i] = { words: string[], totalPoints: number } for optimal partition of sequence[0..i-1]
-    const dp: Array<{ words: string[]; totalPoints: number }> = [];
+    // dp[i] = { words: Array<{word, startPos}>, totalPoints: number } for optimal partition of sequence[0..i-1]
+    const dp: Array<{ words: Array<{ word: string; startPos: number }>; totalPoints: number }> = [];
     dp[0] = { words: [], totalPoints: 0 };
+    
+    // Track the best partition found at any position
+    let bestOverall: { words: Array<{ word: string; startPos: number }>; totalPoints: number } = { words: [], totalPoints: 0 };
 
     for (let i = 1; i <= n; i++) {
-      let best: { words: string[]; totalPoints: number } = { words: [], totalPoints: 0 };
+      let best = dp[i - 1]; // Inherit from previous position
       
       // Try all possible last words ending at position i
       for (let j = 0; j < i; j++) {
@@ -189,7 +192,7 @@ export class WordValidationService {
             // Update best if this partition has more points
             if (newPoints > best.totalPoints) {
               best = {
-                words: [...prevPartition.words, word],
+                words: [...prevPartition.words, { word, startPos: j }],
                 totalPoints: newPoints
               };
             }
@@ -198,9 +201,15 @@ export class WordValidationService {
       }
       
       dp[i] = best;
+      
+      // Track best partition overall (not just at the end)
+      if (best.totalPoints > bestOverall.totalPoints) {
+        bestOverall = best;
+      }
     }
 
-    return dp[n];
+    // Return the best partition found anywhere, not just at the end
+    return bestOverall;
   }
 
   /**
@@ -228,19 +237,44 @@ export class WordValidationService {
       
       // If we found at least one valid word partition
       if (partition.words.length > 0) {
-        let currentPos = startPos;
-        
-        for (const word of partition.words) {
+        for (const wordInfo of partition.words) {
+          const { word, startPos: wordOffsetInSeq } = wordInfo;
+          
+          // Double-check that word is valid (safety check)
+          if (!this.isValidWord(word)) {
+            console.warn(`⚠️ Invalid word in partition: "${word}" - skipping`);
+            continue;
+          }
+          
+          // Calculate absolute position: startPos (of sequence) + wordOffsetInSeq (in sequence)
+          const absolutePos = startPos + wordOffsetInSeq;
+          
+          // Mark as complete only if:
+          // 1. The line is completely filled
+          // 2. This partition uses the ENTIRE line (all letters)
+          // 3. AND this is a single-word partition (the entire line is one word)
+          const allWords = partition.words.map(w => w.word).join('');
+          const isCompleteWord = isLineComplete && 
+            allWords === letters && 
+            partition.words.length === 1 &&
+            word === letters;
+          
+          // Calculate points: base points (word length) + bonus (+2 for complete row/column)
+          const basePoints = this.calculateWordPoints(word);
+          const totalPoints = basePoints + (isCompleteWord ? 2 : 0);
+          
+          // Calculate actual start position for this word
+          const wordStartX = direction === 'horizontal' ? absolutePos : row;
+          const wordStartY = direction === 'horizontal' ? row : absolutePos;
+            
           validWords.push({
             word,
-            points: this.calculateWordPoints(word),
-            startX: direction === 'horizontal' ? currentPos : startPos,
-            startY: direction === 'horizontal' ? row : currentPos,
+            points: totalPoints,
+            startX: wordStartX,
+            startY: wordStartY,
             direction,
-            // Mark as complete only if this partition uses the entire line
-            isComplete: isLineComplete && partition.words.join('') === letters
+            isComplete: isCompleteWord
           });
-          currentPos += word.length;
         }
       }
     };
@@ -303,22 +337,16 @@ export class WordValidationService {
     const completedRowsSet = new Set<number>();
     const completedColsSet = new Set<number>();
 
-    // Calculate points from valid words
+    // Calculate points from valid words (already includes +2 bonus for complete words)
     validWords.forEach(wordScore => {
       totalPoints += wordScore.points;
       
-      // Add bonus for complete rows/columns (only once per line)
+      // Track completed rows/columns for stats (bonus already included in wordScore.points)
       if (wordScore.isComplete) {
         if (wordScore.direction === 'horizontal') {
-          if (!completedRowsSet.has(wordScore.startY)) {
-            totalPoints += 2; // 2 point bonus for complete row
-            completedRowsSet.add(wordScore.startY);
-          }
+          completedRowsSet.add(wordScore.startY);
         } else {
-          if (!completedColsSet.has(wordScore.startX)) {
-            totalPoints += 2; // 2 point bonus for complete column
-            completedColsSet.add(wordScore.startX);
-          }
+          completedColsSet.add(wordScore.startX);
         }
       }
     });

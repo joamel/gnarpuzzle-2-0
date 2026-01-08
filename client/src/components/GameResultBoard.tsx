@@ -1,22 +1,64 @@
 import React, { useState, useEffect } from 'react';
 import { ValidWord, GridCell } from '../types/game';
+import Brick from './Brick';
 import '../styles/board.css';
 
 interface GameResultBoardProps {
   grid: Array<Array<{ letter: string | null }>> | GridCell[] | any;
   boardSize?: number;
   playerId?: number;
+  words?: ValidWord[]; // Validated words from server
 }
 
-const GameResultBoard: React.FC<GameResultBoardProps> = ({ grid, boardSize = 5 }) => {
+const GameResultBoard: React.FC<GameResultBoardProps> = ({ grid, boardSize = 5, words }) => {
   const [selectedWordIndex, setSelectedWordIndex] = useState<number | null>(null);
   const [extractedWords, setExtractedWords] = useState<ValidWord[]>([]);
+  const [shakingCells, setShakingCells] = useState<Set<string>>(new Set());
 
-  // Extract ValidWords from grid on mount
+  // Function to trigger wave animation on word letters
+  const animateWord = (wordIndex: number) => {
+    const word = extractedWords[wordIndex];
+    if (!word || !word.letters) return;
+    
+    setSelectedWordIndex(wordIndex);
+    
+    // Animate each letter with a delay for wave effect
+    word.letters.forEach((letter, i) => {
+      setTimeout(() => {
+        const key = `${letter.x}-${letter.y}`;
+        setShakingCells(prev => new Set(prev).add(key));
+        
+        // Remove shake class after animation completes
+        setTimeout(() => {
+          setShakingCells(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(key);
+            return newSet;
+          });
+        }, 1000); // Match animation duration
+      }, i * 150); // Stagger delay for wave effect
+    });
+  };
+
+  // Use words from server if provided, otherwise extract from grid
   useEffect(() => {
-    const validWords = extractWordsFromGrid(grid, boardSize);
-    setExtractedWords(validWords);
-  }, [grid, boardSize]);
+    if (words && words.length > 0) {
+      // Build letters array for each word from server
+      const wordsWithLetters = words.map(word => {
+        const letters: Array<{ letter: string; x: number; y: number }> = [];
+        for (let i = 0; i < word.word.length; i++) {
+          const x = word.direction === 'horizontal' ? word.startX + i : word.startX;
+          const y = word.direction === 'horizontal' ? word.startY : word.startY + i;
+          letters.push({ letter: word.word[i], x, y });
+        }
+        return { ...word, letters };
+      });
+      setExtractedWords(wordsWithLetters);
+    } else {
+      const validWords = extractWordsFromGrid(grid, boardSize);
+      setExtractedWords(validWords);
+    }
+  }, [grid, boardSize, words]);
 
   // Auto-reset selected word after 2 seconds
   useEffect(() => {
@@ -192,44 +234,40 @@ const GameResultBoard: React.FC<GameResultBoardProps> = ({ grid, boardSize = 5 }
         <>
           <div style={{ position: 'relative', display: 'inline-block', width: '100%', textAlign: 'center' }}>
             <div className="game-board" style={{ '--grid-size': boardSize } as React.CSSProperties}>
-              {Array.from({ length: boardSize }).map((_, y) => (
-                <div key={`row-${y}`} className="board-row">
-                  {Array.from({ length: boardSize }).map((_, x) => {
-                    const cell = getCell(x, y);
-                    const letter = cell?.letter;
-                    
-                    // Find which word(s) this cell belongs to
-                    const wordIndices = extractedWords
-                      .map((word, idx) => 
-                        word.letters.some(l => l.x === x && l.y === y) ? idx : -1
-                      )
-                      .filter(idx => idx !== -1);
-                    
-                    const isPartOfSelectedWord = selectedWordIndex !== null && 
-                      wordIndices.includes(selectedWordIndex);
-                    
-                    const handleCellClick = () => {
-                      if (wordIndices.length > 0) {
-                        setSelectedWordIndex(wordIndices[0]);
-                      }
-                    };
-                    
-                    return (
-                      <div
-                        key={`cell-${x}-${y}`}
-                        className={`grid-cell ${letter ? 'filled' : 'empty'} ${
-                          isPartOfSelectedWord ? `highlighted-word` : ''
-                        }`}
-                        onClick={handleCellClick}
-                        style={{ cursor: wordIndices.length > 0 ? 'pointer' : 'default' }}
-                        title={wordIndices.length > 0 ? `Ord: ${extractedWords[wordIndices[0]]?.word}` : ''}
-                      >
-                        <span className="cell-letter">{letter || ''}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
+              {Array.from({ length: boardSize }).map((_, y) => 
+                Array.from({ length: boardSize }).map((_, x) => {
+                  const cell = getCell(x, y);
+                  const letter = cell?.letter;
+                  const cellKey = `${x}-${y}`;
+                  
+                  // Find which word(s) this cell belongs to
+                  const wordIndices = extractedWords
+                    .map((word, idx) => 
+                      word.letters.some(l => l.x === x && l.y === y) ? idx : -1
+                    )
+                    .filter(idx => idx !== -1);
+                  
+                  const isShaking = shakingCells.has(cellKey);
+                  
+                  const handleCellClick = () => {
+                    if (wordIndices.length > 0) {
+                      animateWord(wordIndices[0]);
+                    }
+                  };
+                  
+                  return (
+                    <Brick
+                      key={cellKey}
+                      letter={letter || ''}
+                      variant="board"
+                      isSelected={false}
+                      onClick={handleCellClick}
+                      disabled={false}
+                      className={isShaking ? 'word-shake' : ''}
+                    />
+                  );
+                })
+              )}
             </div>
           </div>
 
@@ -240,7 +278,7 @@ const GameResultBoard: React.FC<GameResultBoardProps> = ({ grid, boardSize = 5 }
                 <div 
                   key={`word-${index}`} 
                   className={`word-legend-item ${selectedWordIndex === index ? 'selected' : ''}`}
-                  onClick={() => setSelectedWordIndex(index)}
+                  onClick={() => animateWord(index)}
                   style={{ cursor: 'pointer' }}
                 >
                   <span className="word-text">{word.word}</span>

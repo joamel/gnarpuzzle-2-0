@@ -109,6 +109,20 @@
   min-width: 50px;
 }
 
+/* Word shake animation - wave effect */
+@keyframes wordShake {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  10% { transform: translateY(-10px) rotate(-4deg); }
+  20% { transform: translateY(-8px) rotate(4deg); }
+  30% { transform: translateY(-5px) rotate(-3deg); }
+  40% { transform: translateY(-3px) rotate(3deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+}
+
+.brick.word-shake {
+  animation: wordShake 1s ease-in-out;
+}
+
 /* Mobile optimizations */
 @media (max-width: 480px) {
   .brick.brick-button {

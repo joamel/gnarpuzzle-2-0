@@ -10,26 +10,43 @@ const DebugResultsPage: React.FC = () => {
   const [boardSize, setBoardSize] = useState(4);
   const [showBoard, setShowBoard] = useState(true);
 
-  // Generate mock grid with all cells filled
+  // Generate mock grid with specific letters
   const generateMockGrid = (size: number): GridCell[][] => {
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-    let letterIdx = 0;
+    // Grid to test partitioning:
+    // R I B E  <- "BE" at x=2
+    // E S E D  <- Column 2: "BECK" with "ED" at y=2
+    // D Ä C K  <- "DÄCK" complete
+    // O R K I
+    const letters4x4 = [
+      ['R', 'I', 'B', 'E'],
+      ['E', 'S', 'E', 'D'],
+      ['D', 'Ä', 'C', 'K'],
+      ['O', 'R', 'K', 'I']
+    ];
 
-    return Array(size)
-      .fill(null)
-      .map((_, y) =>
-        Array(size)
-          .fill(null)
-          .map((_, x) => {
-            const letter = letters[letterIdx % letters.length];
-            letterIdx++;
-            return {
-              letter,
+    // For other sizes
+    if (size !== 4) {
+      return Array(size)
+        .fill(null)
+        .map((_, y) =>
+          Array(size)
+            .fill(null)
+            .map((_, x) => ({
+              letter: 'A',
               x,
               y
-            };
-          })
-      );
+            }))
+        );
+    }
+
+    // Return 4x4 grid
+    return letters4x4.map((row, y) =>
+      row.map((letter, x) => ({
+        letter,
+        x,
+        y
+      }))
+    );
   };
 
   // Calculate word score based on letter values
@@ -42,59 +59,49 @@ const DebugResultsPage: React.FC = () => {
     return word.split('').reduce((sum, letter) => sum + (letterValues[letter] || 0), 0);
   };
 
-  // Mock words with calculated points
+  // Mock words - testing partitioning with correct positions
   const mockWords: ValidWord[] = [
+    // Row 0: "RIBE" -> "BE" at position (2,0)
     {
-      word: 'HEJ',
-      points: calculateWordScore('HEJ'),
-      startX: 0,
+      word: 'BE',
+      points: 2,
+      startX: 2,
       startY: 0,
       direction: 'horizontal',
-      isComplete: true,
+      isComplete: false,
       letters: [
-        { x: 0, y: 0, letter: 'H' },
-        { x: 1, y: 0, letter: 'E' },
-        { x: 2, y: 0, letter: 'J' }
+        { x: 2, y: 0, letter: 'B' },
+        { x: 3, y: 0, letter: 'E' }
       ]
     },
+    // Row 2: "DÄCK" - complete row
     {
-      word: 'GNAR',
-      points: calculateWordScore('GNAR'),
-      startX: 0,
-      startY: 1,
-      direction: 'horizontal',
-      isComplete: true,
-      letters: [
-        { x: 0, y: 1, letter: 'G' },
-        { x: 1, y: 1, letter: 'N' },
-        { x: 2, y: 1, letter: 'A' },
-        { x: 3, y: 1, letter: 'R' }
-      ]
-    },
-    {
-      word: 'ORD',
-      points: calculateWordScore('ORD'),
+      word: 'DÄCK',
+      points: 6,
       startX: 0,
       startY: 2,
       direction: 'horizontal',
       isComplete: true,
       letters: [
-        { x: 0, y: 2, letter: 'O' },
-        { x: 1, y: 2, letter: 'R' },
-        { x: 2, y: 2, letter: 'D' }
+        { x: 0, y: 2, letter: 'D' },
+        { x: 1, y: 2, letter: 'Ä' },
+        { x: 2, y: 2, letter: 'C' },
+        { x: 3, y: 2, letter: 'K' }
       ]
     },
+    // Column 0: "REDO" - complete column
     {
-      word: 'VÄG',
-      points: calculateWordScore('VÄG'),
-      startX: 3,
+      word: 'REDO',
+      points: 6,
+      startX: 0,
       startY: 0,
       direction: 'vertical',
       isComplete: true,
       letters: [
-        { x: 3, y: 0, letter: 'V' },
-        { x: 3, y: 1, letter: 'Ä' },
-        { x: 3, y: 2, letter: 'G' }
+        { x: 0, y: 0, letter: 'R' },
+        { x: 0, y: 1, letter: 'E' },
+        { x: 0, y: 2, letter: 'D' },
+        { x: 0, y: 3, letter: 'O' }
       ]
     }
   ];
@@ -136,6 +143,7 @@ const DebugResultsPage: React.FC = () => {
         <GameResultBoard
           grid={showBoard ? mockGrid : emptyGrid}
           boardSize={boardSize}
+          words={showBoard ? mockWords : []}
         />
       </div>
 

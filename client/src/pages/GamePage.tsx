@@ -112,6 +112,7 @@ const GamePage: React.FC = () => {
               <GameResultBoard 
                 grid={selectedPlayer.grid || Array(boardSize).fill(null).map(() => Array(boardSize).fill({ letter: null }))}
                 boardSize={boardSize}
+                words={selectedPlayer.words}
               />
             </div>
           ) : currentPlayer && (
@@ -119,6 +120,7 @@ const GamePage: React.FC = () => {
               <GameResultBoard 
                 grid={currentPlayer.grid || Array(boardSize).fill(null).map(() => Array(boardSize).fill({ letter: null }))}
                 boardSize={boardSize}
+                words={currentPlayer.words}
               />
             </div>
           )}
