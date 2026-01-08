@@ -297,48 +297,50 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
 
   return (
     <div className="room-lobby">
-      <div className="lobby-header">
-        <h2>{currentRoom.name}</h2>
-        {(currentRoom.settings as any)?.require_password && (
-          <div className="room-code-section">
-            <div className="room-code">
-              <span>Kod: <strong>{currentRoom.code}</strong></span>
+      <div className="lobby-content-scrollable">
+        <div className="lobby-header">
+          <h2>{currentRoom.name}</h2>
+          {(currentRoom.settings as any)?.require_password && (
+            <div className="room-code-section">
+              <div className="room-code">
+                <span>Kod: <strong>{currentRoom.code}</strong></span>
+              </div>
+              <button
+                onClick={() => navigator.clipboard.writeText(currentRoom.code)}
+                className="copy-code-button"
+                title="Kopiera rumkod"
+              >
+                📋
+              </button>
             </div>
-            <button
-              onClick={() => navigator.clipboard.writeText(currentRoom.code)}
-              className="copy-code-button"
-              title="Kopiera rumkod"
-            >
-              📋
-            </button>
+          )}
+        </div>
+
+        <RoomSettings 
+          gridSize={currentRoom.settings?.grid_size || 5}
+          maxPlayers={currentRoom.settings?.max_players || 6}
+          letterTimer={currentRoom.settings?.letter_timer || 20}
+          placementTimer={currentRoom.settings?.placement_timer || 30}
+          onShowTips={() => setShowTips(true)}
+          isOwner={isActualOwner && !isStandardRoom}
+          onShowSettings={() => setShowSettings(true)}
+        />
+
+        <PlayersList 
+          playerList={playerList}
+          readyPlayers={readyPlayers}
+          authUserId={authUser?.id}
+          isReady={isReady}
+          maxPlayers={currentRoom.settings?.max_players || 6}
+          onReadyChange={handleReadyChange}
+        />
+
+        {error && (
+          <div className="error-message">
+            {error}
           </div>
         )}
       </div>
-
-      <RoomSettings 
-        gridSize={currentRoom.settings?.grid_size || 5}
-        maxPlayers={currentRoom.settings?.max_players || 6}
-        letterTimer={currentRoom.settings?.letter_timer || 20}
-        placementTimer={currentRoom.settings?.placement_timer || 30}
-        onShowTips={() => setShowTips(true)}
-        isOwner={isActualOwner && !isStandardRoom}
-        onShowSettings={() => setShowSettings(true)}
-      />
-
-      <PlayersList 
-        playerList={playerList}
-        readyPlayers={readyPlayers}
-        authUserId={authUser?.id}
-        isReady={isReady}
-        maxPlayers={currentRoom.settings?.max_players || 6}
-        onReadyChange={handleReadyChange}
-      />
-
-      {error && (
-        <div className="error-message">
-          {error}
-        </div>
-      )}
 
       <div className="lobby-actions">
         {isActualOwner && (

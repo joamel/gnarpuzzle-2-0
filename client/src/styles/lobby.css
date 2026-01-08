@@ -6,9 +6,17 @@
   padding: 8px;
   background: transparent;
   height: calc(100vh - 50px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.lobby-content-scrollable {
+  flex: 1;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  gap: 8px;
 }
 
 .lobby-header {
