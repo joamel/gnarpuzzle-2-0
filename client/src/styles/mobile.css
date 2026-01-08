@@ -322,6 +322,10 @@ body {
   letter-spacing: 0.3px;
 }
 
+.rooms-list-title {
+  font-size: 1.125rem;
+}
+
 .card-subtitle {
   margin: 0;
   font-size: 0.875rem;
