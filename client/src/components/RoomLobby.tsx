@@ -39,6 +39,11 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   const isOwnerByRole = playerList.some(p => p.userId === String(authUser?.id) && p.role === 'owner');
   const isActualOwner = isOwner || isOwnerByRole;
   
+  // Check if this is a standard room (standard public rooms have specific names)
+  // Standard rooms should not allow settings changes
+  const standardRoomNames = ['Snabbspel 4×4', 'Klassiskt 5×5', 'Utmaning 6×6'];
+  const isStandardRoom = currentRoom && standardRoomNames.includes(currentRoom.name);
+  
   const hasEnoughPlayers = playerList.length >= 2;
   
   // Check if all non-owner players are ready - using readyPlayers state
@@ -48,8 +53,9 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   const allPlayersReady = nonOwnerPlayers.length === 0 || 
     (nonOwnerPlayers.every(p => readyPlayers.has(p.userId)));
   
+  // Can start game if we have enough players and all are ready
   const canActuallyStartGame = hasEnoughPlayers && allPlayersReady;
-
+  
   // Handle ready status change
   const handleReadyChange = (newReadyStatus: boolean) => {
     setIsReady(newReadyStatus);
@@ -94,20 +100,10 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
       socketService.on('room:joined', handleRoomJoined);
       socketService.on('player:ready_changed', handlePlayerReadyChanged);
       
-      // Listen for settings updates
-      const handleSettingsUpdated = (data: { roomCode: string; settings: any }) => {
-        if (data.roomCode === currentRoom.code) {
-          // Refresh the page to show new settings
-          window.location.reload();
-        }
-      };
-      socketService.on('room:settings_updated', handleSettingsUpdated);
-      
       return () => {
         socketService.leaveRoom(currentRoom.code);
         socketService.off('room:joined', handleRoomJoined);
         socketService.off('player:ready_changed', handlePlayerReadyChanged);
-        socketService.off('room:settings_updated', handleSettingsUpdated);
       };
     }
   }, [currentRoom?.code]);
@@ -249,8 +245,8 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
     
     try {
       await apiService.updateRoomSettings(currentRoom.id, settings);
-      // Refresh room data to show updated settings
-      window.location.reload();
+      // Close modal and let socket event handle room update
+      setShowSettings(false);
     } catch (err) {
       console.error('Failed to save settings:', err);
       throw err;
@@ -325,7 +321,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
         letterTimer={currentRoom.settings?.letter_timer || 20}
         placementTimer={currentRoom.settings?.placement_timer || 30}
         onShowTips={() => setShowTips(true)}
-        isOwner={isActualOwner}
+        isOwner={isActualOwner && !isStandardRoom}
         onShowSettings={() => setShowSettings(true)}
       />
 
