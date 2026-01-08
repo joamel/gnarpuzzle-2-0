@@ -818,6 +818,9 @@ router.post('/:id/start', AuthService.authenticateToken, async (req, res) => {
     // Update room status to playing
     await RoomModel.updateStatus(roomId, 'playing');
 
+    // Join all room members to the game socket room for real-time updates
+    socketService.joinPlayersToGame(room.code, game.id);
+
     // Notify all room members that the game has started
     socketService.broadcastToRoom(`room:${room.code}`, 'game:started', {
       gameId: game.id,

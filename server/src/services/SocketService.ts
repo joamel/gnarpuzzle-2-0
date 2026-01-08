@@ -835,6 +835,44 @@ export class SocketService {
     }
   }
 
+  public joinPlayersToGame(roomCode: string, gameId: number): void {
+    logger.info(`🎮 Joining all players in room ${roomCode} to game:${gameId}`, {
+      service: 'gnarpuzzle-server'
+    });
+
+    // Find all sockets in the room and join them to the game
+    const roomName = `room:${roomCode}`;
+    const room = this.io.sockets.adapter.rooms.get(roomName);
+    
+    if (!room) {
+      logger.warn(`⚠️ Room ${roomName} not found in socket adapter`, {
+        service: 'gnarpuzzle-server'
+      });
+      return;
+    }
+
+    let joinedCount = 0;
+    for (const socketId of room) {
+      const socket = this.io.sockets.sockets.get(socketId);
+      if (socket) {
+        socket.join(`game:${gameId}`);
+        joinedCount++;
+        const userData = this.connectedUsers.get(socketId);
+        logger.info(`✅ Joined ${userData?.username || 'unknown'} to game:${gameId}`, {
+          service: 'gnarpuzzle-server',
+          socketId,
+          gameId
+        });
+      }
+    }
+
+    logger.info(`🎮 Joined ${joinedCount} players to game:${gameId}`, {
+      service: 'gnarpuzzle-server',
+      gameId,
+      roomCode
+    });
+  }
+
   public getRoomMemberCount(roomCode: string): number {
     const room = this.io.sockets.adapter.rooms.get(`room:${roomCode}`);
     return room ? room.size : 0;
