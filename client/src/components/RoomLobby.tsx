@@ -68,25 +68,6 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
     }
   };
 
-  // Initialize readyPlayers from currentRoom.players if available
-  useEffect(() => {
-    if (currentRoom?.code) {
-      // Fetch fresh room data to get player ready status
-      apiService.getRoomByCode(currentRoom.code).then(data => {
-        if (data?.room?.players) {
-          const ready = new Set<string>();
-          data.room.players.forEach((player: any) => {
-            if (player.ready) {
-              ready.add(String(player.userId));
-            }
-          });
-          setReadyPlayers(ready);
-          console.log('✨ Initialized readyPlayers from API:', ready);
-        }
-      });
-    }
-  }, [currentRoom?.code]); // Only run when room changes
-
   // Join the Socket.IO room when entering the lobby
   useEffect(() => {
     if (currentRoom?.code) {
@@ -251,25 +232,6 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
       socketService.off('room:member_left', handleMemberLeft);
     };
   }, [currentRoom?.code]);
-
-  // Re-sync ready status when player list changes (new player joined)
-  useEffect(() => {
-    if (currentRoom?.code && playerList.length > 0) {
-      // Fetch fresh ready status whenever player list changes
-      apiService.getRoomByCode(currentRoom.code).then(data => {
-        if (data?.room?.players) {
-          const ready = new Set<string>();
-          data.room.players.forEach((player: any) => {
-            if (player.ready) {
-              ready.add(String(player.userId));
-            }
-          });
-          setReadyPlayers(ready);
-          console.log('🔄 Re-synced readyPlayers after player list change:', ready);
-        }
-      });
-    }
-  }, [playerList.length, currentRoom?.code]);
 
   const handleStartGame = async () => {
     if (!currentRoom || !canActuallyStartGame) {
