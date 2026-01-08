@@ -1,14 +1,16 @@
 /* Unified Board Styles - Grid containers only. Cell styling is in brick.css */
 
 .board {
-  display: inline-grid;
-  grid-template-columns: repeat(var(--grid-size, 5), minmax(35px, 1fr));
+  display: grid;
+  grid-template-columns: repeat(var(--grid-size, 5), minmax(50px, 1fr));
   gap: 8px;
   padding: 16px;
   background: transparent;
   border-radius: 8px;
   max-width: 90vw;
   max-height: 90vh;
+  width: fit-content;
+  margin: 0 auto;
 }
 
 /* Game board during gameplay */
@@ -16,7 +18,7 @@
   display: grid;
   grid-template-columns: repeat(var(--grid-size, 5), 1fr);
   gap: 4px;
-  width: 100%;
+  width: fit-content;
   max-width: 270px;
   margin: 0 auto;
   padding: 12px;
@@ -151,11 +153,20 @@
 
 /* Mobile optimizations */
 @media (max-width: 480px) {
-  .board,
-  .game-board {
+  .board {
+    grid-template-columns: repeat(var(--grid-size, 5), 50px);
+    gap: 4px !important;
     padding: 12px;
-    gap: 4px;
-    place-items: center;
-    max-width: 220px;
+    width: fit-content;
+    margin: 0 auto;
+    max-width: 100%;
+  }
+
+  .game-board {
+    gap: 4px !important;
+    padding: 12px;
+    width: fit-content;
+    margin: 0 auto;
+    max-width: 100%;
   }
 }

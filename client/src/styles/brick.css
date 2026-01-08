@@ -97,8 +97,8 @@
 .brick.brick-button {
   aspect-ratio: 1;
   font-size: 18px;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   flex-shrink: 0;
 }
 
@@ -106,19 +106,20 @@
 .brick.brick-board {
   aspect-ratio: 1;
   font-size: 40px;
-  min-width: 35px;
+  min-width: 50px;
 }
 
 /* Mobile optimizations */
 @media (max-width: 480px) {
   .brick.brick-button {
     font-size: 14px;
-    width: 26px;
-    height: 26px;
+    width: 32px;
+    height: 32px;
   }
 
   .brick.brick-board {
     font-size: 28px;
-    min-width: 30px;
+    min-width: 50px;
+    margin: 0 !important;
   }
 }
