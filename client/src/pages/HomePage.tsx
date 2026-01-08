@@ -177,7 +177,7 @@ const HomePage: React.FC = () => {
           {/* Available Rooms */}
           <div className="card">
             <div className="rooms-header">
-              <h2 className="card-title">Tillgängliga rum ({availableRooms.length})</h2>
+              <h2 className="card-title rooms-list-title">Tillgängliga rum ({availableRooms.length})</h2>
               {user && (
                 <div className="user-info">
                   Inloggad som: <strong>{user.username}</strong>
@@ -222,10 +222,13 @@ const HomePage: React.FC = () => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <h3 className="font-semibold text-white truncate">{room.name}</h3>
+                            {(room.settings as any)?.require_password && <span style={{fontSize: '14px'}}>🔒</span>}
                           </div>
                           <div className="flex items-center gap-4 text-xs text-gray-400">
                             <span>👥 {room.member_count || 0}/{room.max_players || 6}</span>
                             <span>📏 {room.board_size || 5}×{room.board_size || 5}</span>
+                            <span>🔤 {(room.settings as any)?.letter_timer || 20}s</span>
+                            <span>✋ {(room.settings as any)?.placement_timer || 30}s</span>
                           </div>
                         </div>
                         <div className="text-xs font-semibold text-gray-500">
