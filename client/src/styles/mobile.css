@@ -307,7 +307,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10rem;
+  gap: 12px;
   margin-bottom: 1rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid rgba(102, 126, 234, 0.2);

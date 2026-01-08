@@ -9,7 +9,7 @@ import Logo from '@/assets/Logo';
 import '../styles/home.css';
 
 const HomePage: React.FC = () => {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const { joinRoom, currentRoom, leaveRoom } = useGame();
   const navigate = useNavigate();
   const shouldNavigate = useRef(false);
@@ -154,7 +154,7 @@ const HomePage: React.FC = () => {
               await logout();
               window.location.reload();
             }}
-            className="header-btn"
+            className="logout-button"
             aria-label="Logga ut"
           >
             Logga ut
@@ -176,8 +176,13 @@ const HomePage: React.FC = () => {
 
           {/* Available Rooms */}
           <div className="card">
-            <div className="card-header">
+            <div className="rooms-header">
               <h2 className="card-title">Tillgängliga rum ({availableRooms.length})</h2>
+              {user && (
+                <div className="user-info">
+                  Inloggad som: <strong>{user.username}</strong>
+                </div>
+              )}
             </div>
             <div className="card-content">
               {availableRooms.length === 0 ? (
@@ -283,54 +288,56 @@ const HomePage: React.FC = () => {
               
               <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px'}}>
                 <div className="form-group">
-                  <label className="form-label">Max spelare</label>
-                  <select 
-                    value={maxPlayers} 
+                  <label className="form-label">Max spelare: {maxPlayers}</label>
+                  <input
+                    type="range"
+                    value={maxPlayers}
                     onChange={(e) => setMaxPlayers(Number(e.target.value))}
-                    className="form-input"
-                  >
-                    <option value={2}>2 spelare</option>
-                    <option value={3}>3 spelare</option>
-                    <option value={4}>4 spelare</option>
-                  </select>
+                    min={2}
+                    max={6}
+                    step={1}
+                    style={{width: '100%', cursor: 'pointer'}}
+                  />
                 </div>
                 
                 <div className="form-group">
-                  <label className="form-label">Rutstorlek</label>
-                  <select 
-                    value={boardSize} 
+                  <label className="form-label">Brädstorlek: {boardSize}×{boardSize}</label>
+                  <input
+                    type="range"
+                    value={boardSize}
                     onChange={(e) => setBoardSize(Number(e.target.value))}
-                    className="form-input"
-                  >
-                    <option value={4}>4×4</option>
-                    <option value={5}>5×5</option>
-                    <option value={6}>6×6</option>
-                  </select>
+                    min={4}
+                    max={6}
+                    step={1}
+                    style={{width: '100%', cursor: 'pointer'}}
+                  />
                 </div>
               </div>
 
               <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px'}}>
                 <div className="form-group">
-                  <label className="form-label">Bokstavstid (sek)</label>
+                  <label className="form-label">Tid för val: {letterTimer}s</label>
                   <input
-                    type="number"
+                    type="range"
                     value={letterTimer}
-                    onChange={(e) => setLetterTimer(Math.max(5, Math.min(60, Number(e.target.value))))}
-                    className="form-input"
+                    onChange={(e) => setLetterTimer(Number(e.target.value))}
                     min={5}
                     max={60}
+                    step={1}
+                    style={{width: '100%', cursor: 'pointer'}}
                   />
                 </div>
                 
                 <div className="form-group">
-                  <label className="form-label">Placeringstid (sek)</label>
+                  <label className="form-label">Tid för placering: {placementTimer}s</label>
                   <input
-                    type="number"
+                    type="range"
                     value={placementTimer}
-                    onChange={(e) => setPlacementTimer(Math.max(10, Math.min(60, Number(e.target.value))))}
-                    className="form-input"
+                    onChange={(e) => setPlacementTimer(Number(e.target.value))}
                     min={10}
                     max={60}
+                    step={1}
+                    style={{width: '100%', cursor: 'pointer'}}
                   />
                 </div>
               </div>

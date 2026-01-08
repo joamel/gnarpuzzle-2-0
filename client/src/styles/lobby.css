@@ -308,14 +308,9 @@
   text-transform: uppercase;
 }
 
-.player-status.online {
-  background: #667eea;
-  color: white; /* Blue theme */
-}
-
 .player-status.waiting {
   background: #667eea;
-  color: white; /* Blue theme - same as online */
+  color: white; /* Blue theme */
 }
 
 /* Lobby Actions */

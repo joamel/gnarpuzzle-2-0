@@ -7,6 +7,28 @@
   overflow: hidden;
 }
 
+/* Rooms header with user info */
+.rooms-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #dce6ff;
+}
+
+.user-info {
+  font-size: 13px;
+  color: #667eea;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.user-info strong {
+  font-size: 15px;
+}
+
 /* Unified header style - same as game-header */
 .home-page header {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -388,10 +410,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   margin-bottom: 20px;
   padding: 16px;
   margin: -24px -24px 20px -24px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  flex-wrap: nowrap;
   border-radius: 16px 16px 0 0;
 }
 
@@ -400,6 +424,7 @@
   font-size: 20px;
   font-weight: 600;
   color: white;
+  white-space: nowrap;
 }
 
 .create-room-modal-header .close-button {
@@ -418,8 +443,7 @@
   justify-content: center;
   font-weight: bold;
   line-height: 1;
-  filter: none;
-  text-shadow: none;
+  flex-shrink: 0;
 }
 
 .create-room-modal-header .close-button:hover {
@@ -520,10 +544,12 @@
 .create-room-modal-actions .btn-secondary {
   background: white;
   color: #667eea;
-  border: 2px solid #e6edff;
+  border: none;
+  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.1);
 }
 
 .create-room-modal-actions .btn-secondary:hover:not(:disabled) {
   background: #f8f9ff;
-  border-color: #667eea;
+  border-color: #764ba2;
+  color: #764ba2;
 }

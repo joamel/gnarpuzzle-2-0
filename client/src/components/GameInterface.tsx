@@ -111,6 +111,7 @@ const GameInterface: React.FC = () => {
   const [temporaryPlacement, setTemporaryPlacement] = useState<{ x: number; y: number; letter: string } | null>(null);
   const [placingLetter, setPlacingLetter] = useState<boolean>(false);
   const [submitInProgress, setSubmitInProgress] = useState<boolean>(false);
+  const [pendingLetter, setPendingLetter] = useState<string | null>(null);
 
   const swedishLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'Å', 'Ä', 'Ö'];
 
@@ -175,25 +176,22 @@ const GameInterface: React.FC = () => {
   // If the player doesn't place their letter in time, the server handles 
   // auto-placement via handlePlacementTimeout -> autoPlaceLetter
 
-  const handleLetterSelect = async (letter: string) => {
-    // Check if it's the player's turn
+  const handleLetterSelect = (letter: string) => {
+    // Local confirm step: choose letter, then confirm explicitly
     if (!isMyTurn || gamePhase !== 'letter_selection') {
-      console.log('❌ Cannot select letter - not your turn or wrong phase:', {
-        isMyTurn,
-        gamePhase,
-        expectedPhase: 'letter_selection'
-      });
+      console.log('❌ Cannot select letter - not your turn or wrong phase:', { isMyTurn, gamePhase });
       return;
     }
+    setPendingLetter(letter);
+  };
 
+  const handleConfirmLetter = async () => {
+    if (!pendingLetter) return;
     try {
-      await selectLetter(letter);
-      console.log(`✅ Letter selected: ${letter}`);
-      
-      // Don't set initial placement here - let user click to place
-      // A fallback random placement will be created if timeout is imminent
+      await selectLetter(pendingLetter);
+      setPendingLetter(null);
     } catch (err) {
-      console.error('Failed to select letter:', err);
+      console.error('Failed to confirm letter:', err);
     }
   };
 
@@ -272,12 +270,23 @@ const GameInterface: React.FC = () => {
       </div>
 
       {gamePhase === 'letter_selection' && isMyTurn && (
-        <LetterSelector
-          availableLetters={swedishLetters}
-          selectedLetter={selectedLetter || undefined}
-          onLetterSelect={handleLetterSelect}
-          disabled={!isMyTurn}
-        />
+        <div className="letter-selection-section">
+          <LetterSelector
+            availableLetters={swedishLetters}
+            selectedLetter={pendingLetter || selectedLetter || undefined}
+            onLetterSelect={handleLetterSelect}
+            disabled={!isMyTurn}
+          />
+          <div className="letter-confirm-under">
+            <button 
+              onClick={handleConfirmLetter}
+              className="confirm-button primary-button"
+              disabled={!pendingLetter || placingLetter}
+            >
+              Bekräfta bokstav
+            </button>
+          </div>
+        </div>
       )}
 
       {gamePhase === 'letter_placement' && selectedLetter && (
@@ -291,12 +300,6 @@ const GameInterface: React.FC = () => {
                   disabled={placingLetter}
                 >
                   {placingLetter ? 'Placerar...' : 'Bekräfta placering'}
-                </button>
-                <button 
-                  onClick={() => setTemporaryPlacement(null)}
-                  className="cancel-button secondary-button"
-                >
-                  Ångra
                 </button>
               </div>
             </div>
