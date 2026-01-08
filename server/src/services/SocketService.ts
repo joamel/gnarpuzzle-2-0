@@ -258,7 +258,14 @@ export class SocketService {
           }))
         },
         memberCount: members.length,
-        roomCode
+        roomCode,
+        readyPlayers: Array.from(this.roomPlayerReadyStatus.get(roomCode) || []).map(String)
+      });
+      
+      console.log('📢 Broadcasting room:member_joined to other players:', {
+        newJoiner: userData.username,
+        roomCode,
+        readyPlayers: Array.from(this.roomPlayerReadyStatus.get(roomCode) || []).map(String)
       });
 
       // Send room data to joining user
@@ -275,6 +282,12 @@ export class SocketService {
             role: m.id === room.created_by ? 'owner' : 'member'
           }))
         },
+        readyPlayers: Array.from(this.roomPlayerReadyStatus.get(roomCode) || []).map(String)
+      });
+      
+      console.log('✅ Emitting room:joined event with readyPlayers:', {
+        roomCode,
+        userId: userData.userId,
         readyPlayers: Array.from(this.roomPlayerReadyStatus.get(roomCode) || []).map(String)
       });
 
@@ -364,6 +377,14 @@ export class SocketService {
       } else {
         readySet.delete(userData.userId);
       }
+      
+      console.log('🔵 Player ready status updated:', {
+        roomCode,
+        userId: userData.userId,
+        username: userData.username,
+        isReady,
+        totalReady: Array.from(readySet)
+      });
 
       // Broadcast ready status to all players in the room (including sender)
       this.io.to(`room:${roomCode}`).emit('player:ready_changed', {

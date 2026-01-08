@@ -202,6 +202,16 @@ router.get('/:code', AuthService.optionalAuth, async (req, res) => {
 
     const members = await RoomModel.getRoomMembers(room.id);
 
+    // Get ready status for each member
+    const socketService = getSocketService();
+    const readyStatusMap = socketService ? (socketService as any).roomPlayerReadyStatus?.get(code) : null;
+
+    const playersWithReady = members.map(member => ({
+      userId: member.id,
+      username: member.username,
+      ready: readyStatusMap ? readyStatusMap.has(member.id) : false
+    }));
+
     res.status(200).json({
       success: true,
       room: {
@@ -219,6 +229,7 @@ router.get('/:code', AuthService.optionalAuth, async (req, res) => {
           id: member.id,
           username: member.username
         })),
+        players: playersWithReady, // Include players with ready status
         created_at: room.created_at
       }
     });
@@ -521,6 +532,29 @@ router.delete('/:code/leave', AuthService.authenticateToken, async (req, res) =>
         message: 'You are not a member of this room'
       });
       return;
+    }
+
+    // Remove ready status from Socket service and notify others
+    const socketService = getSocketService();
+    if (socketService) {
+      (socketService as any).roomPlayerReadyStatus?.get(code)?.delete(String(userId));
+      
+      // Notify others that player left
+      (socketService as any).io?.to(`room:${code}`)?.emit('room:member_left', {
+        user: {
+          id: userId,
+          username: authReq.user!.username
+        },
+        roomCode: code
+      });
+      
+      // Also emit ready changed to false
+      (socketService as any).io?.to(`room:${code}`)?.emit('player:ready_changed', {
+        userId: String(userId),
+        username: authReq.user!.username,
+        isReady: false,
+        roomCode: code
+      });
     }
 
     // If the creator left, transfer ownership to next member
