@@ -44,19 +44,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   const nonReadyPlayersCount = nonOwnerPlayers.filter(p => !readyPlayers.has(p.userId)).length;
   const totalPlayersCount = playerList.length;
   const allPlayersReady = nonOwnerPlayers.length === 0 || 
-    (nonOwnerPlayers.every(p => {
-      const isReady = readyPlayers.has(p.userId);
-      console.log('🔍 Player ready check:', { userId: p.userId, username: p.username, isReady, readyPlayers: Array.from(readyPlayers) });
-      return isReady;
-    }));
-  
-  console.log('🎯 Start game check:', { 
-    hasEnoughPlayers, 
-    allPlayersReady, 
-    canActuallyStartGame: hasEnoughPlayers && allPlayersReady,
-    nonOwnerCount: nonOwnerPlayers.length,
-    readyPlayersCount: readyPlayers.size
-  });
+    (nonOwnerPlayers.every(p => readyPlayers.has(p.userId)));
   
   const canActuallyStartGame = hasEnoughPlayers && allPlayersReady;
 
@@ -71,17 +59,13 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   // Join the Socket.IO room when entering the lobby
   useEffect(() => {
     if (currentRoom?.code) {
-      console.log('🟢 RoomLobby: currentRoom changed, code:', currentRoom.code);
-      console.log('🟢 RoomLobby: socketService.isConnected():', socketService.isConnected());
       socketService.joinRoom(currentRoom.code);
       
       // Listen for when WE join the room - get ready status from server
       const handleRoomJoined = (data: any) => {
-        console.log('🟦 room:joined event received:', data);
         if (data.readyPlayers && Array.isArray(data.readyPlayers)) {
           const ready = new Set<string>(data.readyPlayers.map(String));
           setReadyPlayers(ready);
-          console.log('🔄 Synced readyPlayers from room:joined event:', ready);
         }
       };
       
@@ -180,13 +164,10 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
     if (!currentRoom?.code) return;
 
     const handleMemberJoined = (data: any) => {
-      console.log('🟦 room:member_joined event:', data);
-      
       // If readyPlayers was sent in the event, use it directly
       if (data.readyPlayers && Array.isArray(data.readyPlayers)) {
         const ready = new Set<string>(data.readyPlayers.map(String));
         setReadyPlayers(ready);
-        console.log('🔄 Synced readyPlayers from socket event:', ready);
       }
       
        // Update playerList directly from socket event (instant)
@@ -197,17 +178,14 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
            role: member.role,
            joinedAt: new Date().toISOString()
          }));
-         console.log('🟩 Setting playerList from socket event:', mappedMembers);
          setPlayerList(mappedMembers);
        }
     };
 
-    const handleMemberLeft = (data: any) => {
-      console.log('🟥 room:member_left event:', data);
+    const handleMemberLeft = () => {
       // Refresh room data when someone leaves
       if (currentRoom.code) {
         apiService.getRoomByCode(currentRoom.code).then(freshData => {
-          console.log('🟧 Fresh room data after member left:', freshData?.room?.members);
           if (freshData?.room?.members) {
             const mappedMembers = freshData.room.members.map((member: any) => ({
               userId: String(member.id),
@@ -215,7 +193,6 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
               role: String(member.id) === String(freshData.room.createdBy) ? 'owner' : 'member',
               joinedAt: new Date().toISOString()
             }));
-            console.log('🟨 Setting playerList after leave:', mappedMembers);
             setPlayerList(mappedMembers);
           }
         }).catch(err => {

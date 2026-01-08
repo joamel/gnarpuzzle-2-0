@@ -118,7 +118,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       
       // Set selected letter when entering placement phase (robustness for missed letter:selected events)
       if (data.phase === 'letter_placement' && data.current_letter) {
-        console.log('📝 Setting letter from phase change:', data.current_letter);
+
         setSelectedLetter(data.current_letter);
       }
       
@@ -160,8 +160,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     const handleLetterSelected = (data: any) => {
       // All players should get the selected letter to place on their own grids
       setSelectedLetter(data.letter);
-      console.log('📝 Letter selected for ALL players:', data.letter);
-      
+
       // Update player state
       setPlayers(prev => prev.map(p => 
         p.userId === data.playerId 
@@ -256,28 +255,23 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
           isWarning: false,
         });
       }
-      
-      console.log('🎮 Game started, fetching current game state...');
-      
+
       // Fetch current game state to get accurate phase and player data
       if (data.gameId) {
-        console.log('🔄 Fetching game data for gameId:', data.gameId);
-        
+
         apiService.getGame(data.gameId).then(gameData => {
-          console.log('🎮 Fetched current game data:', gameData);
-          
+
           if (gameData && gameData.game) {
             const game = gameData.game;
-            console.log('🔍 API game object:', game);
-            console.log('🔍 API game.current_phase:', game.current_phase);
+
+
             console.log('🔍 API game keys:', Object.keys(game));
-            console.log('✅ Setting game phase to:', game.current_phase);
-            
+
             // Only update gamePhase if API has valid phase, otherwise keep socket phase
             if (game.current_phase) {
               setGamePhase(game.current_phase as GamePhase);
             } else {
-              console.log('⚠️ API has no current_phase, keeping socket phase:', data.phase);
+
             }
             
             setCurrentGame({
@@ -287,18 +281,11 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
               currentTurn: game.current_turn,
               status: 'active'
             });
-            
-            console.log('🎯 Setting currentGame with turn data:', {
-              gameId: game.id,
-              currentTurn: game.current_turn,
-              currentTurnType: typeof game.current_turn
-            });
-            
+
             // Set players from game data
             if (game.players) {
               try {
-                console.log('🔄 Processing players from game data:', game.players.length);
-                
+
                 const mappedPlayers = game.players.map((p: any, index: number) => {
                   console.log(`🎯 Processing player ${index + 1}:`, {
                     id: p.id,
@@ -348,8 +335,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
                     connected: true
                   };
                 });
-                
-                console.log('✅ Successfully mapped players:', mappedPlayers.length);
+
                 setPlayers(mappedPlayers);
                 
                 console.log('👥 Setting players with position data:', 
@@ -365,14 +351,13 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
                 if (user) {
                   const currentPlayer = mappedPlayers.find((p: any) => p.userId === user.id);
                   if (currentPlayer?.currentLetter) {
-                    console.log('Setting selectedLetter from game state:', currentPlayer.currentLetter);
+
                     setSelectedLetter(currentPlayer.currentLetter);
                   }
                 }
               } catch (mappingError) {
                 console.error('❌ Error during player mapping:', mappingError);
-                console.log('🔄 Trying fallback - setting mock player data');
-                
+
                 // Fallback: Set basic game phase from socket data
                 if (data.phase) {
                   setGamePhase(data.phase as GamePhase);
@@ -389,11 +374,10 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
           }
         }).catch(err => {
           console.error('❌ Failed to fetch game state:', err);
-          console.log('🔄 Trying fallback - setting basic game phase');
-          
+
           // Fallback: Set basic game phase from socket data
           if (data.phase) {
-            console.log('📡 Setting game phase from socket data:', data.phase);
+
             setGamePhase(data.phase as GamePhase);
             setCurrentGame({
               id: data.gameId,
@@ -430,8 +414,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     };
 
     const handleRoomMemberLeft = (data: any) => {
-      console.log(`🚪 Member left room: ${data.user.username}`);
-      
+
       // Force refresh room data to get updated member list
       if (currentRoom && currentRoom.code === data.roomCode) {
         fetchRoomData(data.roomCode).catch(err => {
@@ -441,8 +424,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     };
 
     const handleGamePlayerLeft = (data: any) => {
-      console.log(`🚪 Player left game: userId ${data.leftUserId}, remaining: ${data.remainingPlayers}`);
-      
+
       // Update current turn if it changed
       if (currentGame && data.newCurrentTurn) {
         setCurrentGame(prev => prev ? {
@@ -460,8 +442,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     };
 
     const handleOwnershipTransferred = (data: any) => {
-      console.log(`👑 Room ownership transferred to: ${data.newCreator.username}`);
-      
+
       // Update current room data
       if (currentRoom && currentRoom.code === data.roomCode) {
         setCurrentRoom(prev => prev ? { 
@@ -472,8 +453,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     };
 
     const handleRoomUpdated = (data: any) => {
-      console.log(`🔄 Room updated:`, data.room);
-      
+
       // Update current room data
       if (currentRoom && currentRoom.code === data.room.code) {
         setCurrentRoom(data.room);
@@ -481,8 +461,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     };
 
     const handleTurnSkipped = (data: any) => {
-      console.log(`⏭️ Turn skipped: player ${data.skippedPlayerId} timed out, now player ${data.nextPlayerId}'s turn`);
-      
+
       // Update game state with new current turn
       setCurrentGame(prev => {
         if (!prev) return null;
@@ -567,17 +546,16 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
 
   // Game actions
   const startGame = useCallback(async (roomId: number) => {
-    console.log('🎮 GameContext.startGame called with roomId:', roomId);
-    console.log('🎮 Type of roomId:', typeof roomId);
-    console.log('🎮 Current room from state:', currentRoom);
-    console.log('🎮 Current room ID from state:', currentRoom?.id);
+
+
+
+
     try {
       setIsLoading(true);
       setError(null);
-      
-      console.log('📡 Calling apiService.startGame...');
+
       const game = await apiService.startGame(roomId);
-      console.log('✅ Game started successfully:', game);
+
       console.log('🎮 Game object structure:', {
         game,
         gameKeys: game ? Object.keys(game) : 'no game',
@@ -595,14 +573,13 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       };
       
       setCurrentGame(gameState);
-      console.log('🎮 setCurrentGame called with:', gameState);
-      
+
       // Set game phase 
       setGamePhase('letter_selection');
       
       // Update room status to 'playing' after successful game start
       if (currentRoom) {
-        console.log('🏠 Updating room status to playing');
+
         setCurrentRoom({
           ...currentRoom,
           status: 'playing'
@@ -611,8 +588,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       
       // TODO: Load players data for the new game
       // For now, we'll rely on Socket events to populate players
-      console.log('🎮 Game started successfully, waiting for player data...');
-      
+
       // TEMPORARY: Create mock player data so GameInterface can render
       if (user && game?.id) {
         const gridSize = currentRoom?.board_size || 5; // Use room settings or default
@@ -649,7 +625,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       throw err;
     } finally {
       setIsLoading(false);
-      console.log('🏁 startGame finished, isLoading set to false');
+
     }
   }, [currentRoom, user]);
 
@@ -665,13 +641,6 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   }, []);
 
   const selectLetter = useCallback(async (letter: string) => {
-    console.log('🎯 selectLetter called with:', {
-      letter,
-      currentGame: currentGame ? { id: currentGame.id, currentTurn: currentGame.currentTurn } : null,
-      currentPlayer: currentPlayer ? { userId: currentPlayer.userId, username: currentPlayer.username, position: currentPlayer.position } : null,
-      isMyTurn,
-      gamePhase
-    });
 
     if (!currentGame || !currentPlayer) {
       console.error('❌ selectLetter failed - missing game or player:', {
@@ -746,16 +715,15 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
       setError(null);
-      
-      console.log('🏠 GameContext.joinRoom called with code:', code);
+
       const room = await apiService.joinRoom(code, password);
-      console.log('🏠 GameContext.joinRoom received room data:', room);
-      console.log('🏠 Room ID from server:', room.id);
+
+
       console.log('🏠 Room object keys:', Object.keys(room));
       setCurrentRoom(room);
       
       // Also join the Socket.IO room immediately
-      console.log('🏠 GameContext: Calling socketService.joinRoom for room:', code);
+
       socketService.joinRoom(code);
       
       return room;

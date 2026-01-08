@@ -29,13 +29,13 @@ const GamePage: React.FC = () => {
     });
     
     if (currentGame && (gamePhase === 'letter_selection' || gamePhase === 'letter_placement')) {
-      console.log('🎮 Setting gameStarted to true!');
+
       setGameStarted(true);
     }
     
     // If room status is "playing", show game interface even without currentGame
     if (currentRoom?.status === 'playing') {
-      console.log('🎮 Room status is playing - setting gameStarted to true!');
+
       setGameStarted(true);
     }
   }, [currentGame, gamePhase, currentRoom?.status]);
@@ -88,8 +88,6 @@ const GamePage: React.FC = () => {
   if (gamePhase === 'finished' && leaderboard && gameStarted) {
     const currentPlayer = leaderboard.find(p => p.userId === user?.id);
     const selectedPlayer = selectedPlayerBoard ? leaderboard.find(p => p.userId === selectedPlayerBoard) : null;
-
-    console.log('🏆 Leaderboard data:', { leaderboard, currentPlayer, selectedPlayer });
 
     return (
       <div className="game-finished">

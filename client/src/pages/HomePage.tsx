@@ -51,7 +51,7 @@ const HomePage: React.FC = () => {
   // This ensures clean state when user navigates back from game
   useEffect(() => {
     if (currentRoom) {
-      console.log('📤 User arrived at lobby while in room, auto-leaving:', currentRoom.code);
+
       leaveRoom().catch(err => {
         console.error('Failed to auto-leave room:', err);
       });
@@ -73,23 +73,19 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     if (!socketService.isConnected()) return;
 
-    const handleRoomCreated = (data: any) => {
-      console.log('Room created via Socket.IO:', data);
+    const handleRoomCreated = () => {
       loadRooms();
     };
 
-    const handleRoomJoined = (data: any) => {
-      console.log('Room joined via Socket.IO:', data);
+    const handleRoomJoined = () => {
       loadRooms();
     };
 
-    const handleRoomLeft = (data: any) => {
-      console.log('Room left via Socket.IO:', data);
+    const handleRoomLeft = () => {
       loadRooms();
     };
 
-    const handleRoomUpdated = (data: any) => {
-      console.log('Room updated via Socket.IO:', data);
+    const handleRoomUpdated = () => {
       loadRooms();
     };
 
@@ -137,8 +133,7 @@ const HomePage: React.FC = () => {
 
   const handlePasswordSubmit = async () => {
     if (!pendingRoomCode || !passwordInput.trim()) return;
-    
-    console.log('🔐 Submitting password for room:', pendingRoomCode);
+
     await joinRoomByCode(pendingRoomCode, passwordInput.trim());
     setShowPasswordPrompt(false);
     setPasswordInput('');
@@ -384,15 +379,12 @@ const HomePage: React.FC = () => {
                         placement_timer: placementTimer,
                         require_password: requirePassword
                       });
-                      
-                      console.log('✅ Room created successfully:', roomData);
-                      
+
                       // Room creation automatically joins the user as creator on the server
                       // We still need to call joinRoom() to set currentRoom in GameContext
                       if (roomData?.room?.code || roomData?.code) {
                         const roomCode = roomData.room?.code || roomData.code;
-                        console.log(`🎯 Joining room ${roomCode} and navigating...`);
-                        
+
                         // Join the room - creator is already a member on server,
                         // so this just sets currentRoom in GameContext and joins socket room
                         shouldNavigate.current = true;
