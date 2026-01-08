@@ -2,13 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useGame } from '../contexts/GameContext';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/apiService';
+import { socketService } from '../services/socketService';
+import RoomSettings from './RoomSettings';
+import PlayersList from './PlayersList';
+import TipsModal from './TipsModal';
 
 interface RoomLobbyProps {
   onStartGame: () => void;
 }
-
-// Extended Player type for lobby display
-import { socketService } from '../services/socketService';
 
 interface LobbyMember {
   userId: string;
@@ -36,13 +37,26 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   const isOwnerByRole = playerList.some(p => p.userId === String(authUser?.id) && p.role === 'owner');
   const isActualOwner = isOwner || isOwnerByRole;
   
-  const canStartGame = playerList.length >= 2; // Minst 2 spelare krävs
   const hasEnoughPlayers = playerList.length >= 2;
   
-  // Check if all non-owner players are ready
+  // Check if all non-owner players are ready - using readyPlayers state
   const nonOwnerPlayers = playerList.filter(p => p.role !== 'owner');
+  const nonReadyPlayersCount = nonOwnerPlayers.filter(p => !readyPlayers.has(p.userId)).length;
+  const totalPlayersCount = playerList.length;
   const allPlayersReady = nonOwnerPlayers.length === 0 || 
-    (nonOwnerPlayers.every(p => p.userId === String(authUser?.id) ? isReady : readyPlayers.has(p.userId)));
+    (nonOwnerPlayers.every(p => {
+      const isReady = readyPlayers.has(p.userId);
+      console.log('🔍 Player ready check:', { userId: p.userId, username: p.username, isReady, readyPlayers: Array.from(readyPlayers) });
+      return isReady;
+    }));
+  
+  console.log('🎯 Start game check:', { 
+    hasEnoughPlayers, 
+    allPlayersReady, 
+    canActuallyStartGame: hasEnoughPlayers && allPlayersReady,
+    nonOwnerCount: nonOwnerPlayers.length,
+    readyPlayersCount: readyPlayers.size
+  });
   
   const canActuallyStartGame = hasEnoughPlayers && allPlayersReady;
 
@@ -54,12 +68,41 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
     }
   };
 
+  // Initialize readyPlayers from currentRoom.players if available
+  useEffect(() => {
+    if (currentRoom?.code) {
+      // Fetch fresh room data to get player ready status
+      apiService.getRoomByCode(currentRoom.code).then(data => {
+        if (data?.room?.players) {
+          const ready = new Set<string>();
+          data.room.players.forEach((player: any) => {
+            if (player.ready) {
+              ready.add(String(player.userId));
+            }
+          });
+          setReadyPlayers(ready);
+          console.log('✨ Initialized readyPlayers from API:', ready);
+        }
+      });
+    }
+  }, [currentRoom?.code]); // Only run when room changes
+
   // Join the Socket.IO room when entering the lobby
   useEffect(() => {
     if (currentRoom?.code) {
       console.log('🟢 RoomLobby: currentRoom changed, code:', currentRoom.code);
       console.log('🟢 RoomLobby: socketService.isConnected():', socketService.isConnected());
       socketService.joinRoom(currentRoom.code);
+      
+      // Listen for when WE join the room - get ready status from server
+      const handleRoomJoined = (data: any) => {
+        console.log('🟦 room:joined event received:', data);
+        if (data.readyPlayers && Array.isArray(data.readyPlayers)) {
+          const ready = new Set<string>(data.readyPlayers.map(String));
+          setReadyPlayers(ready);
+          console.log('🔄 Synced readyPlayers from room:joined event:', ready);
+        }
+      };
       
       // Listen for ready status changes
       const handlePlayerReadyChanged = (data: {
@@ -81,10 +124,12 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
         }
       };
       
+      socketService.on('room:joined', handleRoomJoined);
       socketService.on('player:ready_changed', handlePlayerReadyChanged);
       
       return () => {
         socketService.leaveRoom(currentRoom.code);
+        socketService.off('room:joined', handleRoomJoined);
         socketService.off('player:ready_changed', handlePlayerReadyChanged);
       };
     }
@@ -155,35 +200,79 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
 
     const handleMemberJoined = (data: any) => {
       console.log('🟦 room:member_joined event:', data);
-      // Refresh room data when someone joins
+      
+      // If readyPlayers was sent in the event, use it directly
+      if (data.readyPlayers && Array.isArray(data.readyPlayers)) {
+        const ready = new Set<string>(data.readyPlayers.map(String));
+        setReadyPlayers(ready);
+        console.log('🔄 Synced readyPlayers from socket event:', ready);
+      }
+      
+       // Update playerList directly from socket event (instant)
+       if (data.room?.members && data.room.members.length > 0) {
+         const mappedMembers = data.room.members.map((member: any) => ({
+           userId: String(member.userId),
+           username: member.username,
+           role: member.role,
+           joinedAt: new Date().toISOString()
+         }));
+         console.log('🟩 Setting playerList from socket event:', mappedMembers);
+         setPlayerList(mappedMembers);
+       }
+    };
+
+    const handleMemberLeft = (data: any) => {
+      console.log('🟥 room:member_left event:', data);
+      // Refresh room data when someone leaves
       if (currentRoom.code) {
         apiService.getRoomByCode(currentRoom.code).then(freshData => {
-          console.log('🟨 Fresh room data after member join:', freshData?.room?.members);
-          if (freshData?.room?.members && freshData.room.members.length > 0) {
+          console.log('🟧 Fresh room data after member left:', freshData?.room?.members);
+          if (freshData?.room?.members) {
             const mappedMembers = freshData.room.members.map((member: any) => ({
               userId: String(member.id),
               username: member.username,
               role: String(member.id) === String(freshData.room.createdBy) ? 'owner' : 'member',
               joinedAt: new Date().toISOString()
             }));
-            console.log('🟩 Setting playerList:', mappedMembers);
+            console.log('🟨 Setting playerList after leave:', mappedMembers);
             setPlayerList(mappedMembers);
           }
         }).catch(err => {
-          console.error('Failed to refresh after member joined:', err);
+          console.error('Failed to refresh after member left:', err);
         });
       }
     };
 
     socketService.on('room:member_joined', handleMemberJoined);
+    socketService.on('room:member_left', handleMemberLeft);
 
     return () => {
       socketService.off('room:member_joined', handleMemberJoined);
+      socketService.off('room:member_left', handleMemberLeft);
     };
   }, [currentRoom?.code]);
 
+  // Re-sync ready status when player list changes (new player joined)
+  useEffect(() => {
+    if (currentRoom?.code && playerList.length > 0) {
+      // Fetch fresh ready status whenever player list changes
+      apiService.getRoomByCode(currentRoom.code).then(data => {
+        if (data?.room?.players) {
+          const ready = new Set<string>();
+          data.room.players.forEach((player: any) => {
+            if (player.ready) {
+              ready.add(String(player.userId));
+            }
+          });
+          setReadyPlayers(ready);
+          console.log('🔄 Re-synced readyPlayers after player list change:', ready);
+        }
+      });
+    }
+  }, [playerList.length, currentRoom?.code]);
+
   const handleStartGame = async () => {
-    if (!currentRoom || !canStartGame) {
+    if (!currentRoom || !canActuallyStartGame) {
       return;
     }
     
@@ -264,90 +353,22 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
         </div>
       </div>
 
-      <div className="room-settings">
-        <div className="settings-header">
-          <h3>Spelinställningar</h3>
-          <button
-            onClick={() => setShowTips(!showTips)}
-            className="tips-button"
-            title="Tips och regler"
-          >
-            ?
-          </button>
-        </div>
-        <div className="settings-grid">
-          <div className="setting-item">
-            <span className="setting-label">Rutstorlek:</span>
-            <span className="setting-value">{currentRoom.settings?.grid_size || 5}×{currentRoom.settings?.grid_size || 5}</span>
-          </div>
-          <div className="setting-item">
-            <span className="setting-label">Max spelare:</span>
-            <span className="setting-value">{currentRoom.settings?.max_players || 6}</span>
-          </div>
-          <div className="setting-item">
-            <span className="setting-label">Bokstavstid:</span>
-            <span className="setting-value">{currentRoom.settings?.letter_timer || 20}s</span>
-          </div>
-          <div className="setting-item">
-            <span className="setting-label">Placeringstid:</span>
-            <span className="setting-value">{currentRoom.settings?.placement_timer || 30}s</span>
-          </div>
-        </div>
-      </div>
+      <RoomSettings 
+        gridSize={currentRoom.settings?.grid_size || 5}
+        maxPlayers={currentRoom.settings?.max_players || 6}
+        letterTimer={currentRoom.settings?.letter_timer || 20}
+        placementTimer={currentRoom.settings?.placement_timer || 30}
+        onShowTips={() => setShowTips(true)}
+      />
 
-      <div className="players-section">
-        <h3>Spelare ({playerList.length}/{currentRoom.settings?.max_players || 6})</h3>        
-        <div className="players-list">
-          {playerList.map((member, index) => {
-            const isCurrentUser = member.userId === String(authUser?.id);
-            const isOwner = member.role === 'owner';
-            const isPlayerReady = readyPlayers.has(member.userId);
-            
-            console.log(`🟧 Rendering player: ${member.username} (userId: ${member.userId}, authId: ${String(authUser?.id)}, isCurrentUser: ${isCurrentUser})`);
-            
-            return (
-              <div key={`player-${member.userId || index}-${member.username}`} className="player-item">
-                <div className="player-info">
-                  <span className="player-name">{member.username}</span>
-                  {isOwner && <span className="owner-badge">👑</span>}
-                  {isCurrentUser && <span className="you-badge">Du</span>}
-                </div>
-                <div className="player-actions">
-                  {!isOwner && (
-                    <>
-                      {isCurrentUser ? (
-                        <label className="ready-checkbox">
-                          <input
-                            type="checkbox"
-                            checked={isReady}
-                            onChange={(e) => handleReadyChange(e.target.checked)}
-                          />
-                          <span className="checkbox-label">Redo</span>
-                        </label>
-                      ) : (
-                        <span className={`ready-status ${isPlayerReady ? 'ready' : 'not-ready'}`}>
-                          {isPlayerReady ? '✓' : '⏳'}
-                        </span>
-                      )}
-                    </>
-                  )}
-                  {isOwner && <div className="player-status online">🟢</div>}
-                </div>
-              </div>
-            );
-          })}
-          
-          {/* Show empty slots */}
-          {Array.from({ length: (currentRoom.settings?.max_players || 6) - playerList.length }, (_, i) => (
-            <div key={`empty-slot-${playerList.length + i}`} className="player-item empty">
-              <div className="player-info">
-                <span className="player-name">Väntar på spelare...</span>
-              </div>
-              <div className="player-status waiting">Väntar</div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <PlayersList 
+        playerList={playerList}
+        readyPlayers={readyPlayers}
+        authUserId={authUser?.id}
+        isReady={isReady}
+        maxPlayers={currentRoom.settings?.max_players || 6}
+        onReadyChange={handleReadyChange}
+      />
 
       {error && (
         <div className="error-message">
@@ -364,7 +385,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
               className="start-game-button primary-button"
               title={!hasEnoughPlayers ? 'Minst 2 spelare krävs för att starta' : !allPlayersReady ? 'Alla spelare måste vara redo' : 'Starta spelet'}
             >
-              {isStarting ? 'Startar spel...' : !canActuallyStartGame ? `Väntar på spelare (${playerList.length}/2)` : 'Starta spel'}
+              {isStarting ? 'Startar spel...' : !canActuallyStartGame ? `Väntar på spelare (${nonReadyPlayersCount}/${totalPlayersCount})` : 'Starta spel'}
             </button>
             
             {/* Reset room button - only show if room status is not waiting */}
@@ -381,48 +402,36 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
           </>
         )}
 
-        {!isOwner && (
+        {isActualOwner && !canActuallyStartGame && (
           <div className="waiting-message">
             {!hasEnoughPlayers ? (
-              <p>Väntar på fler spelare för att starta ({playerList.length}/2)</p>
+              <p>Väntar på fler spelare för att starta (minst 2 behövs)</p>
+            ) : !allPlayersReady ? (
+              <p>⏳ Väntar på att alla spelare ska bli redo ({readyPlayers.size}/{nonOwnerPlayers.length} redo)</p>
+            ) : null}
+          </div>
+        )}
+
+        {!isActualOwner && (
+          <div className="waiting-message">
+            {!hasEnoughPlayers ? (
+              <p>Väntar på fler spelare för att starta ({nonReadyPlayersCount}/{totalPlayersCount})</p>
             ) : !isReady ? (
               <p>👉 Du måste trycka redo för att starta</p>
             ) : (
-              <p>Väntar på att spelledaren startar spelet.</p>
+              <p>✓ Redo! Väntar på att spelledaren startar spelet.</p>
             )}
           </div>
         )}
       </div>
       
-      {/* Tips Modal */}
-      {showTips && (
-        <>
-          <div className="modal-backdrop" onClick={() => setShowTips(false)} />
-          <div className="tips-modal">
-            <div className="modal-header">
-              <h4>💡 Tips & Regler</h4>
-              <button 
-                onClick={() => setShowTips(false)}
-                className="modal-close-button"
-                title="Stäng"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="modal-content">
-              <ul>
-                <li><strong>Så här går det till:</strong> Välj bokstav → Placera på brädet → Få poäng för ord</li>
-                <li><strong>Spelare:</strong> Minst 2 spelare krävs för att starta</li>
-                <li><strong>Bjud in:</strong> Dela rumkoden med vänner</li>
-                <li><strong>Poäng:</strong> 1 poäng per bokstav + 2 extra för helrader/kolumner</li>
-                <li><strong>Tidsgränser:</strong> {currentRoom.settings?.letter_timer || 20}s för bokstavsval, {currentRoom.settings?.placement_timer || 30}s för placering</li>
-                <li><strong>Strategi:</strong> Försök bilda längre ord för mer poäng</li>
-                <li><strong>Bonus:</strong> Fyll en hel rad eller kolumn för extra poäng</li>
-              </ul>
-            </div>
-          </div>
-        </>
-      )}
+      <TipsModal 
+        isOpen={showTips}
+        onClose={() => setShowTips(false)}
+        gridSize={currentRoom.settings?.grid_size || 5}
+        letterTimer={currentRoom.settings?.letter_timer || 20}
+        placementTimer={currentRoom.settings?.placement_timer || 30}
+      />
     </div>
   );
 };

@@ -72,19 +72,21 @@
   min-height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   padding: 20px;
+  overflow-y: auto;
 }
 
 .game-finished-content {
   width: 100%;
-  max-width: 400px;
+  max-width: 600px;
   background: white;
   border-radius: 20px;
   padding: 32px 24px;
   text-align: center;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  margin: 20px 0;
 }
 
 .game-finished h2 {
@@ -252,20 +254,33 @@
 /* Mobile Optimizations */
 @media (max-width: 480px) {
   .game-finished {
-    padding: 16px;
+    padding: 12px;
+    align-items: flex-start;
   }
   
   .game-finished-content {
-    padding: 24px 20px;
+    padding: 20px 16px;
+    max-width: 100%;
+    margin: 0;
   }
   
   .game-finished h2 {
-    font-size: 24px;
+    font-size: 22px;
+    margin-bottom: 16px;
   }
   
   .leaderboard-item {
     padding: 10px 12px;
   }
+
+  .player-board-section {
+    padding: 12px 8px;
+  }
+
+  .game-actions {
+    margin-top: 16px;
+  }
+}
   
   .username,
   .score {
@@ -276,7 +291,6 @@
     font-size: 16px;
     min-width: 35px;
   }
-}
 
 /* Player Board Section */
 .player-board-section {
@@ -285,6 +299,12 @@
   padding: 16px;
   margin: 20px 0;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .game-result-board {
@@ -292,6 +312,11 @@
   flex-direction: column;
   gap: 16px;
   align-items: center;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
 }
 
 .empty-board-message {
@@ -315,7 +340,8 @@
     0 8px 16px rgba(102, 126, 234, 0.25),
     0 4px 8px rgba(0, 0, 0, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  max-width: 90vw;
+  max-width: min(90vw, 500px);
+  margin: 0 auto;
 }
 
 .board-row {
@@ -381,10 +407,13 @@
 
 .words-legend {
   width: 100%;
+  max-width: min(90vw, 500px);
   background: #f8f9ff;
   border-radius: 8px;
   padding: 12px;
   border: 1px solid #e6edff;
+  box-sizing: border-box;
+  overflow-x: auto;
 }
 
 .words-legend h4 {
@@ -395,23 +424,27 @@
 
 .words-list {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .word-legend-item {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px;
+  gap: 6px;
+  padding: 4px 10px;
   background: white;
-  border-radius: 4px;
+  border-radius: 16px;
   transition: all 0.2s ease;
-  border: 2px solid transparent;
+  border: 2px solid #e0e0e0;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .word-legend-item:hover {
   background: #f5f5f5;
+  border-color: #bbb;
+  transform: translateY(-1px);
 }
 
 .word-legend-item.selected {
@@ -419,6 +452,7 @@
   border: 2px solid #3B82F6;
   font-weight: 600;
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+  transform: scale(1.05);
 }
 
 .word-color {
@@ -437,18 +471,18 @@
 .word-color.valid-word-5 { border-color: #DDA0DD; }
 
 .word-text {
-  flex: 1;
   font-weight: 600;
   color: #333;
   font-size: 13px;
 }
 
 .word-points {
-  font-size: 12px;
+  font-size: 11px;
   color: #667eea;
-  font-weight: 600;
-  min-width: 40px;
-  text-align: right;
+  font-weight: 700;
+  background: #f0f4ff;
+  padding: 2px 6px;
+  border-radius: 8px;
 }
 
 /* Board Modal */
@@ -526,6 +560,46 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Mobile optimizations for small screens */
+@media (max-width: 400px) {
+  .player-board-section {
+    padding: 12px 8px;
+    margin: 16px 0;
+  }
+
+  .game-result-board {
+    gap: 12px;
+  }
+
+  .board-grid {
+    grid-template-columns: repeat(var(--grid-size, 5), minmax(35px, 1fr));
+    gap: 4px;
+    padding: 8px;
+    max-width: 95vw;
+  }
+
+  .board-cell {
+    min-width: 30px;
+    font-size: 12px;
+  }
+
+  .words-legend {
+    padding: 8px;
+    max-width: 95vw;
+  }
+
+  .word-legend-item {
+    padding: 3px 8px;
+    font-size: 12px;
+    gap: 4px;
+  }
+
+  .word-points {
+    font-size: 10px;
+    padding: 2px 5px;
   }
 }
 

@@ -182,14 +182,7 @@ const HomePage: React.FC = () => {
           {/* Available Rooms */}
           <div className="card">
             <div className="card-header">
-              <h2 className="card-title flex-1">Tillgängliga rum ({availableRooms.length})</h2>
-              <button
-                onClick={loadRooms}
-                className="refresh-btn"
-                aria-label="Uppdatera rumslista"
-              >
-                🔄
-              </button>
+              <h2 className="card-title">Tillgängliga rum ({availableRooms.length})</h2>
             </div>
             <div className="card-content">
               {availableRooms.length === 0 ? (

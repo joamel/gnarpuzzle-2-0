@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import RoomLobby from '../components/RoomLobby';
 import GameResultBoard from '../components/GameResultBoard';
 import Logo from '@/assets/Logo';
+import { socketService } from '../services/socketService';
 
 // Lazy load GameInterface for better performance
 const GameInterface = React.lazy(() => import('../components/GameInterface').then(module => ({ 
@@ -43,6 +44,17 @@ const GamePage: React.FC = () => {
     setGameStarted(true);
   };
 
+  // Return to room lobby after game finishes
+  const handleBackToLobby = () => {
+    setGameStarted(false);
+    setSelectedPlayerBoard(null);
+    
+    // Reset ready status when returning to lobby
+    if (currentRoom?.code) {
+      socketService.setPlayerReady(currentRoom.code, false);
+    }
+  };
+
   // Leave room and go back to home
   const handleLeaveRoom = async () => {
     // Confirm before leaving if game is in progress
@@ -72,8 +84,8 @@ const GamePage: React.FC = () => {
     );
   }
 
-  // Show leaderboard if game is finished
-  if (gamePhase === 'finished' && leaderboard) {
+  // Show leaderboard if game is finished and user wants to see results
+  if (gamePhase === 'finished' && leaderboard && gameStarted) {
     const currentPlayer = leaderboard.find(p => p.userId === user?.id);
     const selectedPlayer = selectedPlayerBoard ? leaderboard.find(p => p.userId === selectedPlayerBoard) : null;
 
@@ -127,10 +139,10 @@ const GamePage: React.FC = () => {
 
           <div className="game-actions">
             <button 
-              onClick={handleLeaveRoom} 
+              onClick={handleBackToLobby} 
               className="back-to-lobby-button primary-button"
             >
-              Lämna spelet
+              Tillbaka till rummet
             </button>
           </div>
         </div>
