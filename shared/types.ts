@@ -94,26 +94,99 @@ export interface Word {
 
 // Socket Events
 export interface SocketEvents {
+  // Connection events
+  'connect': () => void;
+  'disconnect': (reason: string) => void;
+  'connect_error': (error: Error) => void;
+
   // Room events
-  'room:created': (room: Room) => void;
-  'room:joined': (room: Room, user: User) => void;
-  'room:left': (roomId: string, userId: string) => void;
-  'room:updated': (room: Room) => void;
+  'room:created': (data: { room: any }) => void;
+  'room:joined': (data: { 
+    success: boolean;
+    room: any; 
+    user: any;
+    roomCode: string;
+    readyPlayers?: string[];
+  }) => void;
+  'room:member_joined': (data: { 
+    user: { id: number; username: string }; 
+    room: { id: number; code: string; name: string; members: any[] };
+    memberCount: number;
+    readyPlayers?: string[];
+  }) => void;
+  'room:left': (data: { room: any; user: any }) => void;
+  'room:updated': (data: { room: any }) => void;
+  'room:member_left': (data: { 
+    user: { id: number; username: string }; 
+    roomCode: string;
+  }) => void;
+  'room:ownership_transferred': (data: { 
+    roomCode: string; 
+    newCreator: { id: number; username: string }; 
+  }) => void;
+  'room:settings_updated': (data: { roomCode: string; settings: any }) => void;
+
+  // Ready status events
+  'player:ready_changed': (data: {
+    userId: string;
+    username: string;
+    isReady: boolean;
+    roomCode: string;
+  }) => void;
 
   // Game events
-  'game:start': (game: Game) => void;
-  'game:state': (gameState: GameState) => void;
-  'turn:start': (playerId: string, letter: string) => void;
-  'turn:timeout': () => void;
-  'letter:selected': (letter: string, playerId: string) => void;
-  'letter:placed': (position: { row: number; col: number }, playerId: string) => void;
-  'board:updated': (board: GameBoard) => void;
-  'game:end': (results: GameResults) => void;
+  'game:started': (data: {
+    gameId: number;
+    roomId: number;
+    phase: 'letter_selection' | 'letter_placement';
+    timer_end?: number;
+    message: string;
+  }) => void;
+  'game:phase_changed': (data: { 
+    gameId: number; 
+    phase: 'letter_selection' | 'letter_placement'; 
+    timer_end: number;
+    current_turn?: number;
+  }) => void;
+  'letter:selected': (data: { 
+    gameId: number; 
+    playerId: number; 
+    letter: string; 
+    turn: number; 
+  }) => void;
+  'letter:placed': (data: { 
+    gameId: number; 
+    playerId: number; 
+    letter: string; 
+    x: number; 
+    y: number; 
+  }) => void;
+  'turn:skipped': (data: {
+    gameId: number;
+    skippedPlayerId: number;
+    nextPlayerId: number;
+  }) => void;
+  'game:ended': (data: { 
+    gameId: number; 
+    leaderboard: Array<{
+      userId: number;
+      username: string;
+      score: number;
+      words: any[];
+    }>;
+    finalScores: any;
+    reason?: string;
+    message?: string;
+  }) => void;
+  'game:player_left': (data: {
+    gameId: number;
+    leftUserId: number;
+    remainingPlayers: number;
+    newCurrentTurn?: number;
+  }) => void;
 
   // System events
   'error': (error: { message: string; code?: string }) => void;
-  'connect': () => void;
-  'disconnect': () => void;
 }
 
 export interface GameResults {
