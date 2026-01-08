@@ -214,7 +214,7 @@ describe('HomePage Component', () => {
       
       await waitFor(() => {
         expect(screen.getByText('Max spelare')).toBeInTheDocument();
-        expect(screen.getByText('Rutstorlek')).toBeInTheDocument();
+        expect(screen.getByText(/Brädstorlek/)).toBeInTheDocument();
       });
     });
 
