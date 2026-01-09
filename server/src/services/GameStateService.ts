@@ -2,6 +2,7 @@ import { DatabaseManager } from '../config/database';
 import { Game, Player, GridCell, RoomSettings } from '../models/types';
 import { SocketService } from './SocketService';
 import { WordValidationService, GridScore } from './WordValidationService';
+import { gameLogger } from '../utils/logger';
 
 export class GameStateService {
   private static instance: GameStateService;
@@ -28,9 +29,9 @@ export class GameStateService {
   private async initializeWordService(): Promise<void> {
     try {
       await this.wordValidationService.loadDictionary();
-      console.log('📖 Word validation service initialized');
+      gameLogger.info('Word validation service initialized');
     } catch (error) {
-      console.error('Failed to initialize word validation service:', error);
+      gameLogger.error('Failed to initialize word validation service', { error });
     }
   }
 
@@ -148,7 +149,7 @@ export class GameStateService {
     // Store timer ID for potential clearing
     this.activeTimers.set(gameId, timerId);
     
-    console.log(`⏰ Set letter selection timeout for ${settings.letter_timer} seconds`);
+    gameLogger.debug('Set letter selection timeout', { gameId, seconds: settings.letter_timer });
   }
 
   /**
@@ -450,11 +451,11 @@ export class GameStateService {
    * Handle automatic timeout scenarios
    */
   async handleLetterSelectionTimeout(gameId: number): Promise<void> {
-    console.log(`⏰ handleLetterSelectionTimeout triggered for game ${gameId}`);
+    gameLogger.warn('Letter selection timeout triggered', { gameId });
     
     const game = await this.getGameById(gameId);
     if (!game || game.current_phase !== 'letter_selection') {
-      console.log(`⚠️ Skipping letter selection timeout - phase is ${game?.current_phase || 'unknown'}`);
+      gameLogger.debug('Skipping letter selection timeout - wrong phase', { gameId, phase: game?.current_phase });
       return;
     }
 
@@ -502,11 +503,11 @@ export class GameStateService {
   }
 
   async handlePlacementTimeout(gameId: number): Promise<void> {
-    console.log(`⏰ handlePlacementTimeout triggered for game ${gameId}`);
+    gameLogger.warn('Placement timeout triggered', { gameId });
     
     const game = await this.getGameById(gameId);
     if (!game || game.current_phase !== 'letter_placement') {
-      console.log(`❌ Skipping timeout - game phase is ${game?.current_phase || 'unknown'}`);
+      gameLogger.debug('Skipping placement timeout - wrong phase', { gameId, phase: game?.current_phase });
       return;
     }
 
@@ -811,7 +812,7 @@ export class GameStateService {
    */
   async calculatePlayerScore(gameId: number, userId: number): Promise<GridScore | null> {
     if (!this.wordValidationService.isReady()) {
-      console.warn('Word validation service not ready, skipping score calculation');
+      gameLogger.warn('Word validation service not ready - skipping score calculation', { gameId, playerId: userId });
       return null;
     }
 
@@ -933,7 +934,12 @@ export class GameStateService {
       finalScores: scores
     });
 
-    console.log(`🏁 Game ${gameId} ended. Winner: ${players[0]?.username} (${players[0]?.final_score} pts)`);
+    gameLogger.info('Game ended', { 
+      gameId, 
+      winner: players[0]?.username, 
+      score: players[0]?.final_score,
+      playerCount: players.length 
+    });
   }
 
   /**
@@ -957,7 +963,11 @@ export class GameStateService {
 
     // Get remaining players
     const remainingPlayers = await db.all(`
-      SELECT user_id, position FROM players WHERE game_id = ? ORDER BY position ASC
+      gameLogger.info('Player left during game - ending game', { 
+        gameId, 
+        leavingUserId, 
+        remainingPlayers: remainingPlayers.length 
+      }
     `, gameId) as { user_id: number; position: number }[];
 
     // If only 1 or fewer players left, end the game

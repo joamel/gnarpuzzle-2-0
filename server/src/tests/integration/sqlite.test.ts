@@ -4,8 +4,9 @@ import { MigrationManager } from '../../config/migrations';
 import path from 'path';
 import fs from 'fs/promises';
 
-// Skip due to migration conflicts when running multiple test files
-// TODO: Fix by using separate test databases or mocking migrations
+// Skip due to migration conflicts when running multiple test files concurrently
+// The migration system tries to add columns that already exist from other test runs
+// This needs architectural fix: separate migration state per test or use mocks
 describe.skip('SQLite Integration Tests', () => {
   let dbManager: DatabaseManager;
   let testDbPath: string;

@@ -3,6 +3,7 @@ import { GameState, Player, Room, GamePhase, GameTimer, Leaderboard } from '../t
 import { socketService } from '../services/socketService';
 import { apiService } from '../services/apiService';
 import { useAuth } from './AuthContext';
+import { logger } from '../utils/logger';
 
 interface GameContextType {
   // Current game state
@@ -211,7 +212,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
           return p;
         }));
       } catch (error) {
-        console.error('❌ Error handling letter placed event:', error, data);
+        logger.game.error('Error handling letter placed event', { error, data });
       }
     };
 
@@ -258,7 +259,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
           setCurrentRoom(prev => prev ? { ...prev, status: 'waiting' } : null);
         }
       } catch (error) {
-        console.error('❌ Error handling game ended event:', error, data);
+        logger.game.error('Error handling game ended event', { error, data });
         // Set minimal game end state
         setGamePhase('finished');
         setGameTimer(null);
