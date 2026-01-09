@@ -438,8 +438,7 @@
 /* Accessibility */
 .grid-cell:focus,
 .brick:focus {
-  outline: 3px solid rgba(102, 126, 234, 0.5);
-  outline-offset: 2px;
+  outline: none;
 }
 
 /* Loading states */

@@ -238,8 +238,8 @@ const GameInterface: React.FC = () => {
               <span className="other-turn">⏳ {currentPlayer?.username}s tur</span>
             )
           ) : gamePhase === 'letter_placement' ? (
-            currentPlayer?.placementConfirmed ? (
-              <span className="waiting">🎯 Alla spelare placerar: <span className="selected-letter">{selectedLetter}</span></span>
+            selectedLetter ? (
+              <span className="waiting">🎯 Placera bokstav: <span className="selected-letter">{selectedLetter}</span></span>
             ) : (
               <span className="waiting">⌛ Väntar på bokstav...</span>
             )

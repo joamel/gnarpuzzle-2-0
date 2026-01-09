@@ -159,9 +159,9 @@ const GamePage: React.FC = () => {
           <button 
             onClick={handleLeaveRoom}
             className="header-btn"
-            aria-label="Tillbaka"
+            aria-label="Lämna rummet"
           >
-            ←
+            🚪 Lämna rummet
           </button>
         </header>
         
@@ -185,9 +185,9 @@ const GamePage: React.FC = () => {
         <button 
           onClick={handleLeaveRoom}
           className="header-btn"
-          aria-label="Tillbaka"
+          aria-label="Lämna rummet"
         >
-          ←
+          🚪 Lämna rummet
         </button>
       </header>
       
