@@ -97,7 +97,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   useEffect(() => {
     if (!socketService.isConnected()) return;
 
-    const handleGamePhaseChanged = (data: any) => {
+    const handleGamePhaseChanged = async (data: any) => {
       console.log('🚀 handleGamePhaseChanged received:', {
         phase: data.phase,
         timer_end: data.timer_end,
@@ -117,9 +117,26 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       }
       
       // Set selected letter when entering placement phase (robustness for missed letter:selected events)
-      if (data.phase === 'letter_placement' && data.current_letter) {
-
-        setSelectedLetter(data.current_letter);
+      if (data.phase === 'letter_placement') {
+        if (data.current_letter) {
+          console.log('✅ Phase change included current_letter:', data.current_letter);
+          setSelectedLetter(data.current_letter);
+        } else if (data.gameId && user) {
+          // Fallback: Fetch from API if letter not included in event
+          console.warn('⚠️ Phase change missing current_letter, fetching from API');
+          try {
+            const gameData = await apiService.getGame(data.gameId);
+            const currentPlayer = gameData?.game?.players?.find((p: any) => p.user_id === user.id);
+            if (currentPlayer?.current_letter) {
+              console.log('✅ Recovered current_letter from API:', currentPlayer.current_letter);
+              setSelectedLetter(currentPlayer.current_letter);
+            } else {
+              console.error('❌ Could not recover current_letter from API');
+            }
+          } catch (error) {
+            console.error('❌ Failed to fetch game state for letter recovery:', error);
+          }
+        }
       }
       
       // Only set timer if we have a valid timer_end value
@@ -158,6 +175,13 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     };
 
     const handleLetterSelected = (data: any) => {
+      console.log('🔤 Letter selected event received:', {
+        letter: data.letter,
+        playerId: data.playerId,
+        turn: data.turn,
+        timestamp: new Date().toLocaleTimeString()
+      });
+      
       // All players should get the selected letter to place on their own grids
       setSelectedLetter(data.letter);
 
