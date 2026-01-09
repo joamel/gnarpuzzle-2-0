@@ -4,8 +4,8 @@ import { MigrationManager } from '../../config/migrations';
 import path from 'path';
 import fs from 'fs/promises';
 
-// Skip these tests for now - they have issues with shared database state
-// TODO: Fix test isolation for SQLite integration tests
+// Skip due to migration conflicts when running multiple test files
+// TODO: Fix by using separate test databases or mocking migrations
 describe.skip('SQLite Integration Tests', () => {
   let dbManager: DatabaseManager;
   let testDbPath: string;

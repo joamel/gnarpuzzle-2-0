@@ -28,11 +28,12 @@ describe('WordValidationService Scoring', () => {
       const score = service.calculateGridScore(grid);
 
       // Should find LÅS (3p) + TA (2p) = 5p word points
-      expect(score.totalPoints).toBe(7); // 5p words + 2p complete row bonus
+      // No complete row bonus since LÅSTA isn't a valid word as one unit
+      expect(score.totalPoints).toBe(5); // 5p words, no bonus
       expect(score.words.length).toBe(2);
       expect(score.words.map(w => w.word)).toContain('LÅS');
       expect(score.words.map(w => w.word)).toContain('TA');
-      expect(score.completedRows).toBe(1);
+      expect(score.completedRows).toBe(0); // Row filled but not forming a valid single word
     });
 
     it('should not give complete row bonus for partial rows', () => {

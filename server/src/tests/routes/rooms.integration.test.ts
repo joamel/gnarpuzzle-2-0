@@ -30,7 +30,8 @@ vi.mock('../../services/GameStateService', () => {
 vi.mock('../../index', () => ({
   getSocketService: vi.fn(() => ({
     emitToRoom: vi.fn(),
-    broadcastToRoom: vi.fn()
+    broadcastToRoom: vi.fn(),
+    joinPlayersToGame: vi.fn()
   }))
 }));
 

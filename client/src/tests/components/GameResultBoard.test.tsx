@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import GameResultBoard from './GameResultBoard';
-import { GridCell } from '../types/game';
+import GameResultBoard from '../../components/GameResultBoard';
+import { GridCell } from '../../types/game';
 
 describe('GameResultBoard', () => {
   // Test with a 4x4 board
@@ -33,23 +33,23 @@ describe('GameResultBoard', () => {
       ]
     ];
 
-    render(
+    const { container } = render(
       <GameResultBoard
         grid={grid}
         boardSize={4}
       />
     );
 
-    // Should render the board grid
-    const cells = screen.queryAllByRole('generic', { hidden: true })
-      .filter(el => el.className?.includes('board-cell'));
-    
-    // 4x4 = 16 cells
-    expect(cells).toHaveLength(16);
+    // Component uses Brick components, find the game board container
+    const gameBoard = container.querySelector('.game-board');
+    expect(gameBoard).toBeInTheDocument();
 
-    // Should render word cells with correct titles
-    const hCell = cells.find(el => el.getAttribute('title')?.includes('Ord: HA'));
-    expect(hCell).toBeInTheDocument();
+    // Check that we have a 4x4 grid rendered (16 Brick components)
+    const bricks = container.querySelectorAll('.brick');
+    expect(bricks.length).toBe(16);
+
+    // Check that the word 'HA' is detected in legend
+    expect(screen.getByText('HA')).toBeInTheDocument();
   });
 
   // Test with empty grid
@@ -83,33 +83,57 @@ describe('GameResultBoard', () => {
 
   // Test with multiple words
   it('displays multiple words in legend', () => {
-    const grid: GridCell[][] = Array(5).fill(null).map((_, y) =>
-      Array(5).fill(null).map((_, x) => ({
-        letter: x < 2 && y < 2 ? String.fromCharCode(65 + x + y) : null,
-        x,
-        y
-      }))
-    );
+    const grid: GridCell[][] = [
+      [
+        { letter: 'K', x: 0, y: 0 },
+        { letter: 'A', x: 1, y: 0 },
+        { letter: 'T', x: 2, y: 0 },
+        { letter: null, x: 3, y: 0 },
+        { letter: null, x: 4, y: 0 }
+      ],
+      [
+        { letter: 'O', x: 0, y: 1 },
+        { letter: null, x: 1, y: 1 },
+        { letter: 'E', x: 2, y: 1 },
+        { letter: null, x: 3, y: 1 },
+        { letter: null, x: 4, y: 1 }
+      ],
+      [
+        { letter: null, x: 0, y: 2 },
+        { letter: null, x: 1, y: 2 },
+        { letter: null, x: 2, y: 2 },
+        { letter: null, x: 3, y: 2 },
+        { letter: null, x: 4, y: 2 }
+      ],
+      [
+        { letter: null, x: 0, y: 3 },
+        { letter: null, x: 1, y: 3 },
+        { letter: null, x: 2, y: 3 },
+        { letter: null, x: 3, y: 3 },
+        { letter: null, x: 4, y: 3 }
+      ],
+      [
+        { letter: null, x: 0, y: 4 },
+        { letter: null, x: 1, y: 4 },
+        { letter: null, x: 2, y: 4 },
+        { letter: null, x: 3, y: 4 },
+        { letter: null, x: 4, y: 4 }
+      ]
+    ];
 
-    render(
+    const { container } = render(
       <GameResultBoard
         grid={grid}
-        
         boardSize={5}
       />
     );
 
-    // Check that the board was rendered with correct number of cells (5x5 = 25)
-    const cells = screen.queryAllByRole('generic', { hidden: true })
-      .filter(el => el.className?.includes('board-cell'));
-    expect(cells).toHaveLength(25);
+    // Check that the board was rendered with correct number of bricks (5x5 = 25)
+    const bricks = container.querySelectorAll('.brick');
+    expect(bricks.length).toBe(25);
 
-    // Check that word cells have correct titles
-    const testCells = cells.filter(el => el.getAttribute('title')?.includes('Ord: TEST'));
-    expect(testCells.length).toBeGreaterThan(0);
-
-    const ordCells = cells.filter(el => el.getAttribute('title')?.includes('Ord: ORD'));
-    expect(ordCells.length).toBeGreaterThan(0);
+    // Check that words are shown in legend
+    expect(screen.getByText('KAT')).toBeInTheDocument();
   });
 
   // Test with 5x5 board
@@ -122,19 +146,17 @@ describe('GameResultBoard', () => {
       }))
     );
 
-    render(
+    const { container } = render(
       <GameResultBoard
         grid={grid}
-        
         boardSize={5}
       />
     );
 
-    const cells = screen.queryAllByRole('generic', { hidden: true })
-      .filter(el => el.className?.includes('board-cell'));
+    const bricks = container.querySelectorAll('.brick');
     
     // 5x5 = 25 cells
-    expect(cells).toHaveLength(25);
+    expect(bricks.length).toBe(25);
   });
 
   // Test with 6x6 board
@@ -147,19 +169,17 @@ describe('GameResultBoard', () => {
       }))
     );
 
-    render(
+    const { container } = render(
       <GameResultBoard
         grid={grid}
-        
         boardSize={6}
       />
     );
 
-    const cells = screen.queryAllByRole('generic', { hidden: true })
-      .filter(el => el.className?.includes('board-cell'));
+    const bricks = container.querySelectorAll('.brick');
     
     // 6x6 = 36 cells
-    expect(cells).toHaveLength(36);
+    expect(bricks.length).toBe(36);
   });
 
   // Test with complex board state (mixed filled and empty)
@@ -191,21 +211,19 @@ describe('GameResultBoard', () => {
       ]
     ];
 
-
-
     const { container } = render(
       <GameResultBoard
         grid={grid}
-        
         boardSize={4}
       />
     );
 
-    // Check for filled cells
-    const filledCells = container.querySelectorAll('.board-cell.filled');
-    const emptyCells = container.querySelectorAll('.board-cell.empty');
+    // Check total number of bricks
+    const allBricks = container.querySelectorAll('.brick');
+    expect(allBricks.length).toBe(16); // 4x4 grid
 
-    expect(filledCells.length).toBe(5); // K, T, E, O, D
-    expect(emptyCells.length).toBe(11); // rest are empty
+    // Check for bricks with letters (Brick component will have the letter as content)
+    const filledBricks = Array.from(allBricks).filter(brick => brick.textContent && brick.textContent.trim() !== '');
+    expect(filledBricks.length).toBe(5); // K, T, E, O, D
   });
 });

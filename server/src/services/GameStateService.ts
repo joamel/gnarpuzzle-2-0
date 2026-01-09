@@ -526,6 +526,8 @@ export class GameStateService {
 
     console.log(`📍 Found ${unconfirmedPlayers.length} players with unconfirmed placements`);
 
+    // Process all auto-placements FIRST before marking any as confirmed
+    // This prevents race conditions where advanceToNextTurn runs before all updates complete
     for (const player of unconfirmedPlayers) {
       if (player.current_letter) {
         console.log(`⏰ Timeout: Processing unconfirmed placement for player ${player.user_id} with letter "${player.current_letter}"`);
@@ -534,12 +536,17 @@ export class GameStateService {
       } else {
         console.log(`⚠️ Player ${player.user_id} has no current letter to auto-place`);
       }
-      
+    }
+    
+    // NOW mark all as confirmed in a batch (more efficient and safer)
+    if (unconfirmedPlayers.length > 0) {
+      const playerIds = unconfirmedPlayers.map(p => p.id).join(',');
       await db.run(`
         UPDATE players 
         SET placement_confirmed = 1 
-        WHERE id = ?
-      `, player.id);
+        WHERE id IN (${playerIds})
+      `);
+      console.log(`✅ Marked ${unconfirmedPlayers.length} players as confirmed`);
     }
 
     await this.advanceToNextTurn(gameId);
@@ -670,31 +677,47 @@ export class GameStateService {
     
     // First check if the letter is already placed somewhere in the grid
     let foundExistingPlacement = false;
+    let existingPosition = { x: 0, y: 0 };
+    
     for (let y = 0; y < gridState.length; y++) {
       for (let x = 0; x < gridState[y].length; x++) {
         const cellLetter = gridState[y][x].letter;
-        console.log(`🔍 Checking cell (${x}, ${y}): "${cellLetter}" vs "${letter}" (match: ${cellLetter === letter})`);
         
-        if (cellLetter === letter) {
+        // Normalize both letters for comparison (trim whitespace, convert to uppercase)
+        const normalizedCellLetter = cellLetter ? String(cellLetter).trim().toUpperCase() : null;
+        const normalizedLetter = letter ? String(letter).trim().toUpperCase() : null;
+        
+        console.log(`🔍 Checking cell (${x}, ${y}): "${cellLetter}" (normalized: "${normalizedCellLetter}") vs "${letter}" (normalized: "${normalizedLetter}")`);
+        
+        if (normalizedCellLetter && normalizedLetter && normalizedCellLetter === normalizedLetter) {
           console.log(`✅ Letter "${letter}" already placed at (${x}, ${y}) for player ${playerId} - confirming placement`);
           foundExistingPlacement = true;
-          
-          // Letter already placed, just broadcast the existing placement
-          this.socketService.broadcastToRoom(`game:${gameId}`, 'letter:placed', {
-            gameId,
-            playerId,
-            letter,
-            x,
-            y,
-            auto: true,
-            confirmed: true
-          });
-          
-          return; // Letter already placed, no need to move it
+          existingPosition = { x, y };
+          break;
         }
       }
+      if (foundExistingPlacement) break;
     }
     
+    // If letter already placed, just confirm it - don't move it!
+    if (foundExistingPlacement) {
+      console.log(`🎯 Confirming existing placement at (${existingPosition.x}, ${existingPosition.y})`);
+      
+      // Letter already placed, just broadcast the existing placement
+      this.socketService.broadcastToRoom(`game:${gameId}`, 'letter:placed', {
+        gameId,
+        playerId,
+        letter,
+        x: existingPosition.x,
+        y: existingPosition.y,
+        auto: true,
+        confirmed: true
+      });
+      
+      return; // Letter already placed, no need to move it
+    }
+    
+    // If letter not found, log a warning and place randomly
     if (!foundExistingPlacement) {
       console.log(`⚠️ Letter "${letter}" not found in grid for player ${playerId}, placing in random empty cell`);
     }

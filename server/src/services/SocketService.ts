@@ -49,7 +49,11 @@ export class SocketService {
   private connectedUsers: Map<string, { userId?: number; username?: string; roomCode?: string }> = new Map();
   private gameStateService: GameStateService;
   private roomPlayerReadyStatus: Map<string, Set<number>> = new Map(); // Maps roomCode -> Set of ready userIds
-
+  
+  // Grace period for disconnects - give users time to reconnect before removing from game
+  private disconnectTimers: Map<number, NodeJS.Timeout> = new Map(); // userId -> timeout
+  private readonly DISCONNECT_GRACE_PERIOD_MS = 90 * 1000; // 90 seconds (1.5 minutes)
+  
   constructor(io: SocketServer) {
     this.io = io;
     this.gameStateService = GameStateService.getInstance(this);
@@ -178,6 +182,17 @@ export class SocketService {
       }
 
       this.connectedUsers.set(socket.id, userData);
+
+      // If this user had a disconnect timer (they're reconnecting), cancel it
+      const disconnectTimer = this.disconnectTimers.get(userData.userId);
+      if (disconnectTimer) {
+        clearTimeout(disconnectTimer);
+        this.disconnectTimers.delete(userData.userId);
+        logger.info(`Player ${userData.username} (${userData.userId}) reconnected - cancelled disconnect timer`, {
+          service: 'gnarpuzzle-server',
+          socketId: socket.id
+        });
+      }
 
       // Auto-join to lobby for room updates
       socket.join('lobby');
@@ -645,12 +660,120 @@ export class SocketService {
   private async handleDisconnect(socket: Socket): Promise<void> {
     const userData = this.connectedUsers.get(socket.id);
     
-    if (userData) {
-      // If user was in a room, automatically remove them
-      if (userData.roomCode && userData.userId) {
+    if (userData && userData.userId) {
+      const userId = userData.userId;
+      
+      // If user was in a room with an active game, give them time to reconnect
+      if (userData.roomCode) {
         try {
           const RoomModel = (await import('../models/RoomModel')).RoomModel;
           const GameModel = (await import('../models/GameModel')).GameModel;
+          const room = await RoomModel.findByCode(userData.roomCode);
+          
+          if (room && room.id) {
+            const roomId = room.id as number;
+            const activeGame = await GameModel.findByRoomId(roomId);
+            
+            // If there's an active game, set a grace period timer
+            if (activeGame && activeGame.state !== 'finished') {
+              logger.info(`Player ${userData.username} (${userId}) disconnected from active game ${activeGame.id} - starting ${this.DISCONNECT_GRACE_PERIOD_MS/1000}s grace period`);
+              
+              // Clear any existing timer for this user
+              const existingTimer = this.disconnectTimers.get(userId);
+              if (existingTimer) {
+                clearTimeout(existingTimer);
+              }
+              
+              // Set new timer for grace period
+              const timer = setTimeout(async () => {
+                logger.info(`Grace period expired for player ${userData.username} (${userId}) - removing from game ${activeGame.id}`);
+                
+                // Check if user has reconnected in the meantime
+                const stillDisconnected = !Array.from(this.connectedUsers.values())
+                  .some(u => u.userId === userId);
+                
+                if (stillDisconnected) {
+                  // User still disconnected after grace period - remove from game
+                  const { GameStateService } = await import('./GameStateService');
+                  const gameStateService = GameStateService.getInstance(this);
+                  await gameStateService.handlePlayerLeft(activeGame.id, userId);
+                  
+                  // Also remove from room
+                  const removed = await RoomModel.removeMember(roomId, userId);
+                  if (removed) {
+                    // Notify room
+                    this.io.to(`room:${userData.roomCode}`).emit('room:member_left', {
+                      user: {
+                        id: userId,
+                        username: userData.username
+                      },
+                      roomCode: userData.roomCode,
+                      wasCreator: room.created_by === userId
+                    });
+                    
+                    // Handle creator transfer if needed
+                    if (room.created_by === userId) {
+                      const remainingMembers = await RoomModel.getRoomMembers(roomId);
+                      if (remainingMembers.length > 0) {
+                        const newCreator = remainingMembers[0];
+                        await RoomModel.transferOwnership(roomId, newCreator.id);
+                        
+                        this.io.to(`room:${userData.roomCode}`).emit('room:ownership_transferred', {
+                          newCreator: {
+                            id: newCreator.id,
+                            username: newCreator.username
+                          },
+                          roomCode: userData.roomCode,
+                          previousCreator: userData.username
+                        });
+                        
+                        logger.info(`Auto-transfer ownership of room ${userData.roomCode} from ${userData.username} to ${newCreator.username}`);
+                      }
+                    }
+                    
+                    // Emit updated room data
+                    const updatedRoom = await RoomModel.findByCode(userData.roomCode!);
+                    if (updatedRoom) {
+                      this.io.to(`room:${userData.roomCode}`).emit('room:updated', {
+                        room: updatedRoom
+                      });
+                    }
+                    
+                    logger.info(`Removed disconnected user ${userData.username} from room ${userData.roomCode} after grace period`);
+                  }
+                } else {
+                  logger.info(`Player ${userData.username} (${userId}) reconnected within grace period - not removing from game`);
+                }
+                
+                // Cleanup timer
+                this.disconnectTimers.delete(userId);
+              }, this.DISCONNECT_GRACE_PERIOD_MS);
+              
+              this.disconnectTimers.set(userId, timer);
+              
+              // Don't remove user immediately - they have grace period
+              // Just log the disconnect and remove from connectedUsers map
+              this.connectedUsers.delete(socket.id);
+              
+              logger.info(`Client disconnected (grace period active): ${userData.username}`, {
+                service: 'gnarpuzzle-server',
+                socketId: socket.id,
+                userId: userData.userId,
+                gracePeriodSeconds: this.DISCONNECT_GRACE_PERIOD_MS / 1000
+              });
+              
+              return;
+            }
+          }
+        } catch (error) {
+          logger.error('Error checking for active game during disconnect:', error);
+        }
+      }
+      
+      // No active game or not in room - handle disconnect immediately (old behavior)
+      if (userData.roomCode && userData.userId) {
+        try {
+          const RoomModel = (await import('../models/RoomModel')).RoomModel;
           const room = await RoomModel.findByCode(userData.roomCode);
           
           if (room) {
@@ -662,18 +785,9 @@ export class SocketService {
               return;
             }
             
-            const roomId = room.id as number; // Force cast since we validated it exists
-
-            // Check if there's an active game - handle player leaving mid-game
-            const activeGame = await GameModel.findByRoomId(roomId);
-            if (activeGame && activeGame.state !== 'finished') {
-              logger.info(`Player ${userData.username} (${userData.userId}) disconnected from active game ${activeGame.id}`);
-              const { GameStateService } = await import('./GameStateService');
-              const gameStateService = GameStateService.getInstance(this);
-              await gameStateService.handlePlayerLeft(activeGame.id, userData.userId);
-            }
+            const roomId = room.id as number;
             
-            // Notify room BEFORE removing user (while socket is still connected to room)
+            // Notify room BEFORE removing user
             socket.to(`room:${userData.roomCode}`).emit('room:member_left', {
               user: {
                 id: userData.userId,
@@ -684,15 +798,15 @@ export class SocketService {
             });
             
             // Remove user from room
-            const removed = await RoomModel.removeMember(roomId!, userData.userId);
+            const removed = await RoomModel.removeMember(roomId, userData.userId);
             
             if (removed) {
               // If the creator left, transfer ownership to next member
               if (isCreator) {
-                const remainingMembers = await RoomModel.getRoomMembers(roomId!);
+                const remainingMembers = await RoomModel.getRoomMembers(roomId);
                 if (remainingMembers.length > 0) {
                   const newCreator = remainingMembers[0];
-                  await RoomModel.transferOwnership(roomId!, newCreator.id);
+                  await RoomModel.transferOwnership(roomId, newCreator.id);
                   
                   // Notify room about new creator
                   socket.to(`room:${userData.roomCode}`).emit('room:ownership_transferred', {

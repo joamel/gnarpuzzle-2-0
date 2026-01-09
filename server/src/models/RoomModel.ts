@@ -380,13 +380,28 @@ export class RoomModel {
 
   private static parseRoomSettings(room: any): Room {
     try {
+      // Handle null/undefined settings
+      if (!room.settings) {
+        console.warn(`⚠️ Room ${room.code} has no settings, using defaults`);
+        return {
+          ...room,
+          settings: {
+            grid_size: room.board_size || 5,
+            max_players: room.max_players || 6,
+            letter_timer: room.settings?.letter_timer || 20,
+            placement_timer: room.settings?.placement_timer || 30,
+            require_password: false
+          }
+        } as Room;
+      }
+
       const settings = typeof room.settings === 'string' 
         ? JSON.parse(room.settings) 
         : room.settings;
       
       // Ensure require_password is a boolean (could be string "true"/"false" or boolean)
       let requirePassword = false;
-      if (settings.require_password !== undefined && settings.require_password !== null) {
+      if (settings && settings.require_password !== undefined && settings.require_password !== null) {
         if (typeof settings.require_password === 'boolean') {
           requirePassword = settings.require_password;
         } else if (typeof settings.require_password === 'string') {
@@ -397,6 +412,10 @@ export class RoomModel {
       }
       
       const completeSettings = {
+        grid_size: room.board_size || settings?.grid_size || 5,
+        max_players: room.max_players || settings?.max_players || 6,
+        letter_timer: settings?.letter_timer || 20,
+        placement_timer: settings?.placement_timer || 30,
         ...settings,
         require_password: requirePassword
       };

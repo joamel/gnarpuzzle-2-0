@@ -150,7 +150,7 @@ describe('WordValidationService', () => {
       const hundWord = validWords.find(w => w.word === 'HUND');
       
       expect(hundWord).toBeDefined();
-      expect(hundWord?.points).toBe(4); // 1 point per letter
+      expect(hundWord?.points).toBe(6); // 4 points (1 per letter) + 2 bonus for complete row
       expect(hundWord?.direction).toBe('horizontal');
       expect(hundWord?.startX).toBe(0);
       expect(hundWord?.startY).toBe(0);
