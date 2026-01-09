@@ -275,6 +275,12 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       setCurrentGame(gameState);
       setGamePhase(data.phase as GamePhase);
       
+      // If players are included in the event (reconnection), set them immediately
+      if (data.players && Array.isArray(data.players) && data.players.length > 0) {
+        console.log('🎮 Setting players from game:started event:', data.players.length);
+        setPlayers(data.players);
+      }
+      
       // Update room status to playing
       if (currentRoom) {
         setCurrentRoom({
@@ -763,12 +769,34 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
 
       const room = await apiService.joinRoom(code, password);
 
-
       console.log('🏠 Room object keys:', Object.keys(room));
       setCurrentRoom(room);
       
+      // If room is playing, fetch the active game
+      if (room.status === 'playing') {
+        try {
+          console.log('🎮 Room is playing, fetching active game...');
+          const gameResponse = await apiService.getGameByRoomId(room.id);
+          if (gameResponse && gameResponse.game) {
+            const game = gameResponse.game;
+            const gameState: GameState = {
+              id: Number(game.id),
+              roomId: Number(game.room_id),
+              phase: 'letter_selection', // Will be updated by socket events
+              currentTurn: game.current_turn || 1,
+              status: 'active'
+            };
+            setCurrentGame(gameState);
+            setGamePhase('letter_selection'); // Will be updated by socket
+            console.log('🎮 Restored game state:', gameState);
+          }
+        } catch (gameErr) {
+          console.error('Failed to fetch active game:', gameErr);
+          // Don't fail the join if we can't fetch game - socket will sync
+        }
+      }
+      
       // Also join the Socket.IO room immediately
-
       socketService.joinRoom(code);
       
       return room;

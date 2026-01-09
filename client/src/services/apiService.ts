@@ -171,6 +171,10 @@ class ApiService {
   async getGame(gameId: number): Promise<any> {
     return this.request<any>(`/api/games/${gameId}`);
   }
+
+  async getGameByRoomId(roomId: number): Promise<any> {
+    return this.request<any>(`/api/games/room/${roomId}`);
+  }
 }
 
 // Singleton instance

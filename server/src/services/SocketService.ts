@@ -306,6 +306,86 @@ export class SocketService {
         readyPlayers: Array.from(this.roomPlayerReadyStatus.get(roomCode) || []).map(String)
       });
 
+      // If room has an active game, sync game state to the reconnecting player
+      try {
+        const { GameModel } = await import('../models');
+        const activeGame = await GameModel.findByRoomId(room.id);
+        
+        if (activeGame && activeGame.state !== 'finished') {
+          console.log(`🎮 Room ${roomCode} has active game ${activeGame.id} - syncing state to reconnecting player`);
+          
+          // Get all players in the game
+          const { PlayerModel } = await import('../models');
+          const playersData = await PlayerModel.getGamePlayers(activeGame.id);
+          
+          // Find the reconnecting player
+          const reconnectingPlayer = playersData.find(p => p.user_id === userData.userId);
+          
+          if (reconnectingPlayer) {
+            // Join the player to the game socket room
+            await socket.join(`game:${activeGame.id}`);
+            
+            // Map players with complete game data
+            const mappedPlayers = playersData.map((p: any) => {
+              let parsedGrid;
+              try {
+                if (typeof p.grid_state === 'string') {
+                  parsedGrid = JSON.parse(p.grid_state || '[[]]');
+                } else if (p.grid_state && Array.isArray(p.grid_state)) {
+                  parsedGrid = p.grid_state;
+                } else {
+                  parsedGrid = Array(5).fill(null).map((_, y) => 
+                    Array(5).fill(null).map((_, x) => ({
+                      letter: null,
+                      x: x,
+                      y: y
+                    }))
+                  );
+                }
+              } catch (parseError) {
+                parsedGrid = Array(5).fill(null).map((_, y) => 
+                  Array(5).fill(null).map((_, x) => ({
+                    letter: null,
+                    x: x,
+                    y: y
+                  }))
+                );
+              }
+              
+              return {
+                id: p.id,
+                userId: p.user_id,
+                gameId: activeGame.id,
+                position: p.position,
+                username: p.username,
+                grid: parsedGrid,
+                currentLetter: p.current_letter || undefined,
+                placementConfirmed: p.placement_confirmed === 1,
+                finalScore: p.final_score || 0,
+                connected: true
+              };
+            });
+            
+            // Emit game:started event with full game state including players
+            socket.emit('game:started', {
+              gameId: activeGame.id,
+              roomId: room.id,
+              phase: activeGame.current_phase || 'letter_selection',
+              currentTurn: activeGame.current_turn,
+              timer_end: activeGame.phase_timer_end,
+              players: mappedPlayers
+            });
+            
+            console.log(`✅ Synced game state with ${mappedPlayers.length} players to reconnecting player ${userData.username}`);
+          }
+        }
+      } catch (gameSyncError) {
+        logger.error(`Failed to sync game state for reconnecting player ${userData.username}:`, {
+          error: (gameSyncError as Error).message
+        });
+        // Don't fail the room join if game sync fails
+      }
+
       logger.info(`User joined Socket.IO room: ${userData.username} -> room:${roomCode}`, {
         service: 'gnarpuzzle-server',
         userId: userData.userId,
