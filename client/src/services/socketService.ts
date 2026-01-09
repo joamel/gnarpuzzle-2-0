@@ -45,17 +45,14 @@ class SocketService {
       });
 
       this.socket.on('connect', () => {
-        console.log('🔗 Connected to server');
         this.isConnecting = false;
         this.reconnectAttempts = 0; // Reset on successful connection
         
         // Process any pending room joins
         if (this.pendingRoomJoins.length > 0) {
-          console.log(`🔗 Processing ${this.pendingRoomJoins.length} pending room joins`);
           const pending = [...this.pendingRoomJoins];
           this.pendingRoomJoins = [];
           pending.forEach(roomCode => {
-            console.log(`🚪 Processing pending room join: ${roomCode}`);
             this.socket?.emit('room:join', { roomCode });
           });
         }
@@ -71,7 +68,6 @@ class SocketService {
       });
 
       this.socket.on('disconnect', (reason) => {
-        console.log('💔 Disconnected from server:', reason);
         this.isConnecting = false;
         if (reason !== 'io client disconnect') {
           this.handleReconnection();

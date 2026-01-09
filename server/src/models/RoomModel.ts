@@ -112,20 +112,11 @@ export class RoomModel {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
     
-    console.log(`👥 RoomModel.addMember: Adding user ${userId} to room ${roomId}`);
-    
     try {
       const result = await db.run(`
         INSERT INTO room_members (room_id, user_id) 
         VALUES (?, ?)
       `, roomId, userId);
-      
-      console.log(`👥 RoomModel.addMember: Insert result:`, result);
-      console.log(`👥 RoomModel.addMember: Changes:`, result.changes);
-      
-      // Verify it was actually inserted
-      const verify = await this.isUserInRoom(roomId, userId);
-      console.log(`👥 RoomModel.addMember: Verification - isUserInRoom returned:`, verify);
       
       return result.changes > 0;
     } catch (error: any) {
@@ -186,7 +177,6 @@ export class RoomModel {
         
         // Reset room status to waiting
         await db.run('UPDATE rooms SET status = ? WHERE id = ?', 'waiting', roomId);
-        console.log(`✅ Room ${roomId} reset to waiting status (empty room)`);
       }
     }
     

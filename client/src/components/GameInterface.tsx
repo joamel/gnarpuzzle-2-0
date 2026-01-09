@@ -118,27 +118,18 @@ const GameInterface: React.FC = () => {
   // Single function to submit current placement - used by both OK button and timeout
   const submitPlacement = async () => {
     if (!temporaryPlacement) {
-      console.log('❌ No temporary placement to submit');
       return;
     }
     
     if (submitInProgress) {
-      console.log('⚠️ Submit already in progress, skipping...');
       return;
     }
-    
-    console.log('📤 submitPlacement called with position:', temporaryPlacement);
-    console.log('📤 Current gamePhase:', gamePhase);
-    console.log('📤 Current gameTimer:', gameTimer?.remainingSeconds);
     
     try {
       setSubmitInProgress(true);
       setPlacingLetter(true);
-      console.log('📤 Calling placeLetter with coordinates:', temporaryPlacement.x, temporaryPlacement.y);
       await placeLetter(temporaryPlacement.x, temporaryPlacement.y);
-      console.log('📤 Calling confirmPlacement...');
       await confirmPlacement();
-      console.log('✅ Placement submitted successfully at position:', temporaryPlacement);
       setTemporaryPlacement(null);
     } catch (err) {
       console.error('❌ Failed to submit placement:', err);

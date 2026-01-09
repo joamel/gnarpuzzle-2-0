@@ -99,17 +99,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     if (!socketService.isConnected()) return;
 
     const handleGamePhaseChanged = async (data: any) => {
-      console.log('🚀 handleGamePhaseChanged received:', {
-        phase: data.phase,
-        timer_end: data.timer_end,
-        gameId: data.gameId,
-        current_turn: data.current_turn,
-        current_letter: data.current_letter,
-        timestamp: new Date().toLocaleTimeString(),
-        timerValid: !!data.timer_end,
-        remainingMs: data.timer_end ? data.timer_end - Date.now() : 'N/A'
-      });
-      
+
       setGamePhase(data.phase);
       
       // Clear selected letter when starting new letter selection phase
@@ -129,7 +119,6 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
             const gameData = await apiService.getGame(data.gameId);
             const currentPlayer = gameData?.game?.players?.find((p: any) => p.user_id === user.id);
             if (currentPlayer?.current_letter) {
-              console.log('✅ Recovered current_letter from API:', currentPlayer.current_letter);
               setSelectedLetter(currentPlayer.current_letter);
             } else {
               console.error('❌ Could not recover current_letter from API');

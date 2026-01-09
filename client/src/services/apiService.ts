@@ -129,7 +129,6 @@ class ApiService {
     
     try {
       const result = await this.request<Game>(endpoint, { method: 'POST' });
-      // console.log('✅ ApiService.startGame success:', result);
       return result;
     } catch (error) {
       console.error('❌ ApiService.startGame failed:', error);
