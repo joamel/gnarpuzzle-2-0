@@ -33,8 +33,6 @@ const PlayersList: React.FC<PlayersListProps> = ({
           const isOwner = member.role === 'owner';
           const isPlayerReady = readyPlayers.has(member.userId);
 
-          console.log(`🟧 Rendering player: ${member.username} (userId: ${member.userId}, authId: ${String(authUserId)}, isCurrentUser: ${isCurrentUser})`);
-
           return (
             <div key={`player-${member.userId || index}-${member.username}`} className="player-item">
               <div className="player-info">
