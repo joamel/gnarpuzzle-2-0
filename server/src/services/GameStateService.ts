@@ -889,7 +889,7 @@ export class GameStateService {
    * - If only 1 player left: end the game
    * - If more players but leaving player had turn: switch to next player
    */
-  async handlePlayerLeft(gameId: number, leavingUserId: number): Promise<void> {
+  async handlePlayerLeft(gameId: number, leavingUserId: number, intentional: boolean = false): Promise<void> {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
 
@@ -899,18 +899,30 @@ export class GameStateService {
       return;
     }
 
-    // Remove player from the game
-    await db.run(`DELETE FROM players WHERE game_id = ? AND user_id = ?`, gameId, leavingUserId);
-    console.log(`🚪 Removed player ${leavingUserId} from game ${gameId}`);
+    // If intentional leave (clicked button), remove player immediately
+    if (intentional) {
+      console.log(`🚪 Player ${leavingUserId} intentionally left game ${gameId} - removing immediately`);
+      
+      // Remove player from the game
+      await db.run(`DELETE FROM players WHERE game_id = ? AND user_id = ?`, gameId, leavingUserId);
+      console.log(`🚪 Removed player ${leavingUserId} from game ${gameId}`);
+    } else {
+      console.log(`🚪 Player ${leavingUserId} disconnected from game ${gameId} - will be removed if not reconnecting`);
+      // For non-intentional disconnects, the SocketService handles the grace period
+      // and will call this function again with proper removal after timeout
+      return;
+    }
 
     // Get remaining players
     const remainingPlayers = await db.all(`
-      gameLogger.info('Player left during game - ending game', { 
-        gameId, 
-        leavingUserId, 
-        remainingPlayers: remainingPlayers.length 
-      }
+      SELECT user_id, position FROM players WHERE game_id = ?
     `, gameId) as { user_id: number; position: number }[];
+    
+    gameLogger.info('Player left during game - checking remaining players', { 
+      gameId, 
+      leavingUserId, 
+      remainingPlayers: remainingPlayers.length 
+    });
 
     // If only 1 or fewer players left, end the game
     if (remainingPlayers.length <= 1) {

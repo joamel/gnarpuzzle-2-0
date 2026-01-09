@@ -495,11 +495,13 @@ router.post('/:code/join', AuthService.authenticateToken, async (req, res) => {
  * DELETE /api/rooms/:code/leave
  * Leave a room
  * Requires authentication
+ * Body: { intentional?: boolean } - if true, immediately remove player without grace period
  */
 router.delete('/:code/leave', AuthService.authenticateToken, async (req, res) => {
   try {
     const authReq = req as AuthenticatedRequest;
     const { code } = req.params;
+    const { intentional = false } = req.body || {};
 
     const room = await RoomModel.findByCode(code);
     if (!room) {
@@ -516,12 +518,12 @@ router.delete('/:code/leave', AuthService.authenticateToken, async (req, res) =>
     // Check if there's an active game - handle player leaving mid-game
     const activeGame = await GameModel.findByRoomId(room.id);
     if (activeGame && activeGame.state !== 'finished') {
-      logger.info(`Player ${authReq.user!.username} (${userId}) leaving active game ${activeGame.id}`);
+      logger.info(`Player ${authReq.user!.username} (${userId}) leaving active game ${activeGame.id} (intentional: ${intentional})`);
       const socketService = getSocketService();
       if (socketService) {
         const { GameStateService } = await import('../services/GameStateService');
         const gameStateService = GameStateService.getInstance(socketService);
-        await gameStateService.handlePlayerLeft(activeGame.id, userId);
+        await gameStateService.handlePlayerLeft(activeGame.id, userId, intentional);
       }
     }
 

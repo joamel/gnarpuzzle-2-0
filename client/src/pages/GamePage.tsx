@@ -64,7 +64,7 @@ const GamePage: React.FC = () => {
     }
     
     try {
-      await leaveRoom();
+      await leaveRoom(true); // intentional = true when clicking button
       navigate('/');
     } catch (error) {
       console.error('Failed to leave room:', error);

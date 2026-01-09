@@ -26,7 +26,7 @@ interface GameContextType {
   
   // Room actions
   joinRoom: (code: string, password?: string) => Promise<Room>;
-  leaveRoom: () => Promise<void>;
+  leaveRoom: (intentional?: boolean) => Promise<void>;
   
   // UI state
   isLoading: boolean;
@@ -781,11 +781,11 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     }
   }, []);
 
-  const leaveRoom = useCallback(async () => {
+  const leaveRoom = useCallback(async (intentional: boolean = false) => {
     if (!currentRoom) return;
     
     try {
-      await apiService.leaveRoom(currentRoom.code);
+      await apiService.leaveRoom(currentRoom.code, intentional);
       setCurrentRoom(null);
       setCurrentGame(null);
       setPlayers([]);

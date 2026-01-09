@@ -110,8 +110,11 @@ class ApiService {
     return response.room || response;
   }
 
-  async leaveRoom(code: string): Promise<any> {
-    return this.request<any>(`/api/rooms/${code}/leave`, { method: 'DELETE' });
+  async leaveRoom(code: string, intentional: boolean = false): Promise<any> {
+    return this.request<any>(`/api/rooms/${code}/leave`, { 
+      method: 'DELETE',
+      body: JSON.stringify({ intentional })
+    });
   }
 
   async updateRoomSettings(roomId: number, settings: { max_players?: number; grid_size?: number; letter_timer?: number; placement_timer?: number }): Promise<any> {
