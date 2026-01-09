@@ -194,52 +194,74 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     };
 
     const handleLetterPlaced = (data: any) => {
-      // Update player's grid
-      setPlayers(prev => prev.map(p => {
-        if (p.userId === data.playerId) {
-          const newGrid = [...p.grid];
-          if (newGrid[data.y] && newGrid[data.y][data.x]) {
-            newGrid[data.y][data.x] = {
-              letter: data.letter,
-              x: data.x,
-              y: data.y,
-            };
+      try {
+        // Update player's grid
+        setPlayers(prev => prev.map(p => {
+          if (p.userId === data.playerId) {
+            const newGrid = [...p.grid];
+            if (newGrid[data.y] && newGrid[data.y][data.x]) {
+              newGrid[data.y][data.x] = {
+                letter: data.letter,
+                x: data.x,
+                y: data.y,
+              };
+            }
+            return { ...p, grid: newGrid };
           }
-          return { ...p, grid: newGrid };
-        }
-        return p;
-      }));
+          return p;
+        }));
+      } catch (error) {
+        console.error('❌ Error handling letter placed event:', error, data);
+      }
     };
 
     const handleGameEnded = (data: any) => {
-      // Parse grid and words data if they are JSON strings
-      const parsedLeaderboard = (data.leaderboard || []).map((player: any) => ({
-        ...player,
-        grid: typeof player.grid === 'string' ? JSON.parse(player.grid) : player.grid,
-        words: typeof player.words === 'string' ? JSON.parse(player.words) : player.words
-      }));
-      
-      setLeaderboard(parsedLeaderboard);
-      setGamePhase('finished');
-      setGameTimer(null);
-      
-      // Store board size from game data
-      if (data.boardSize) {
-        setBoardSize(data.boardSize);
-      }
-      
-      // Store reason if provided (e.g., player_left)
-      if (data.reason) {
-        setGameEndReason(data.reason);
-      }
-      
-      if (currentGame) {
-        setCurrentGame(prev => prev ? { ...prev, status: 'completed' } : null);
-      }
+      try {
+        // Parse grid and words data if they are JSON strings
+        const parsedLeaderboard = (data.leaderboard || []).map((player: any) => {
+          try {
+            return {
+              ...player,
+              grid: typeof player.grid === 'string' ? JSON.parse(player.grid) : player.grid,
+              words: typeof player.words === 'string' ? JSON.parse(player.words) : player.words
+            };
+          } catch (parseError) {
+            console.error('❌ Error parsing player leaderboard data:', parseError, player);
+            return {
+              ...player,
+              grid: player.grid,
+              words: player.words
+            };
+          }
+        });
+        
+        setLeaderboard(parsedLeaderboard);
+        setGamePhase('finished');
+        setGameTimer(null);
+        
+        // Store board size from game data
+        if (data.boardSize) {
+          setBoardSize(data.boardSize);
+        }
+        
+        // Store reason if provided (e.g., player_left)
+        if (data.reason) {
+          setGameEndReason(data.reason);
+        }
+        
+        if (currentGame) {
+          setCurrentGame(prev => prev ? { ...prev, status: 'completed' } : null);
+        }
 
-      // Update room status back to waiting
-      if (currentRoom) {
-        setCurrentRoom(prev => prev ? { ...prev, status: 'waiting' } : null);
+        // Update room status back to waiting
+        if (currentRoom) {
+          setCurrentRoom(prev => prev ? { ...prev, status: 'waiting' } : null);
+        }
+      } catch (error) {
+        console.error('❌ Error handling game ended event:', error, data);
+        // Set minimal game end state
+        setGamePhase('finished');
+        setGameTimer(null);
       }
     };
 
@@ -466,31 +488,40 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     };
 
     const handleOwnershipTransferred = (data: any) => {
-
-      // Update current room data
-      if (currentRoom && currentRoom.code === data.roomCode) {
-        setCurrentRoom(prev => prev ? { 
-          ...prev, 
-          created_by: data.newCreator.id 
-        } : null);
+      try {
+        // Update current room data
+        if (currentRoom && currentRoom.code === data.roomCode) {
+          setCurrentRoom(prev => prev ? { 
+            ...prev, 
+            created_by: data.newCreator.id 
+          } : null);
+        }
+      } catch (error) {
+        console.error('❌ Error handling ownership transferred event:', error, data);
       }
     };
 
     const handleRoomUpdated = (data: any) => {
-
-      // Update current room data
-      if (currentRoom && currentRoom.code === data.room.code) {
-        setCurrentRoom(data.room);
+      try {
+        // Update current room data
+        if (currentRoom && currentRoom.code === data.room.code) {
+          setCurrentRoom(data.room);
+        }
+      } catch (error) {
+        console.error('❌ Error handling room updated event:', error, data);
       }
     };
 
     const handleTurnSkipped = (data: any) => {
-
-      // Update game state with new current turn
-      setCurrentGame(prev => {
-        if (!prev) return null;
-        return { ...prev, currentTurn: data.nextPlayerId };
-      });
+      try {
+        // Update game state with new current turn
+        setCurrentGame(prev => {
+          if (!prev) return null;
+          return { ...prev, currentTurn: data.nextPlayerId };
+        });
+      } catch (error) {
+        console.error('❌ Error handling turn skipped event:', error, data);
+      }
     };
 
     // Register socket events

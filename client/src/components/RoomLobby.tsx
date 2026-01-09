@@ -172,40 +172,48 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
     if (!currentRoom?.code) return;
 
     const handleMemberJoined = (data: any) => {
-      // If readyPlayers was sent in the event, use it directly
-      if (data.readyPlayers && Array.isArray(data.readyPlayers)) {
-        const ready = new Set<string>(data.readyPlayers.map(String));
-        setReadyPlayers(ready);
+      try {
+        // If readyPlayers was sent in the event, use it directly
+        if (data.readyPlayers && Array.isArray(data.readyPlayers)) {
+          const ready = new Set<string>(data.readyPlayers.map(String));
+          setReadyPlayers(ready);
+        }
+        
+         // Update playerList directly from socket event (instant)
+         if (data.room?.members && data.room.members.length > 0) {
+           const mappedMembers = data.room.members.map((member: any) => ({
+             userId: String(member.userId),
+             username: member.username,
+             role: member.role,
+             joinedAt: new Date().toISOString()
+           }));
+           setPlayerList(mappedMembers);
+         }
+      } catch (error) {
+        console.error('❌ Error handling member joined event:', error, data);
       }
-      
-       // Update playerList directly from socket event (instant)
-       if (data.room?.members && data.room.members.length > 0) {
-         const mappedMembers = data.room.members.map((member: any) => ({
-           userId: String(member.userId),
-           username: member.username,
-           role: member.role,
-           joinedAt: new Date().toISOString()
-         }));
-         setPlayerList(mappedMembers);
-       }
     };
 
     const handleMemberLeft = () => {
-      // Refresh room data when someone leaves
-      if (currentRoom.code) {
-        apiService.getRoomByCode(currentRoom.code).then(freshData => {
-          if (freshData?.room?.members) {
-            const mappedMembers = freshData.room.members.map((member: any) => ({
-              userId: String(member.id),
-              username: member.username,
-              role: String(member.id) === String(freshData.room.createdBy) ? 'owner' : 'member',
-              joinedAt: new Date().toISOString()
-            }));
-            setPlayerList(mappedMembers);
-          }
-        }).catch(err => {
-          console.error('Failed to refresh after member left:', err);
-        });
+      try {
+        // Refresh room data when someone leaves
+        if (currentRoom.code) {
+          apiService.getRoomByCode(currentRoom.code).then(freshData => {
+            if (freshData?.room?.members) {
+              const mappedMembers = freshData.room.members.map((member: any) => ({
+                userId: String(member.id),
+                username: member.username,
+                role: String(member.id) === String(freshData.room.createdBy) ? 'owner' : 'member',
+                joinedAt: new Date().toISOString()
+              }));
+              setPlayerList(mappedMembers);
+            }
+          }).catch(err => {
+            console.error('Failed to refresh after member left:', err);
+          });
+        }
+      } catch (error) {
+        console.error('❌ Error handling member left event:', error);
       }
     };
 

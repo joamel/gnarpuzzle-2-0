@@ -350,9 +350,14 @@ export class SocketService {
         roomCode
       });
     } catch (error) {
+      socket.emit('room:leave_error', {
+        error: 'Failed to leave room',
+        roomCode
+      });
       logger.error(`Room leave failed: ${roomCode}`, {
         service: 'gnarpuzzle-server',
-        error: (error as Error).message
+        error: (error as Error).message,
+        userId: userData.userId
       });
     }
   }
