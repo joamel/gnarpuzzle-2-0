@@ -934,6 +934,9 @@ export class GameStateService {
       // Update game state to finished
       await db.run(`UPDATE games SET state = 'finished', current_phase = 'finished' WHERE id = ?`, gameId);
       
+      // Update room status back to waiting
+      await db.run(`UPDATE rooms SET status = 'waiting' WHERE id = ?`, game.room_id);
+      
       // Notify all players that game ended due to player leaving
       this.socketService.broadcastToRoom(`game:${gameId}`, 'game:ended', {
         gameId,

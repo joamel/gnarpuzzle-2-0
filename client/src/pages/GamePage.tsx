@@ -29,15 +29,21 @@ const GamePage: React.FC = () => {
     });
     
     if (currentGame && (gamePhase === 'letter_selection' || gamePhase === 'letter_placement')) {
-
       setGameStarted(true);
     }
     
     // If room status is "playing", show game interface even without currentGame
     if (currentRoom?.status === 'playing') {
-
       setGameStarted(true);
     }
+
+    // Return to lobby if game is no longer active and we're showing game interface
+    if (gameStarted && !currentGame && currentRoom?.status !== 'playing') {
+      setGameStarted(false);
+    }
+
+    // If game phase is finished, let it show leaderboard (gameStarted stays true)
+    // but GamePage will render leaderboard because gamePhase === 'finished'
   }, [currentGame, gamePhase, currentRoom?.status]);
 
   const handleStartGame = () => {

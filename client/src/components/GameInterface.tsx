@@ -210,6 +210,10 @@ const GameInterface: React.FC = () => {
   };
 
   if (!currentPlayer) {
+    // If game is finished, don't show loading - let parent handle leaderboard
+    if (gamePhase === 'finished') {
+      return null;
+    }
     return <div>Loading game...</div>;
   }
 
