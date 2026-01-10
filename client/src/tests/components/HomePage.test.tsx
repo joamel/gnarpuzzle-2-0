@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import HomePage from '../../pages/HomePage';
-import React from 'react';
 
 // Mock navigate
 const mockNavigate = vi.fn();

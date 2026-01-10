@@ -937,8 +937,10 @@ export class GameStateService {
       // Update room status back to waiting
       await db.run(`UPDATE rooms SET status = 'waiting' WHERE id = ?`, game.room_id);
       
-      // Notify all players that game ended due to player leaving
-      this.socketService.broadcastToRoom(`game:${gameId}`, 'game:ended', {
+      // Get room code for socket broadcast
+      const room = await db.get(`SELECT code FROM rooms WHERE id = ?`, game.room_id) as { code: string } | undefined;
+      
+      const gameEndedData = {
         gameId,
         reason: 'player_left',
         message: 'Spelet avslutades eftersom en spelare lämnade',
@@ -949,7 +951,13 @@ export class GameStateService {
           words: []
         }] : [],
         finalScores: {}
-      });
+      };
+      
+      // Notify all players that game ended - send to BOTH game room and room room
+      this.socketService.broadcastToRoom(`game:${gameId}`, 'game:ended', gameEndedData);
+      if (room?.code) {
+        this.socketService.broadcastToRoom(`room:${room.code}`, 'game:ended', gameEndedData);
+      }
       
       return;
     }
