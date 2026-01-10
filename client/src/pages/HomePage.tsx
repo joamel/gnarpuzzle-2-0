@@ -5,7 +5,7 @@ import { useGame } from '../contexts/GameContext';
 import { apiService } from '../services/apiService';
 import { socketService } from '../services/socketService';
 import { Room } from '../types/game';
-import Logo from '@/assets/Logo';
+import Logo from '../assets/Logo';
 import '../styles/home.css';
 
 const HomePage: React.FC = () => {

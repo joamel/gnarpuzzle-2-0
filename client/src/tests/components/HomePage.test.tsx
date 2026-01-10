@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import HomePage from '../../pages/HomePage';
+import React from 'react';
 
 // Mock navigate
 const mockNavigate = vi.fn();
@@ -25,11 +26,18 @@ vi.mock('../../contexts/AuthContext', () => ({
 
 // Mock GameContext
 const mockJoinRoom = vi.fn();
+const mockLeaveRoom = vi.fn();
 vi.mock('../../contexts/GameContext', () => ({
   useGame: () => ({
     joinRoom: mockJoinRoom,
+    leaveRoom: mockLeaveRoom,
     currentRoom: null,
   }),
+}));
+
+// Mock Logo component (alias import)
+vi.mock('@/assets/Logo', () => ({
+  default: (props: any) => <div data-testid="logo" {...props}>Logo</div>
 }));
 
 // Mock apiService
@@ -63,80 +71,44 @@ describe('HomePage Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetRooms.mockResolvedValue([]);
+    mockJoinRoom.mockResolvedValue({ success: true });
+    mockLeaveRoom.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
     vi.clearAllTimers();
   });
 
-  describe('Header', () => {
-    it('should render header with username', async () => {
+  describe('Header and layout', () => {
+    it('renders welcome copy and logout', () => {
       renderHomePage();
-      
-      expect(screen.getByText('🧩 GnarPuzzle')).toBeInTheDocument();
-      expect(screen.getByText(/Hej, testuser!/)).toBeInTheDocument();
+
+      expect(screen.getByText('Välkommen till GnarPuzzle')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /logga ut/i })).toBeInTheDocument();
     });
 
-    it('should have logout button', () => {
+    it('shows available rooms count and user info', async () => {
       renderHomePage();
-      
-      const logoutButton = screen.getByRole('button', { name: /logga ut/i });
-      expect(logoutButton).toBeInTheDocument();
-    });
-  });
 
-  describe('Quick Actions', () => {
-    it('should render create room button', () => {
-      renderHomePage();
-      
-      expect(screen.getByText('🎮 Skapa nytt rum')).toBeInTheDocument();
-    });
-
-    it('should render room code input and join button', () => {
-      renderHomePage();
-      
-      expect(screen.getByPlaceholderText(/Rumskod/i)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /gå med/i })).toBeInTheDocument();
-    });
-
-    it('should disable join button when room code is empty', () => {
-      renderHomePage();
-      
-      const joinButton = screen.getByRole('button', { name: /gå med/i });
-      expect(joinButton).toBeDisabled();
-    });
-
-    it('should enable join button when room code is entered', () => {
-      renderHomePage();
-      
-      const input = screen.getByPlaceholderText(/Rumskod/i);
-      fireEvent.change(input, { target: { value: 'ABC123' } });
-      
-      const joinButton = screen.getByRole('button', { name: /gå med/i });
-      expect(joinButton).not.toBeDisabled();
-    });
-
-    it('should convert room code to uppercase', () => {
-      renderHomePage();
-      
-      const input = screen.getByPlaceholderText(/Rumskod/i) as HTMLInputElement;
-      fireEvent.change(input, { target: { value: 'abc123' } });
-      
-      expect(input.value).toBe('ABC123');
+      await waitFor(() => {
+        expect(screen.getByText('Tillgängliga rum (0)')).toBeInTheDocument();
+        expect(screen.getByText(/Inloggad som:/)).toBeInTheDocument();
+        expect(screen.getByText(/testuser/)).toBeInTheDocument();
+      });
     });
   });
 
-  describe('Room List', () => {
-    it('should show empty state when no rooms available', async () => {
-      mockGetRooms.mockResolvedValue([]);
+  describe('Room list', () => {
+    it('shows empty state when no rooms are available', async () => {
       renderHomePage();
-      
+
       await waitFor(() => {
         expect(screen.getByText('Inga rum tillgängliga')).toBeInTheDocument();
+        expect(screen.getByText('Skapa det första rummet')).toBeInTheDocument();
       });
     });
 
-    it('should display available rooms', async () => {
+    it('renders available rooms with details', async () => {
       mockGetRooms.mockResolvedValue([
         {
           id: '1',
@@ -145,214 +117,124 @@ describe('HomePage Component', () => {
           member_count: 2,
           max_players: 4,
           board_size: 4,
+          settings: { placement_timer: 30, letter_timer: 20 },
         },
       ]);
-      
+
       renderHomePage();
-      
+
       await waitFor(() => {
         expect(screen.getByText('Test Room')).toBeInTheDocument();
-        expect(screen.getByText('ABC123')).toBeInTheDocument();
         expect(screen.getByText('Tillgängliga rum (1)')).toBeInTheDocument();
+        expect(screen.getByText(/20\s*s/)).toBeInTheDocument();
+        expect(screen.getByText(/4\s*×\s*4/)).toBeInTheDocument();
       });
     });
 
-    it('should show Fullt button for full rooms', async () => {
+    it('joins a room when clicking a non-full room card', async () => {
       mockGetRooms.mockResolvedValue([
         {
           id: '1',
-          name: 'Full Room',
-          code: 'FULL01',
-          member_count: 4,
-          max_players: 4,
-          board_size: 4,
-        },
-      ]);
-      
-      renderHomePage();
-      
-      await waitFor(() => {
-        expect(screen.getByText('Fullt')).toBeInTheDocument();
-      });
-    });
-
-    it('should have refresh button', () => {
-      renderHomePage();
-      
-      const refreshButton = screen.getByRole('button', { name: /uppdatera rumslista/i });
-      expect(refreshButton).toBeInTheDocument();
-    });
-  });
-
-  describe('Create Room Modal', () => {
-    it('should open modal when create button is clicked', async () => {
-      renderHomePage();
-      
-      const createButton = screen.getByText('🎮 Skapa nytt rum');
-      fireEvent.click(createButton);
-      
-      // Modal should appear with title
-      await waitFor(() => {
-        expect(screen.getByText('Skapa nytt rum')).toBeInTheDocument();
-      });
-    });
-
-    it('should have room name input in modal', async () => {
-      renderHomePage();
-      
-      fireEvent.click(screen.getByText('🎮 Skapa nytt rum'));
-      
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText('Mitt coola rum')).toBeInTheDocument();
-      });
-    });
-
-    it('should have player and board size selects', async () => {
-      renderHomePage();
-      
-      fireEvent.click(screen.getByText('🎮 Skapa nytt rum'));
-      
-      await waitFor(() => {
-        expect(screen.getByText('Max spelare')).toBeInTheDocument();
-        expect(screen.getByText(/Brädstorlek/)).toBeInTheDocument();
-      });
-    });
-
-    it('should close modal when close button is clicked', async () => {
-      renderHomePage();
-      
-      fireEvent.click(screen.getByText('🎮 Skapa nytt rum'));
-      
-      await waitFor(() => {
-        expect(screen.getByText('Skapa nytt rum')).toBeInTheDocument();
-      });
-      
-      const closeButton = screen.getByRole('button', { name: /stäng/i });
-      fireEvent.click(closeButton);
-      
-      // Modal content should be gone (only one "Skapa nytt rum" from main button)
-      await waitFor(() => {
-        const elements = screen.getAllByText(/Skapa nytt rum/);
-        expect(elements).toHaveLength(1);
-      });
-    });
-
-    it('should disable submit when room name is empty', async () => {
-      renderHomePage();
-      
-      fireEvent.click(screen.getByText('🎮 Skapa nytt rum'));
-      
-      await waitFor(() => {
-        const submitButton = screen.getByText('Skapa rum');
-        expect(submitButton).toBeDisabled();
-      });
-    });
-
-    it('should enable submit when room name is entered', async () => {
-      renderHomePage();
-      
-      fireEvent.click(screen.getByText('🎮 Skapa nytt rum'));
-      
-      await waitFor(() => {
-        const input = screen.getByPlaceholderText('Mitt coola rum');
-        fireEvent.change(input, { target: { value: 'My Room' } });
-        
-        const submitButton = screen.getByText('Skapa rum');
-        expect(submitButton).not.toBeDisabled();
-      });
-    });
-  });
-
-  describe('Room Joining', () => {
-    it('should call joinRoom when joining by code', async () => {
-      mockJoinRoom.mockResolvedValue({ success: true });
-      renderHomePage();
-      
-      const input = screen.getByPlaceholderText(/Rumskod/i);
-      fireEvent.change(input, { target: { value: 'TEST01' } });
-      
-      const joinButton = screen.getByRole('button', { name: /gå med/i });
-      fireEvent.click(joinButton);
-      
-      await waitFor(() => {
-        expect(mockJoinRoom).toHaveBeenCalledWith('TEST01');
-      });
-    });
-
-    it('should call joinRoom when clicking join on room card', async () => {
-      mockGetRooms.mockResolvedValue([
-        {
-          id: '1',
-          name: 'Test Room',
-          code: 'ABC123',
+          name: 'Open Room',
+          code: 'OPEN01',
           member_count: 1,
           max_players: 4,
-          board_size: 4,
+          board_size: 5,
+          settings: { placement_timer: 25, letter_timer: 15 },
         },
       ]);
-      mockJoinRoom.mockResolvedValue({ success: true });
-      
+
       renderHomePage();
-      
+
+      const card = await screen.findByText('Open Room');
+      fireEvent.click(card.closest('.card')!);
+
       await waitFor(() => {
-        expect(screen.getByText('Test Room')).toBeInTheDocument();
+        expect(mockJoinRoom).toHaveBeenCalledWith('OPEN01', undefined);
       });
-      
-      // Get the join button on the room card (not the one in quick actions)
-      const joinButtons = screen.getAllByText('Gå med');
-      fireEvent.click(joinButtons[joinButtons.length - 1]); // Last one is on room card
-      
+    });
+
+    it('prompts for password when room is locked and joins with provided code', async () => {
+      mockGetRooms.mockResolvedValue([
+        {
+          id: '2',
+          name: 'Locked Room',
+          code: 'LOCK01',
+          member_count: 1,
+          max_players: 4,
+          board_size: 5,
+          settings: { require_password: true, placement_timer: 25, letter_timer: 15 },
+        },
+      ]);
+
+      renderHomePage();
+
+      const card = await screen.findByText('Locked Room');
+      fireEvent.click(card.closest('.card')!);
+
       await waitFor(() => {
-        expect(mockJoinRoom).toHaveBeenCalledWith('ABC123');
+        expect(screen.getByText('Lösenord krävs')).toBeInTheDocument();
+      });
+
+      const passwordInput = screen.getByPlaceholderText('Ange rumskoden') as HTMLInputElement;
+      fireEvent.change(passwordInput, { target: { value: 'secret' } });
+      expect(passwordInput.value).toBe('SECRET');
+
+      fireEvent.click(screen.getByRole('button', { name: /gå med/i }));
+
+      await waitFor(() => {
+        expect(mockJoinRoom).toHaveBeenCalledWith('LOCK01', 'SECRET');
       });
     });
   });
 
-  describe('Room Creation', () => {
-    it('should call createRoom with correct parameters', async () => {
-      mockCreateRoom.mockResolvedValue({ 
-        room: { id: '1', code: 'NEW123' } 
-      });
-      mockJoinRoom.mockResolvedValue({ success: true });
-      
+  describe('Create room modal', () => {
+    it('opens modal from empty state action', async () => {
       renderHomePage();
-      
-      fireEvent.click(screen.getByText('🎮 Skapa nytt rum'));
-      
-      await waitFor(() => {
-        const input = screen.getByPlaceholderText('Mitt coola rum');
-        fireEvent.change(input, { target: { value: 'My New Room' } });
-      });
-      
+
+      const openButton = await screen.findByText('Skapa det första rummet');
+      fireEvent.click(openButton);
+
+      expect(await screen.findByText('Skapa nytt rum')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Mitt coola rum')).toBeInTheDocument();
+    });
+
+    it('disables submit when room name is empty', async () => {
+      renderHomePage();
+
+      const openButton = await screen.findByText('Skapa det första rummet');
+      fireEvent.click(openButton);
+
+      const submitButton = await screen.findByText('Skapa rum');
+      expect(submitButton).toBeDisabled();
+    });
+
+    it('submits room creation with defaults and joins room', async () => {
+      mockCreateRoom.mockResolvedValue({ room: { id: '10', code: 'NEW123' } });
+
+      renderHomePage();
+
+      const openButton = await screen.findByText('Skapa det första rummet');
+      fireEvent.click(openButton);
+
+      const nameInput = await screen.findByPlaceholderText('Mitt coola rum');
+      fireEvent.change(nameInput, { target: { value: 'My New Room' } });
+
       const submitButton = screen.getByText('Skapa rum');
       fireEvent.click(submitButton);
-      
-      await waitFor(() => {
-        expect(mockCreateRoom).toHaveBeenCalledWith(
-          'My New Room',
-          expect.objectContaining({
-            max_players: 4,
-            board_size: 4,
-          })
-        );
-      });
-    });
-  });
 
-  describe('Error Handling', () => {
-    it('should display error message when join fails', async () => {
-      mockJoinRoom.mockRejectedValue(new Error('Rummet finns inte'));
-      
-      renderHomePage();
-      
-      const input = screen.getByPlaceholderText(/Rumskod/i);
-      fireEvent.change(input, { target: { value: 'INVALID' } });
-      
-      const joinButton = screen.getByRole('button', { name: /gå med/i });
-      fireEvent.click(joinButton);
-      
       await waitFor(() => {
-        expect(screen.getByText('Rummet finns inte')).toBeInTheDocument();
+        expect(mockCreateRoom).toHaveBeenCalledWith('My New Room', {
+          max_players: 4,
+          board_size: 5,
+          letter_timer: 20,
+          placement_timer: 30,
+          require_password: false,
+        });
+      });
+
+      await waitFor(() => {
+        expect(mockJoinRoom).toHaveBeenCalledWith('NEW123');
       });
     });
   });

@@ -3,37 +3,46 @@ import request from 'supertest';
 import express from 'express';
 import { roomRoutes } from '../../routes/rooms';
 import { RoomModel } from '../../models/RoomModel';
+import { GameModel } from '../../models/GameModel';
 import { AuthService } from '../../services/AuthService';
 import { GameStateService } from '../../services/GameStateService';
 
 // Mock dependencies
 vi.mock('../../models/RoomModel');
 vi.mock('../../services/AuthService');
-vi.mock('../../services/GameStateService', () => {
-  const mockStartGame = vi.fn().mockResolvedValue({
-    id: 1,
-    room_id: 1,
-    state: 'starting',
-    current_phase: 'letter_selection',
-    phase_timer_end: Date.now() + 10000
-  });
-  
-  return {
-    GameStateService: {
-      getInstance: vi.fn(() => ({
-        startGame: mockStartGame,
-        handlePlayerLeft: vi.fn().mockResolvedValue(undefined)
-      }))
-    }
-  };
+const mockStartGame = vi.fn().mockResolvedValue({
+  id: 1,
+  room_id: 1,
+  state: 'starting',
+  current_phase: 'letter_selection',
+  phase_timer_end: Date.now() + 10000
 });
-vi.mock('../../index', () => ({
-  getSocketService: vi.fn(() => ({
-    emitToRoom: vi.fn(),
-    broadcastToRoom: vi.fn(),
-    joinPlayersToGame: vi.fn()
-  }))
+const mockHandlePlayerLeft = vi.fn().mockResolvedValue(undefined);
+const mockSocketService = {
+  emitToRoom: vi.fn(),
+  broadcastToRoom: vi.fn(),
+  joinPlayersToGame: vi.fn(),
+  roomPlayerReadyStatus: new Map<string, Set<string>>(),
+  io: {
+    to: vi.fn().mockReturnThis(),
+    emit: vi.fn()
+  }
+};
+
+vi.mock('../../services/GameStateService', () => ({
+  GameStateService: {
+    getInstance: vi.fn(() => ({
+      startGame: mockStartGame,
+      handlePlayerLeft: mockHandlePlayerLeft
+    }))
+  }
 }));
+
+vi.mock('../../index', () => ({
+  getSocketService: vi.fn(() => mockSocketService)
+}));
+
+vi.mock('../../models/GameModel');
 
 const app = express();
 app.use(express.json());
@@ -147,6 +156,65 @@ describe('Room Routes - Start Game Integration', () => {
       expect(response.status).toBe(400);
       expect(response.body.error).toBe('Invalid room ID');
       expect(response.body.message).toBe('Room ID must be a valid number');
+    });
+  });
+
+  describe('DELETE /api/rooms/:code/leave', () => {
+    const room = {
+      id: 1,
+      code: 'TEST01',
+      name: 'Test Room',
+      created_by: 123,
+      max_players: 6,
+      board_size: 5,
+      turn_duration: 15,
+      status: 'playing' as const,
+      settings: {
+        grid_size: 5,
+        max_players: 6,
+        letter_timer: 10,
+        placement_timer: 15,
+        is_private: false
+      },
+      created_at: '2025-01-01T00:00:00.000Z'
+    };
+
+    it('should immediately remove player and invoke game handler on intentional leave', async () => {
+      const readySet = new Set<string>(['123']);
+      mockSocketService.roomPlayerReadyStatus.set(room.code, readySet);
+
+      vi.mocked(RoomModel.findByCode).mockResolvedValueOnce(room as any);
+      vi.mocked(GameModel.findByRoomId).mockResolvedValueOnce({
+        id: 99,
+        state: 'active',
+        current_phase: 'letter_selection',
+        current_turn: 123,
+        phase_timer_end: Date.now() + 10000
+      } as any);
+      vi.mocked(RoomModel.removeMember).mockResolvedValueOnce(true);
+      vi.mocked(RoomModel.getRoomMembers).mockResolvedValueOnce([]);
+      vi.mocked(RoomModel.transferOwnership).mockResolvedValueOnce(true as any);
+
+      const response = await request(app)
+        .delete('/api/rooms/TEST01/leave')
+        .send({ intentional: true });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(mockHandlePlayerLeft).toHaveBeenCalledWith(99, 123, true);
+      expect(mockSocketService.io.to).toHaveBeenCalledWith('room:TEST01');
+      expect(mockSocketService.roomPlayerReadyStatus.get(room.code)?.has('123')).toBe(false);
+    });
+
+    it('should return 404 when room is missing', async () => {
+      vi.mocked(RoomModel.findByCode).mockResolvedValueOnce(null as any);
+
+      const response = await request(app)
+        .delete('/api/rooms/NOROOM/leave')
+        .send({ intentional: true });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Room not found');
     });
   });
 });

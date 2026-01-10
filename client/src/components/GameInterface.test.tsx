@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react';
+import { render, waitFor, fireEvent } from '@testing-library/react';
 import { vi, describe, test, expect, beforeEach } from 'vitest';
 import { GameInterface } from './GameInterface';
 
@@ -16,7 +16,7 @@ const mockUseGame = {
   selectLetter: vi.fn(),
   placeLetter: vi.fn(),
   confirmPlacement: vi.fn(),
-  gameTimer: { endTime: Date.now() + 30000, remainingSeconds: 30, isWarning: false } as any
+  gameTimer: { endTime: Date.now() + 30000, remainingSeconds: 30, isWarning: false }
 };
 
 vi.mock('../contexts/GameContext', () => ({
@@ -29,7 +29,7 @@ describe('GameInterface Letter Placement Logic', () => {
     // Reset mock values
     mockUseGame.gamePhase = 'letter_selection';
     mockUseGame.selectedLetter = null;
-    mockUseGame.gameTimer = 30;
+    mockUseGame.gameTimer = { endTime: Date.now() + 30000, remainingSeconds: 30, isWarning: false };
     mockUseGame.selectLetter.mockResolvedValue(undefined);
     mockUseGame.placeLetter.mockResolvedValue(undefined);
     mockUseGame.confirmPlacement.mockResolvedValue(undefined);
@@ -82,9 +82,18 @@ describe('GameInterface Letter Placement Logic', () => {
     // Set up state with temporary placement and low timer
     mockUseGame.gamePhase = 'letter_placement';
     mockUseGame.selectedLetter = 'D';
-    mockUseGame.gameTimer = { endTime: Date.now() + 1000, remainingSeconds: 1, isWarning: true };
+    mockUseGame.gameTimer = { endTime: Date.now() + 5000, remainingSeconds: 5, isWarning: false };
     
-    render(<GameInterface />);
+    const { rerender } = render(<GameInterface />);
+
+    // Place a temporary letter by clicking a board cell
+    const boardButtons = Array.from(document.querySelectorAll('button'));
+    const boardCell = boardButtons[0];
+    fireEvent.click(boardCell);
+
+    // Drop timer to 1s and rerender to trigger auto-submit effect
+    mockUseGame.gameTimer = { endTime: Date.now() + 1000, remainingSeconds: 1, isWarning: true };
+    rerender(<GameInterface />);
     
     // The initial render should trigger auto-submit because gameTimer ≤ 1
     await waitFor(() => {
@@ -102,6 +111,11 @@ describe('GameInterface Letter Placement Logic', () => {
     mockUseGame.gameTimer = { endTime: Date.now() + 5000, remainingSeconds: 5, isWarning: false }; // Not low timer, but phase will change
     
     const { rerender } = render(<GameInterface />);
+
+    // Place a temporary letter by clicking a board cell
+    const boardButtons = Array.from(document.querySelectorAll('button'));
+    const boardCell = boardButtons[0];
+    fireEvent.click(boardCell);
     
     // Change phase away from letter_placement (simulating timeout)
     mockUseGame.gamePhase = 'letter_selection';

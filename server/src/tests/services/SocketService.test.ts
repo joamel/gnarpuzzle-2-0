@@ -1,6 +1,33 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { Mock } from 'vitest';
 import { SocketService } from '../../services/SocketService';
 import { Server as SocketServer } from 'socket.io';
+
+vi.mock('../../models', () => {
+  const findByCode = vi.fn();
+  const isMember = vi.fn();
+  const addMember = vi.fn();
+  const getRoomMembers = vi.fn();
+  const findByRoomId = vi.fn();
+  const getGamePlayers = vi.fn();
+
+  return {
+    RoomModel: {
+      findByCode,
+      isMember,
+      addMember,
+      getRoomMembers,
+      removeMember: vi.fn(),
+      transferOwnership: vi.fn(),
+    },
+    GameModel: {
+      findByRoomId,
+    },
+    PlayerModel: {
+      getGamePlayers,
+    }
+  };
+});
 
 describe('SocketService', () => {
   let mockIo: any;
@@ -105,6 +132,67 @@ describe('SocketService', () => {
 
       expect(mockIo.to).toHaveBeenCalledWith(room);
       expect(mockIo.emit).toHaveBeenCalledWith(event, data);
+    });
+  });
+
+  describe('reconnect sync', () => {
+    it('emits game:started with players and timer when joining active room', async () => {
+      const { RoomModel, GameModel, PlayerModel } = (await import('../../models')) as any;
+
+      (RoomModel.findByCode as Mock).mockResolvedValue({
+        id: 1,
+        code: 'TEST01',
+        name: 'Test Room',
+        created_by: 1
+      } as any);
+      (RoomModel.isMember as Mock).mockResolvedValue(true);
+      (RoomModel.addMember as Mock).mockResolvedValue(true);
+      (RoomModel.getRoomMembers as Mock).mockResolvedValue([{ id: 1, username: 'tester' }]);
+
+      (GameModel.findByRoomId as Mock).mockResolvedValue({
+        id: 9,
+        state: 'active',
+        current_phase: 'letter_selection',
+        current_turn: 1,
+        phase_timer_end: 123456
+      } as any);
+
+      (PlayerModel.getGamePlayers as Mock).mockResolvedValue([
+        {
+          id: 1,
+          user_id: 1,
+          position: 1,
+          username: 'tester',
+          grid_state: JSON.stringify([[{ letter: null, x: 0, y: 0 }]]),
+          placement_confirmed: 0
+        }
+      ]);
+
+      const socket: any = {
+        id: 'socket-1',
+        join: vi.fn(),
+        to: vi.fn().mockReturnThis(),
+        emit: vi.fn(),
+        handshake: { auth: {} }
+      };
+
+      // Seed connected user so handleRoomJoin treats socket as authed
+      (socketService as any).connectedUsers.set(socket.id, { userId: 1, username: 'tester' });
+
+      await (socketService as any).handleRoomJoin(socket, { roomCode: 'TEST01' });
+
+      expect(socket.join).toHaveBeenCalledWith('room:TEST01');
+      expect(socket.emit).toHaveBeenCalledWith(
+        'game:started',
+        expect.objectContaining({
+          gameId: 9,
+          roomId: 1,
+          timer_end: 123456,
+          players: expect.arrayContaining([
+            expect.objectContaining({ userId: 1, username: 'tester' })
+          ])
+        })
+      );
     });
   });
 });

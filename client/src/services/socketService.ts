@@ -11,6 +11,23 @@ class SocketService {
   private pendingRoomJoins: string[] = [];
 
   connect(token: string): Promise<Socket> {
+    // Test hook: allow Playwright to inject a mock socket via window.__socketMock
+    if (typeof window !== 'undefined' && (window as any).__socketMock) {
+      const mockSocket = (window as any).__socketMock as Socket;
+      this.socket = mockSocket;
+      this.isConnecting = false;
+      this.reconnectAttempts = 0;
+
+      // Re-register stored listeners on the mock socket
+      this.eventListeners.forEach((listeners, event) => {
+        listeners.forEach(listener => {
+          mockSocket.on?.(event, listener as (...args: any[]) => void);
+        });
+      });
+
+      return Promise.resolve(mockSocket);
+    }
+
     if (this.socket?.connected) {
       return Promise.resolve(this.socket);
     }
