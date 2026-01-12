@@ -2,6 +2,7 @@ import React, { useEffect, Suspense, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { GameProvider } from './contexts/GameContext';
+import DebugPanel from './components/DebugPanel';
 import './styles/global.css';
 import './styles/mobile.css';
 // Removed PWA styles to avoid conflicts
@@ -94,16 +95,10 @@ function App() {
       );
     }
 
-    if (!isAuthenticated) {
-      return <Navigate to="/login" replace />;
-    }
-
     return (
-      <GameProvider>
-        <Suspense fallback={<PageLoading />}>
-          {children}
-        </Suspense>
-      </GameProvider>
+      <Suspense fallback={<PageLoading />}>
+        {!isAuthenticated ? <Navigate to="/login" replace /> : children}
+      </Suspense>
     );
   };
 
@@ -140,64 +135,66 @@ function App() {
   };
   return (
     <div className="app-container">
-      <AuthProvider>
-        <Router future={{
-          v7_startTransition: true,
-          v7_relativeSplatPath: true
-        }}>
-          <Routes>
-            <Route 
-              path="/login" 
-              element={
-                <PublicRoute>
-                  <LoginPage />
-                </PublicRoute>
-              } 
-            />
-            <Route 
-              path="/" 
-              element={
-                <ProtectedRoute>
-                  <HomePage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/game" 
-              element={
-                <ProtectedRoute>
-                  <GamePage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/test" 
-              element={
-                <div style={{ isolation: 'isolate' }}>
-                  <GameTestPage />
-                </div>
-              } 
-            />
-            <Route 
-              path="/debug/results" 
-              element={
-                <Suspense fallback={<div>Loading...</div>}>
-                  <DebugResultsPage />
-                </Suspense>
-              } 
-            />
-            <Route 
-              path="/debug/placement" 
-              element={
-                <Suspense fallback={<div>Loading...</div>}>
-                  <DebugPlacementPage />
-                </Suspense>
-              } 
-            />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Router>
-      </AuthProvider>
+      <GameProvider>
+        <AuthProvider>
+          <Router future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true
+          }}>
+            <Routes>
+              <Route 
+                path="/login" 
+                element={
+                  <PublicRoute>
+                    <LoginPage />
+                  </PublicRoute>
+                } 
+              />
+              <Route 
+                path="/" 
+                element={
+                  <ProtectedRoute>
+                    <HomePage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/game" 
+                element={
+                  <ProtectedRoute>
+                    <GamePage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/test" 
+                element={
+                  <div style={{ isolation: 'isolate' }}>
+                    <GameTestPage />
+                  </div>
+                } 
+              />
+              <Route 
+                path="/debug/results" 
+                element={
+                  <Suspense fallback={<div>Loading...</div>}>
+                    <DebugResultsPage />
+                  </Suspense>
+                } 
+              />
+              <Route 
+                path="/debug/placement" 
+                element={
+                  <Suspense fallback={<div>Loading...</div>}>
+                    <DebugPlacementPage />
+                  </Suspense>
+                } 
+              />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Router>
+        </AuthProvider>
+      </GameProvider>
       
       {/* Offline Indicator */}
       {!isOnline && (
@@ -205,6 +202,9 @@ function App() {
           📱 Du är offline - Vissa funktioner är begränsade
         </div>
       )}
+      
+      {/* Debug Panel for Mobile Debugging */}
+      <DebugPanel />
     </div>
   );
 }

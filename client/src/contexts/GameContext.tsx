@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { GameState, Player, Room, GamePhase, GameTimer, Leaderboard } from '../types/game';
 import { socketService } from '../services/socketService';
 import { apiService } from '../services/apiService';
@@ -53,8 +53,38 @@ interface GameProviderProps {
 export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   const { user } = useAuth();
   
+  // DEBUG: Track provider renders and auth changes
+  const renderCountRef = useRef(0);
+  renderCountRef.current++;
+  console.log(`🏗️ [GameProvider] Render #${renderCountRef.current}, user:`, user?.username, 'user id:', user?.id);
+  
   const [currentGame, setCurrentGame] = useState<GameState | null>(null);
-  const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
+  
+  // Track currentRoom with aggressive logging
+  const [currentRoom_internal, setCurrentRoom_internal] = useState<Room | null>(null);
+  const currentRoom = currentRoom_internal; // Read-only access
+  
+  const setCurrentRoom = useCallback((value: Room | null | ((prev: Room | null) => Room | null)) => {
+    if (typeof value === 'function') {
+      setCurrentRoom_internal(prev => {
+        const result = value(prev);
+        if (result === null && prev !== null) {
+          console.error('🚨🚨🚨 CRITICAL: setCurrentRoom functional update returned NULL!');
+          console.error('Previous value:', prev);
+          console.error('Stack trace:', new Error().stack);
+        }
+        return result;
+      });
+    } else {
+      if (value === null && currentRoom_internal !== null) {
+        console.error('🚨🚨🚨 CRITICAL: setCurrentRoom called with NULL!');
+        console.error('Previous value:', currentRoom_internal);
+        console.error('Stack trace:', new Error().stack);
+      }
+      setCurrentRoom_internal(value);
+    }
+  }, [currentRoom_internal]);
+  
   const [players, setPlayers] = useState<Player[]>([]);
   const [gamePhase, setGamePhase] = useState<GamePhase | null>(null);
   const [gameTimer, setGameTimer] = useState<GameTimer | null>(null);
@@ -64,6 +94,39 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   const [leaderboard, setLeaderboard] = useState<Leaderboard[] | null>(null);
   const [gameEndReason, setGameEndReason] = useState<string | null>(null);
   const [boardSize, setBoardSize] = useState<number>(5);
+
+  // Refs for coordinating cleanup across scenarios - PERSISTENT across effect re-runs
+  const reconnectInProgressRef = useRef(false);
+  const isIntentionallyLeavingRef = useRef(false);
+  const appIsHiddenRef = useRef(false);
+
+  // DEBUG: Track provider lifecycle
+  useEffect(() => {
+    console.log(`🏗️ [GameProvider] MOUNTED`);
+    // Test if debug logger catches this
+    setTimeout(() => {
+      console.log('🧪 [TEST] Debug logger should catch this delayed log');
+    }, 2000);
+    return () => {
+      console.log(`🏗️ [GameProvider] UNMOUNTING`);
+    };
+  }, []);
+
+  // Debug: Log currentRoom changes with detailed stack trace
+  useEffect(() => {
+    if (currentRoom) {
+      console.log('🔍 [GameContext] currentRoom changed:', `${currentRoom.code} (${currentRoom.status})`);
+    } else {
+      const stack = new Error().stack || '';
+      const stackLines = stack.split('\n');
+      const caller1 = stackLines[3]?.trim() || 'unknown';
+      const caller2 = stackLines[4]?.trim() || '';
+      console.log('🔍 [GameContext] currentRoom changed: NULL');
+      console.log('   └─ Called from:', caller1);
+      if (caller2) console.log('   └─ Called from:', caller2);
+      console.log('   └─ App is hidden:', appIsHiddenRef.current, 'reconnect in progress:', reconnectInProgressRef.current);
+    }
+  }, [currentRoom]);
 
   const currentPlayer = players.find(p => p.userId === user?.id) || null;
   
@@ -94,9 +157,21 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     return () => clearInterval(interval);
   }, [gameTimer?.endTime]);
 
-  // Socket event handlers
+  // Socket event handlers - ALWAYS register listeners, socket reconnect will trigger re-registration
   useEffect(() => {
-    if (!socketService.isConnected()) return;
+    // DEBUG: Log ALL socket events to catch unexpected ones
+    const debugLogAllEvents = (eventName: string, ...args: any[]) => {
+      if (eventName !== 'connect' && eventName !== 'disconnect' && eventName !== 'connect_error') {
+        console.log(`🔌 [SOCKET EVENT] ${eventName}:`, args);
+      }
+    };
+    
+    // Register debug listener if socket exists
+    const socket = socketService.getSocket();
+    console.log('🔌 Registering debug listener, socket exists:', !!socket);
+    if (socket) {
+      socket.onAny(debugLogAllEvents);
+    }
 
     const handleGamePhaseChanged = async (data: any) => {
 
@@ -207,6 +282,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
 
     const handleGameEnded = (data: any) => {
       try {
+        console.log('🎮 [game:ended] Event received, data:', data);
         // Parse grid and words data if they are JSON strings
         const parsedLeaderboard = (data.leaderboard || []).map((player: any) => {
           try {
@@ -245,7 +321,9 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
 
         // Update room status back to waiting
         if (currentRoom) {
-          setCurrentRoom(prev => prev ? { ...prev, status: 'waiting' } : null);
+          console.log('🎮 game:ended event handler - updating room status');
+          // NEVER clear currentRoom from game:ended event - keep room, just update status
+          setCurrentRoom(prev => prev ? { ...prev, status: 'waiting' } : prev);
         }
       } catch (error) {
         logger.game.error('Error handling game ended event', { error, data });
@@ -456,8 +534,13 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     };
 
     const handleRoomMemberLeft = (data: any) => {
+      // Don't process if WE are the one who left (screen lock, disconnect, etc)
+      if (user && data.user && Number(data.user.id) === Number(user.id)) {
+        console.log('🚪 Ignoring room:member_left for self (likely screen lock/disconnect)');
+        return;
+      }
 
-      // Force refresh room data to get updated member list
+      // Force refresh room data to get updated member list ONLY for other members leaving
       if (currentRoom && currentRoom.code === data.roomCode) {
         fetchRoomData(data.roomCode).catch(err => {
           console.error('Failed to refresh room data after member left:', err);
@@ -490,7 +573,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
           setCurrentRoom(prev => prev ? { 
             ...prev, 
             created_by: data.newCreator.id 
-          } : null);
+          } : prev); // NEVER return null - keep room
         }
       } catch (error) {
         console.error('❌ Error handling ownership transferred event:', error, data);
@@ -499,9 +582,11 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
 
     const handleRoomUpdated = (data: any) => {
       try {
-        // Update current room data
-        if (currentRoom && currentRoom.code === data.room.code) {
+        // Update current room data - ONLY if we have valid room data
+        if (currentRoom && data.room && data.room.code === currentRoom.code) {
           setCurrentRoom(data.room);
+        } else if (currentRoom && !data.room) {
+          console.warn('⚠️ room:updated event received with null/invalid room data, ignoring');
         }
       } catch (error) {
         console.error('❌ Error handling room updated event:', error, data);
@@ -533,6 +618,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     socketService.on('turn:skipped', handleTurnSkipped);
 
     return () => {
+      socketService.getSocket()?.offAny(debugLogAllEvents);
       socketService.off('game:phase_changed', handleGamePhaseChanged);
       socketService.off('letter:selected', handleLetterSelected);
       socketService.off('letter:placed', handleLetterPlaced);
@@ -544,7 +630,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       socketService.off('room:updated', handleRoomUpdated);
       socketService.off('turn:skipped', handleTurnSkipped);
     };
-  }, [currentGame, currentRoom, user, players.length]);
+  }, [currentGame, user]);
 
   // Handle browser refresh/close - warn user and leave room
   useEffect(() => {
@@ -770,7 +856,16 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       const room = await apiService.joinRoom(code, password);
 
       console.log('🏠 Room object keys:', Object.keys(room));
+      console.log('📝 Room object:', JSON.stringify({
+        code: room.code,
+        id: room.id,
+        status: room.status,
+        name: room.name,
+        members: room.members ? room.members.length : 0
+      }));
+      console.log('📝 Setting currentRoom state to:', room.code);
       setCurrentRoom(room);
+      console.log('📝 setCurrentRoom() called (async update scheduled)');
       
       // If room is playing, fetch the active game
       if (room.status === 'playing') {
@@ -813,11 +908,29 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     if (!currentRoom) return;
     
     try {
+      console.log('🚪 leaveRoom() called - intentional:', intentional, 'room:', currentRoom.code);
+      
+      // Set flag to prevent reconnect attempts
+      if (intentional) {
+        isIntentionallyLeavingRef.current = true;
+      }
+      
+      // Leave Socket.IO room FIRST to immediately notify other players
+      socketService.leaveRoom(currentRoom.code);
+      
       await apiService.leaveRoom(currentRoom.code, intentional);
       // Clear the sessionStorage entry for this room when intentionally leaving
       if (intentional) {
         sessionStorage.removeItem(`room_joined_${currentRoom.code}`);
       }
+      console.log('🚪 [leaveRoom] Clearing currentRoom and game state, room:', currentRoom.code, 'intentional:', intentional);
+      
+      // SAFETY CHECK - if non-intentional, warn and don't clear
+      if (!intentional) {
+        console.error('⚠️ [SAFETY] leaveRoom called without intentional=true! Stack:', new Error().stack);
+        return;
+      }
+      
       setCurrentRoom(null);
       setCurrentGame(null);
       setPlayers([]);
@@ -827,11 +940,86 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       setLeaderboard(null);
       setGameEndReason(null);
     } catch (err) {
+      isIntentionallyLeavingRef.current = false; // Reset flag on error
       const message = err instanceof Error ? err.message : 'Failed to leave room';
       setError(message);
       throw err;
     }
   }, [currentRoom]);
+
+  // Handle app visibility changes (reconnect when coming back from background)
+  // Uses REFS to persist state across effect re-runs and prevent race conditions
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.hidden) {
+        // App went to background
+        appIsHiddenRef.current = true;
+        reconnectInProgressRef.current = false; // Reset if screen locks while reconnecting
+        if (currentRoom) {
+          console.log('📱 App went to background, user is in room:', currentRoom.code);
+        }
+      } else {
+        // App came back to foreground
+        appIsHiddenRef.current = false;
+        
+        // Prevent duplicate reconnect attempts
+        if (reconnectInProgressRef.current) {
+          console.log('⏳ Reconnect already in progress, skipping...');
+          return;
+        }
+        
+        // Don't reconnect if user intentionally left
+        if (isIntentionallyLeavingRef.current) {
+          console.log('🚪 User intentionally left, not reconnecting');
+          isIntentionallyLeavingRef.current = false;
+          return;
+        }
+        
+        // Don't reconnect if already in a room (state update may be pending, check refs)
+        if (currentRoom) {
+          console.log('✅ Already in room:', currentRoom.code);
+          return;
+        }
+        
+        // Check for any room_joined entries in sessionStorage
+        const sessionKeys = Object.keys(sessionStorage).filter(key => key.startsWith('room_joined_'));
+        
+        if (sessionKeys.length === 0) {
+          console.log('⚠️ No session records found, no reconnection needed');
+          return;
+        }
+        
+        // Take the first room code found
+        const sessionKey = sessionKeys[0];
+        const roomCode = sessionKey.replace('room_joined_', '');
+        
+        try {
+          reconnectInProgressRef.current = true;
+          console.log('🔄 Found session record for room:', roomCode, '- attempting reconnect');
+          
+          // Wait a bit for socket to reconnect after visibility change
+          await new Promise(resolve => setTimeout(resolve, 500));
+          console.log('⏳ Waiting for socket connection...');
+          
+          // Use the full joinRoom flow (updates state, joins socket, etc)
+          await joinRoom(roomCode);
+          console.log('✅ Successfully reconnected to room:', roomCode);
+        } catch (error) {
+          console.warn('⚠️ Failed to reconnect to room on visibility change:', error);
+          // Clear the session storage if reconnect fails
+          sessionStorage.removeItem(sessionKey);
+        } finally {
+          reconnectInProgressRef.current = false;
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [joinRoom]); // Removed currentRoom dependency - we use refs for state persistence
 
   const value: GameContextType = {
     currentGame,

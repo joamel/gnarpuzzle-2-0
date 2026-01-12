@@ -10,7 +10,7 @@ import '../styles/home.css';
 
 const HomePage: React.FC = () => {
   const { logout, user } = useAuth();
-  const { joinRoom, currentRoom, leaveRoom } = useGame();
+  const { joinRoom, currentRoom } = useGame();
   const navigate = useNavigate();
   const shouldNavigate = useRef(false);
   
@@ -47,21 +47,12 @@ const HomePage: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Auto-leave room when arriving at lobby (HomePage)
-  // This ensures clean state when user navigates back from game
-  useEffect(() => {
-    if (currentRoom) {
-
-      leaveRoom().catch(err => {
-        console.error('Failed to auto-leave room:', err);
-      });
-    }
-  }, []); // Only run once on mount
-
   // Handle navigation to game if already in a room
+  // (e.g., after reconnecting from background)
   useEffect(() => {
     if (currentRoom && shouldNavigate.current) {
       shouldNavigate.current = false;
+      console.log('🏠 Already in room, navigating to game:', currentRoom.code);
       // Use setTimeout to avoid navigation during render
       setTimeout(() => {
         navigate('/game');

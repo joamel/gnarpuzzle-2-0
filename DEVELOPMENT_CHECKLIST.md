@@ -142,11 +142,68 @@
   - 🧹 Rensar alla pågående spel och speldata
   - 🏠 Återställer tomma rum automatiskt till 'waiting' status
 - **Konfiguration**: Miljövariabel `DB_CLEAR_MODE` ('reset', 'clear', 'none')
-- **🔴 KRITISKT**: MÅSTE INAKTIVERAS/MODIFIERAS I PRODUKTION
-  - [ ] Sätt `NODE_ENV=production` för att inaktivera auto-reset
-  - [ ] Implementera proper spel-avslutning istället för force-reset  
-  - [ ] Överväg graceful restart av 'crashed' spel med player confirmation
-  - [ ] Ta bort auto-empty-room-reset eller gör den konfigurerbar per rum
+- **Implementation Status**:
+  - [x] ✅ Sätt `NODE_ENV=production` för att inaktivera auto-reset (IMPLEMENTERAT - line 268 database.ts)
+  - [x] ✅ Implementera proper spel-avslutning istället för force-reset (IMPLEMENTERAT - game:ended event med leaderboard)
+  - [ ] ⏳ Överväg graceful restart av 'crashed' spel med player confirmation (EJ IMPLEMENTERAT)
+  - [ ] ⏳ Ta bort auto-empty-room-reset eller gör den konfigurerbar per rum (EJ IMPLEMENTERAT - resettar automatiskt i dev)
+
+---
+
+## 🐛 BUGFIX - AKTUELLA PROBLEM ATT LÖSA
+
+### ✅ FIXED - Lösenordskravet vid Reconnect
+- **Problem**: Om man disconnectar och reconnectar till ett lösenordsskyddat rum måste man ange lösenordet igen
+- **Lösning implementerad**:
+  - ✅ Spara rumkod i sessionStorage när rummet joinats
+  - ✅ Vid reconnect, kontrollera sessionStorage och retry utan lösenord
+  - ✅ Backend tillåter redan medlemmar att reconnecta utan lösenord
+  - ✅ Rensa sessionStorage entry när användare lämnar intentionellt
+- **Commit**: 047b265 - "Fix: Skip password prompt on reconnect"
+- **Status**: COMPLETED
+
+### ✅ FIXED - Spelare-Räknare Visar Fel (4/2 istället för 2/4)
+- **Problem**: PlayersList visar max_players före antal medlemmar (4/2 istället för 2/4)
+- **Lösning implementerad**:
+  - ✅ Fixade PlayersList.tsx rad 29 - ändrade ordningen
+  - ✅ Nu visar: `Spelare ({playerList.length}/{maxPlayers})` istället för `({maxPlayers}/{playerList.length})`
+  - ✅ HomePage.tsx visar redan rätt format: `{member_count}/{max_players}`
+- **Commit**: 5d03a10 - "Fix: Player count display order in room lobby"
+- **Status**: COMPLETED
+
+### ✅ FIXED - Skärmlås/Bakgrundsläge - Automatisk Reconnect
+- **Problem**: När telefonen låses eller går till bakgrund disconnectade spelaren från rummet automatiskt
+- **Lösning implementerad**:
+  - ✅ Lyssnar på `visibilitychange` event för att detektera när app går i bakgrund
+  - ✅ När app kommer tillbaka från bakgrund, försöker automatiskt reconnecta till rummet
+  - ✅ Använder sessionStorage för att verifiera att användaren faktiskt var i rummet
+  - ✅ Anropar fullständig joinRoom() funktion för korrekt state-uppdatering
+  - ✅ Reconnectar till Socket.IO rummet med all room/game state
+  - ✅ Rensar sessionStorage om reconnect misslyckas
+  - ✅ Fungerar på både mobil och desktop
+- **Teknisk implementation**:
+  - Ny useEffect i GameContext.tsx som lyssnar på `document.visibilitychange`
+  - SessionStorage-baserad verification av room membership
+  - Använder befintlig joinRoom() för fullständig reconnect flow
+  - Graceful error handling med sessionStorage cleanup
+- **Commit**: 6204b65 - "Fix: Auto-reconnect when app returns from background"
+- **Status**: COMPLETED
+
+---
+
+## 🎯 FRAMTIDA FEATURES - TODO LISTA
+
+### 📚 Ordlistor för Fler Språk
+- [ ] **Engelska ordlista** - Lägg till support för engelska ord
+- [ ] **Svenska slang/dialekt** - Utöka med svenska slang och regionala ord
+- **Källa för ordlistor**: 
+  - Engelska: SCOWL English Word Lists
+  - Svenska slang: Slang ordbok eller community-driven lista
+- **Implementation**: 
+  - [ ] Lägg ordlista i `/server/data/english.json` och motsvarande för slang
+  - [ ] Modifiera WordValidationService för att stödja flera språk/varianter
+  - [ ] Låt spelarnas välja språk/ordlista när rummet skapas
+  - [ ] Eller: Global setting som bestäms av rum-skapare
 
 ### 🧹 Start Game Duplicering LÖST ✅
 - **Problem**: Duplicerade start game implementationer (gameRoutes.ts vs rooms.ts)

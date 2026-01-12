@@ -20,13 +20,7 @@ const GamePage: React.FC = () => {
   const [selectedPlayerBoard, setSelectedPlayerBoard] = useState<number | null>(null);
 
   useEffect(() => {
-    console.log('🎮 GamePage useEffect triggered:', {
-      currentGame: !!currentGame,
-      gamePhase,
-      currentGameStarted: gameStarted,
-      roomStatus: currentRoom?.status,
-      shouldStartGame: currentGame && (gamePhase === 'letter_selection' || gamePhase === 'letter_placement')
-    });
+    console.log('🎮 [GamePage] useEffect - currentRoom:', currentRoom?.code || 'NULL', 'currentGame:', !!currentGame, 'gamePhase:', gamePhase);
     
     if (currentGame && (gamePhase === 'letter_selection' || gamePhase === 'letter_placement')) {
       setGameStarted(true);
@@ -44,7 +38,7 @@ const GamePage: React.FC = () => {
 
     // If game phase is finished, let it show leaderboard (gameStarted stays true)
     // but GamePage will render leaderboard because gamePhase === 'finished'
-  }, [currentGame, gamePhase, currentRoom?.status]);
+  }, [currentGame, gamePhase, currentRoom]);
 
   const handleStartGame = () => {
     setGameStarted(true);
@@ -78,8 +72,8 @@ const GamePage: React.FC = () => {
     }
   };
 
-
   if (!currentRoom) {
+    console.log('🎮 [GamePage] Rendering "not in room" screen');
     return (
       <div className="no-room">
         <p>Du är inte i något rum just nu.</p>

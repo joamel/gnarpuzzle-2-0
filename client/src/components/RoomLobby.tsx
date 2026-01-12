@@ -101,7 +101,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
       socketService.on('player:ready_changed', handlePlayerReadyChanged);
       
       return () => {
-        socketService.leaveRoom(currentRoom.code);
+        // Don't leave the socket room on unmount - let cleanup happen naturally
         socketService.off('room:joined', handleRoomJoined);
         socketService.off('player:ready_changed', handlePlayerReadyChanged);
       };
@@ -109,23 +109,9 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   }, [currentRoom?.code]);
 
   useEffect(() => {
-    // console.log('🏠 RoomLobby - currentRoom updated:', currentRoom);
-    // console.log('👤 Raw authUser:', authUser);
-    // console.log('🆔 User ID:', authUser?.id);
-    // console.log('📝 Username:', authUser?.username);
-    // console.log('👑 isOwner check:', {
-    //   createdBy: currentRoom?.createdBy,
-    //   userId: authUser?.id,
-    //   createdByString: String(currentRoom?.createdBy).trim(),
-    //   userIdString: String(authUser?.id).trim(),
-    //   isOwner: currentRoom && authUser && String(currentRoom.createdBy).trim() === String(authUser.id).trim()
-    // });
-    
     // Since Room doesn't have players property, always add user if room exists
     if (currentRoom && authUser) {
       // Add the current user to player list
-      // console.log('⚠️ RoomLobby - adding self to player list. User data:', authUser);
-      // console.log('🏠 Room createdBy:', currentRoom.createdBy, 'User ID:', authUser.id);
       setPlayerList([{
         userId: String(authUser.id),
         username: authUser.username,
@@ -134,14 +120,9 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
       }]);
       
       // Force refresh to get latest member data from server
-      // console.log('🔄 Attempting to fetch fresh member data...');
       if (currentRoom.code) {
         apiService.getRoomByCode(currentRoom.code).then(freshData => {
-          // console.log('🆕 Fresh room data received:', freshData);
-          // console.log('🆕 Fresh members array:', freshData?.room?.members);
-          // console.log('🆕 Room created by:', freshData?.room?.createdBy);
           if (freshData?.room?.members && freshData.room.members.length > 0) {
-            // console.log('✅ Updating playerList with fresh data:', freshData.room.members);
             // Map server data to include role information
             const mappedMembers = freshData.room.members.map((member: any) => ({
               userId: String(member.id),
@@ -151,7 +132,6 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
             }));
             setPlayerList(mappedMembers);
           } else {
-            // console.log('⚠️ Fresh data has empty members array, keeping current user in list');
             // If server doesn't return members, keep at least current user
             setPlayerList([{
               userId: String(authUser.id),
