@@ -814,6 +814,10 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     
     try {
       await apiService.leaveRoom(currentRoom.code, intentional);
+      // Clear the sessionStorage entry for this room when intentionally leaving
+      if (intentional) {
+        sessionStorage.removeItem(`room_joined_${currentRoom.code}`);
+      }
       setCurrentRoom(null);
       setCurrentGame(null);
       setPlayers([]);

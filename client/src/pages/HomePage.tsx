@@ -112,12 +112,32 @@ const HomePage: React.FC = () => {
     try {
       shouldNavigate.current = true;
       await joinRoom(code.trim(), password);
+      // Store room code in sessionStorage on successful join so we skip password on reconnect
+      sessionStorage.setItem(`room_joined_${code.trim()}`, 'true');
     } catch (err: any) {
       // Check if password is required
       if (err.message && err.message.includes('Password required')) {
-        setPendingRoomCode(code);
-        setShowPasswordPrompt(true);
-        setPasswordInput('');
+        // Check if user previously joined this room (sessionStorage)
+        const hasJoinedBefore = sessionStorage.getItem(`room_joined_${code.trim()}`);
+        if (hasJoinedBefore) {
+          // User previously joined this room, so they're just reconnecting
+          // Try again without password prompt (backend will allow as existing member)
+          try {
+            console.log(`🔄 Reconnecting to room ${code} without password (previously joined)`);
+            shouldNavigate.current = true;
+            await joinRoom(code.trim()); // No password
+            sessionStorage.setItem(`room_joined_${code.trim()}`, 'true');
+            return;
+          } catch (retryErr: any) {
+            console.error('Reconnect attempt failed:', retryErr);
+            setError(retryErr.message || 'Kunde inte återansluta till rum');
+          }
+        } else {
+          // First time joining this room, need password
+          setPendingRoomCode(code);
+          setShowPasswordPrompt(true);
+          setPasswordInput('');
+        }
       } else if (err.message && err.message.includes('Invalid password')) {
         setError('Felaktig lösenordskod');
         setPendingRoomCode(code);
