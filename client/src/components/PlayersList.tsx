@@ -26,7 +26,7 @@ const PlayersList: React.FC<PlayersListProps> = ({
 }) => {
   return (
     <div className="players-section">
-      <h3>Spelare ({maxPlayers}/{playerList.length})</h3>
+      <h3>Spelare ({playerList.length}/{maxPlayers})</h3>
       <div className="players-list">
         {playerList.map((member, index) => {
           const isCurrentUser = member.userId === String(authUserId);
