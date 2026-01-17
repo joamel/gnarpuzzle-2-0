@@ -11,6 +11,7 @@ interface GameContextType {
   currentRoom: Room | null;
   players: Player[];
   currentPlayer: Player | null;
+  currentTurnPlayer: Player | null;
   isMyTurn: boolean;
   
   // Game phase and timing
@@ -136,6 +137,9 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   const currentTurnUserId = currentGame?.currentTurn ? Number(currentGame.currentTurn) : 0;
   const playerUserId = user?.id ? Number(user.id) : 0;
   const isMyTurn = currentTurnUserId === playerUserId && currentTurnUserId > 0;
+  
+  // Find the player whose turn it actually is
+  const currentTurnPlayer = players.find(p => Number(p.userId) === currentTurnUserId) || null;
 
   // Only log turn issues when there's an actual problem
   // Removed excessive debug logging for cleaner console
@@ -1056,6 +1060,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     currentRoom,
     players,
     currentPlayer,
+    currentTurnPlayer,
     isMyTurn,
     gamePhase,
     gameTimer,
