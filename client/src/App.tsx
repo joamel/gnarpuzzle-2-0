@@ -135,8 +135,8 @@ function App() {
   };
   return (
     <div className="app-container">
-      <GameProvider>
-        <AuthProvider>
+      <AuthProvider>
+        <GameProvider>
           <Router future={{
             v7_startTransition: true,
             v7_relativeSplatPath: true
@@ -193,8 +193,8 @@ function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Router>
-        </AuthProvider>
-      </GameProvider>
+        </GameProvider>
+      </AuthProvider>
       
       {/* Offline Indicator */}
       {!isOnline && (
