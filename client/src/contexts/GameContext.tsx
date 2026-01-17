@@ -68,16 +68,18 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     if (typeof value === 'function') {
       setCurrentRoom_internal(prev => {
         const result = value(prev);
-        if (result === null && prev !== null) {
-          console.error('🚨🚨🚨 CRITICAL: setCurrentRoom functional update returned NULL!');
+        // Only log error if NULL result is unexpected (when we had a room before)
+        if (result === null && prev !== null && !isIntentionallyLeavingRef.current) {
+          console.error('🚨🚨🚨 CRITICAL: setCurrentRoom functional update returned NULL unexpectedly!');
           console.error('Previous value:', prev);
           console.error('Stack trace:', new Error().stack);
         }
         return result;
       });
     } else {
-      if (value === null && currentRoom_internal !== null) {
-        console.error('🚨🚨🚨 CRITICAL: setCurrentRoom called with NULL!');
+      // Only log error if NULL is unexpected (when we had a room before and not intentionally leaving)
+      if (value === null && currentRoom_internal !== null && !isIntentionallyLeavingRef.current) {
+        console.error('🚨🚨🚨 CRITICAL: setCurrentRoom called with NULL unexpectedly!');
         console.error('Previous value:', currentRoom_internal);
         console.error('Stack trace:', new Error().stack);
       }
@@ -542,7 +544,11 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
 
       // Force refresh room data to get updated member list ONLY for other members leaving
       if (currentRoom && currentRoom.code === data.roomCode) {
-        fetchRoomData(data.roomCode).catch(err => {
+        fetchRoomData(data.roomCode).then(room => {
+          if (room) {
+            setCurrentRoom(room);
+          }
+        }).catch(err => {
           console.error('Failed to refresh room data after member left:', err);
         });
       }
@@ -560,7 +566,11 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       
       // Refresh player list
       if (currentRoom) {
-        fetchRoomData(currentRoom.code).catch(err => {
+        fetchRoomData(currentRoom.code).then(room => {
+          if (room) {
+            setCurrentRoom(room);
+          }
+        }).catch(err => {
           console.error('Failed to refresh room data after player left game:', err);
         });
       }
@@ -867,6 +877,30 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       setCurrentRoom(room);
       console.log('📝 setCurrentRoom() called (async update scheduled)');
       
+      // Initialize players based on room members (for UI display)
+      if (room.members && room.members.length > 0) {
+        console.log('👥 Setting players based on room members:', room.members.length);
+        const roomPlayers: Player[] = room.members.map((member: any, index: number) => {
+          const gridSize = room.board_size || 5;
+          return {
+            userId: member.user_id || member.id,
+            gameId: 0, // Will be set when game starts
+            position: index + 1,
+            username: member.user?.username || member.username || `Player ${index + 1}`,
+            grid: Array(gridSize).fill(null).map((_, y) => Array(gridSize).fill(null).map((_, x) => ({
+              letter: null,
+              x: x,
+              y: y
+            }))),
+            currentLetter: undefined,
+            placementConfirmed: false,
+            finalScore: 0,
+            connected: true
+          };
+        });
+        setPlayers(roomPlayers);
+      }
+      
       // If room is playing, fetch the active game
       if (room.status === 'playing') {
         try {
@@ -925,12 +959,8 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       }
       console.log('🚪 [leaveRoom] Clearing currentRoom and game state, room:', currentRoom.code, 'intentional:', intentional);
       
-      // SAFETY CHECK - if non-intentional, warn and don't clear
-      if (!intentional) {
-        console.error('⚠️ [SAFETY] leaveRoom called without intentional=true! Stack:', new Error().stack);
-        return;
-      }
-      
+      // Always clear state when leaving room - the safety check was too restrictive
+      // This ensures UI state stays in sync regardless of how leaveRoom was called
       setCurrentRoom(null);
       setCurrentGame(null);
       setPlayers([]);

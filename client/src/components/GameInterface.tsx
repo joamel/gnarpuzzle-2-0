@@ -82,8 +82,12 @@ const GameBoard: React.FC<GameBoardProps> = ({
 // Letter selection component
 interface LetterSelectorProps {
   availableLetters: string[];
-  selectedLetter?: string;
+  selectedLetter?: string | null;
+  pendingLetter?: string | null;
+  browsingLetter?: string | null;
   onLetterSelect: (letter: string) => void;
+  onLetterHover?: (letter: string) => void;
+  onLetterBrowseSelect?: (letter: string) => void;
   onDragStart?: (letter: string) => void;
   onDragMove?: (x: number, y: number) => void;
   onDragEnd?: (x: number, y: number) => void;
@@ -95,7 +99,11 @@ interface LetterSelectorProps {
 const LetterSelector: React.FC<LetterSelectorProps> = ({
   availableLetters,
   selectedLetter,
+  pendingLetter,
+  browsingLetter,
   onLetterSelect,
+  onLetterHover,
+  onLetterBrowseSelect,
   onDragStart,
   onDragMove,
   onDragEnd,
@@ -106,26 +114,45 @@ const LetterSelector: React.FC<LetterSelectorProps> = ({
   return (
     <div className={`letter-selector ${isDragActive ? 'drag-active' : ''}`}>
       <div className="letters-grid">
-        {availableLetters.map(letter => (
-          <DraggableBrick
-            key={letter}
-            letter={letter}
-            variant="button"
-            isSelected={selectedLetter === letter}
-            onClick={() => onLetterSelect(letter)}
-            onDragStart={onDragStart}
-            onDragMove={onDragMove}
-            onDragEnd={onDragEnd}
-            onDragCancel={onDragCancel}
-            disabled={disabled}
-          />
-        ))}
+        {availableLetters.map(letter => {
+          const isSelected = selectedLetter === letter;
+          const isPending = pendingLetter === letter;
+          const isBrowsing = browsingLetter === letter;
+          
+          return (
+            <DraggableBrick
+              key={letter}
+              letter={letter}
+              variant="button"
+              mode="selection"
+              isSelected={isSelected || isPending}
+              onClick={() => onLetterSelect(letter)}
+              onLetterHover={onLetterHover}
+              onLetterSelect={onLetterBrowseSelect}
+              onDragStart={onDragStart}
+              onDragMove={onDragMove}
+              onDragEnd={onDragEnd}
+              onDragCancel={onDragCancel}
+              disabled={disabled}
+              className={`
+                ${isSelected ? 'selected' : ''} 
+                ${isPending ? 'pending' : ''} 
+                ${isBrowsing ? 'browsing' : ''}
+              `}
+            />
+          );
+        })}
       </div>
-      {!disabled && (
-        <div className="drag-instructions">
-          <small>Håll inne på en bokstav och dra för att placera direkt</small>
-        </div>
-      )}
+      <div className="drag-instructions">
+        <small>
+          {disabled 
+            ? 'Väntar på din tur...' 
+            : pendingLetter 
+              ? `Vald: ${pendingLetter} - Klicka 'Bekräfta' för att slutföra valet`
+              : 'Klicka för att välja, eller håll inne och dra mellan bokstäver för att browsea'
+          }
+        </small>
+      </div>
     </div>
   );
 };
@@ -155,6 +182,9 @@ const GameInterface: React.FC = () => {
   const [isDragActive, setIsDragActive] = useState(false);
   const [dragPreviewCell, setDragPreviewCell] = useState<{ x: number; y: number } | null>(null);
   const [draggedLetter, setDraggedLetter] = useState<string | null>(null);
+  
+  // Letter browsing state
+  const [browsingLetter, setBrowsingLetter] = useState<string | null>(null);
 
   const swedishLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'Å', 'Ä', 'Ö'];
 
@@ -228,6 +258,18 @@ const GameInterface: React.FC = () => {
       console.error('Failed to confirm letter:', err);
     }
   };
+
+  // Letter browsing handlers
+  const handleLetterHover = useCallback((letter: string) => {
+    if (!isMyTurn || gamePhase !== 'letter_selection') return;
+    setBrowsingLetter(letter);
+  }, [isMyTurn, gamePhase]);
+
+  const handleLetterBrowseSelect = useCallback((letter: string) => {
+    if (!isMyTurn || gamePhase !== 'letter_selection') return;
+    setPendingLetter(letter);
+    setBrowsingLetter(null); // Clear browsing state
+  }, [isMyTurn, gamePhase]);
 
   // Move placement when cell is clicked
   const handleCellClick = async (x: number, y: number) => {
@@ -370,9 +412,18 @@ const GameInterface: React.FC = () => {
         <div className="letter-selection-section">
           <LetterSelector
             availableLetters={swedishLetters}
-            selectedLetter={pendingLetter || selectedLetter || undefined}
+            selectedLetter={selectedLetter}
+            pendingLetter={pendingLetter}
+            browsingLetter={browsingLetter}
             onLetterSelect={handleLetterSelect}
+            onLetterHover={handleLetterHover}
+            onLetterBrowseSelect={handleLetterBrowseSelect}
+            onDragStart={handleDragStart}
+            onDragMove={handleDragMove}
+            onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
             disabled={!isMyTurn}
+            isDragActive={isDragActive}
           />
           <div className="letter-confirm-under">
             <button 

@@ -126,9 +126,9 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
           if (freshData?.room?.members && freshData.room.members.length > 0) {
             // Map server data to include role information
             const mappedMembers = freshData.room.members.map((member: any) => ({
-              userId: String(member.id),
+              userId: String(member.id || member.userId), // Handle both formats
               username: member.username,
-              role: String(member.id) === String(freshData.room.createdBy) ? 'owner' : 'member',
+              role: String(member.id || member.userId) === String(freshData.room.createdBy) ? 'owner' : 'member',
               joinedAt: new Date().toISOString()
             }));
             setPlayerList(mappedMembers);
@@ -163,9 +163,9 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
          // Update playerList directly from socket event (instant)
          if (data.room?.members && data.room.members.length > 0) {
            const mappedMembers = data.room.members.map((member: any) => ({
-             userId: String(member.userId),
+             userId: String(member.id || member.userId), // Handle both formats
              username: member.username,
-             role: member.role,
+             role: member.role || (String(member.id || member.userId) === String(data.room.createdBy) ? 'owner' : 'member'),
              joinedAt: new Date().toISOString()
            }));
            setPlayerList(mappedMembers);
@@ -182,9 +182,9 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
           apiService.getRoomByCode(currentRoom.code).then(freshData => {
             if (freshData?.room?.members) {
               const mappedMembers = freshData.room.members.map((member: any) => ({
-                userId: String(member.id),
+                userId: String(member.id || member.userId), // Handle both formats
                 username: member.username,
-                role: String(member.id) === String(freshData.room.createdBy) ? 'owner' : 'member',
+                role: String(member.id || member.userId) === String(freshData.room.createdBy) ? 'owner' : 'member',
                 joinedAt: new Date().toISOString()
               }));
               setPlayerList(mappedMembers);

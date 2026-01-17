@@ -9,8 +9,13 @@ interface DraggableBrickProps {
   onDragMove?: (x: number, y: number) => void;
   onDragEnd?: (x: number, y: number) => void;
   onDragCancel?: () => void;
+  // Letter browsing mode (for selection phase)
+  onLetterHover?: (letter: string) => void;
+  onLetterSelect?: (letter: string) => void;
+  mode?: 'placement' | 'selection';
   disabled?: boolean;
   isSelected?: boolean;
+  isHovered?: boolean;
   variant?: 'board' | 'button';
   className?: string;
 }
@@ -22,8 +27,12 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
   onDragMove,
   onDragEnd,
   onDragCancel,
+  onLetterHover,
+  onLetterSelect,
+  mode = 'placement',
   disabled = false,
   isSelected = false,
+  isHovered = false,
   variant = 'board',
   className = ''
 }) => {
@@ -36,9 +45,11 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
 
   const baseClass = variant === 'board' ? 'brick brick-board' : 'brick brick-button';
   const selectedClass = isSelected ? 'selected' : '';
+  const hoveredClass = isHovered ? 'hovered' : '';
   const disabledClass = disabled ? 'disabled' : '';
   const filledClass = letter ? 'filled' : '';
   const draggingClass = isDragging ? 'dragging' : '';
+  const browsingClass = mode === 'selection' && isDragging ? 'browsing' : '';
 
   // Helper to get coordinates relative to viewport
   const getEventCoordinates = (e: React.TouchEvent | React.MouseEvent) => {
@@ -63,23 +74,53 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
     return null;
   };
 
-  const startLongPress = useCallback((coords: { x: number, y: number }) => {
-    if (disabled || variant !== 'button') return;
+  // Find letter under coordinates (for selection browsing)
+  const findLetterUnderCoordinates = (x: number, y: number) => {
+    const element = document.elementFromPoint(x, y);
+    if (element?.classList.contains('brick-button')) {
+      const letterElement = element as HTMLElement;
+      const letter = letterElement.getAttribute('data-letter');
+      return letter;
+    }
+    return null;
+  };
 
-    longPressTimeoutRef.current = setTimeout(() => {
-      // Haptic feedback if available
-      if (navigator.vibrate) {
-        navigator.vibrate(50);
-      }
-      
-      setIsDragging(true);
-      isDragStartedRef.current = true;
-      initialTouchRef.current = coords;
-      setDragPosition(coords);
-      
-      onDragStart?.(letter);
-    }, 350); // 350ms for long press
-  }, [disabled, variant, letter, onDragStart]);
+  const startLongPress = useCallback((coords: { x: number, y: number }) => {
+    if (disabled) return;
+
+    // Different behavior for different modes
+    if (mode === 'selection' && variant === 'button') {
+      // In selection mode, allow browsing all letters
+      longPressTimeoutRef.current = setTimeout(() => {
+        // Haptic feedback if available
+        if (navigator.vibrate) {
+          navigator.vibrate(30);
+        }
+        
+        setIsDragging(true);
+        isDragStartedRef.current = true;
+        initialTouchRef.current = coords;
+        setDragPosition(coords);
+        
+        onDragStart?.(letter);
+      }, 200); // Shorter longpress for letter selection
+    } else if (mode === 'placement' && variant === 'button') {
+      // In placement mode, drag to place on board
+      longPressTimeoutRef.current = setTimeout(() => {
+        // Haptic feedback if available
+        if (navigator.vibrate) {
+          navigator.vibrate(50);
+        }
+        
+        setIsDragging(true);
+        isDragStartedRef.current = true;
+        initialTouchRef.current = coords;
+        setDragPosition(coords);
+        
+        onDragStart?.(letter);
+      }, 350); // Standard longpress for placement
+    }
+  }, [disabled, mode, variant, letter, onDragStart]);
 
   const cancelLongPress = useCallback(() => {
     if (longPressTimeoutRef.current) {
@@ -115,13 +156,21 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
     if (isDragging) {
       setDragPosition(coords);
       
-      // Find cell under cursor
-      const cell = findCellUnderCoordinates(coords.x, coords.y);
-      if (cell) {
-        onDragMove?.(cell.x, cell.y);
+      if (mode === 'selection') {
+        // Find letter under cursor for browsing
+        const hoveredLetter = findLetterUnderCoordinates(coords.x, coords.y);
+        if (hoveredLetter) {
+          onLetterHover?.(hoveredLetter);
+        }
+      } else if (mode === 'placement') {
+        // Find cell under cursor for placement
+        const cell = findCellUnderCoordinates(coords.x, coords.y);
+        if (cell) {
+          onDragMove?.(cell.x, cell.y);
+        }
       }
     }
-  }, [isDragging, cancelLongPress, onDragMove]);
+  }, [isDragging, cancelLongPress, mode, onDragMove, onLetterHover]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     e.preventDefault(); // Prevent scrolling while dragging
@@ -138,13 +187,21 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
     cancelLongPress();
 
     if (isDragStartedRef.current && isDragging) {
-      // Find final cell position
-      const cell = findCellUnderCoordinates(coords.x, coords.y);
-      
-      if (cell) {
-        onDragEnd?.(cell.x, cell.y);
-      } else {
-        onDragCancel?.();
+      if (mode === 'selection') {
+        // For letter browsing, we just update selection without placing
+        const hoveredLetter = findLetterUnderCoordinates(coords.x, coords.y);
+        if (hoveredLetter) {
+          onLetterSelect?.(hoveredLetter);
+        }
+      } else if (mode === 'placement') {
+        // For placement mode, actually place the brick on a cell
+        const cell = findCellUnderCoordinates(coords.x, coords.y);
+        
+        if (cell) {
+          onDragEnd?.(cell.x, cell.y);
+        } else {
+          onDragCancel?.();
+        }
       }
       
       setIsDragging(false);
@@ -154,7 +211,7 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
       // This was a regular tap/click, not a drag
       onClick?.();
     }
-  }, [isDragging, cancelLongPress, onDragEnd, onDragCancel, onClick]);
+  }, [isDragging, cancelLongPress, mode, onDragEnd, onDragCancel, onLetterSelect, onClick]);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     const coords = getEventCoordinates(e);
@@ -200,7 +257,7 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
     <>
       <button
         ref={elementRef}
-        className={`${baseClass} ${selectedClass} ${disabledClass} ${filledClass} ${draggingClass} ${className}`}
+        className={`${baseClass} ${selectedClass} ${disabledClass} ${filledClass} ${draggingClass} ${hoveredClass} ${browsingClass} ${className || ''}`}
         onClick={isDragStartedRef.current ? undefined : onClick}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
