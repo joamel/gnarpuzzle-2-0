@@ -162,6 +162,7 @@ const GameInterface: React.FC = () => {
 
   const { 
     currentPlayer, 
+    currentTurnPlayer,
     gamePhase, 
     isMyTurn, 
     selectedLetter,
@@ -185,6 +186,9 @@ const GameInterface: React.FC = () => {
   
   // Letter browsing state
   const [browsingLetter, setBrowsingLetter] = useState<string | null>(null);
+  
+  // Auto-submit tracking to prevent duplicate submissions
+  const autoSubmitTriggeredRef = useRef<boolean>(false);
 
   const swedishLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'Å', 'Ä', 'Ö'];
 
@@ -204,6 +208,7 @@ const GameInterface: React.FC = () => {
       await placeLetter(temporaryPlacement.x, temporaryPlacement.y);
       await confirmPlacement();
       setTemporaryPlacement(null);
+      autoSubmitTriggeredRef.current = false; // Reset auto-submit flag after successful submission
     } catch (err) {
       console.error('❌ Failed to submit placement:', err);
       // Still reset the flags even on error
@@ -218,23 +223,31 @@ const GameInterface: React.FC = () => {
 
   // Auto-submit when timeout is imminent - only if player has actively chosen a position
   // This saves the player's choice if they clicked a cell but didn't press "Bekräfta" in time
+  // Submit with 3 seconds left to account for network latency and server processing
   useEffect(() => {
-    if (gamePhase === 'letter_placement' && gameTimer && gameTimer.remainingSeconds <= 1 && temporaryPlacement) {
-      console.log('⏰ 1 second left - auto-submitting player choice:', temporaryPlacement);
-      submitPlacement();
+    if (gamePhase === 'letter_placement' && gameTimer && gameTimer.remainingSeconds <= 3 && temporaryPlacement && !submitInProgress && !autoSubmitTriggeredRef.current) {
+      console.log('⏰ 3 seconds left - auto-submitting player choice:', temporaryPlacement);
+      autoSubmitTriggeredRef.current = true;
+      submitPlacement().catch(err => {
+        console.error('❌ Auto-submit failed:', err);
+        autoSubmitTriggeredRef.current = false; // Reset flag on failure
+      });
     }
-  }, [gameTimer?.remainingSeconds, gamePhase, temporaryPlacement]);
+  }, [gameTimer?.remainingSeconds, gamePhase, temporaryPlacement, submitInProgress]);
 
   // Emergency save when phase changes away from letter_placement
   const previousGamePhaseRef = useRef(gamePhase);
   useEffect(() => {
     // Only trigger if we're leaving letter_placement phase (not entering it)
-    if (previousGamePhaseRef.current === 'letter_placement' && gamePhase !== 'letter_placement' && temporaryPlacement) {
+    if (previousGamePhaseRef.current === 'letter_placement' && gamePhase !== 'letter_placement' && temporaryPlacement && !submitInProgress && !autoSubmitTriggeredRef.current) {
       console.log('⏰ Phase changed away from letter_placement - emergency saving:', temporaryPlacement);
-      submitPlacement();
+      autoSubmitTriggeredRef.current = true;
+      submitPlacement().catch(err => {
+        console.error('❌ Emergency save failed:', err);
+      });
     }
     previousGamePhaseRef.current = gamePhase;
-  }, [gamePhase, temporaryPlacement]);
+  }, [gamePhase, temporaryPlacement, submitInProgress]);
 
   // Note: No automatic random placement is created on client side.
   // If the player doesn't place their letter in time, the server handles 
@@ -287,6 +300,10 @@ const GameInterface: React.FC = () => {
     const prevPlacement = temporaryPlacement;
     // Move temporary placement to clicked cell
     setTemporaryPlacement({ x, y, letter: selectedLetter });
+    
+    // Reset auto-submit flag when user makes new placement
+    autoSubmitTriggeredRef.current = false;
+    
     console.log(`📍 User moved placement from (${prevPlacement?.x}, ${prevPlacement?.y}) to (${x}, ${y}) for letter ${selectedLetter}`);
   };
 
@@ -381,7 +398,7 @@ const GameInterface: React.FC = () => {
             isMyTurn ? (
               <span className="my-turn">🎯 Din tur!</span>
             ) : (
-              <span className="other-turn">⏳ {currentPlayer?.username}s tur</span>
+              <span className="other-turn">⏳ {currentTurnPlayer?.username || 'Okänd spelare'}s tur</span>
             )
           ) : gamePhase === 'letter_placement' ? (
             selectedLetter ? (
