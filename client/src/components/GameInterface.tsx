@@ -2,9 +2,11 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { GridCell } from '../types/game';
 import { useGame } from '../contexts/GameContext';
 import Brick from './Brick';
+import DraggableBrick from './DraggableBrick';
 import '../styles/board.css';
 import '../styles/game.css';
 import '../styles/brick.css';
+import '../styles/draggable-brick.css';
 
 interface GameBoardProps {
   grid: GridCell[][];
@@ -12,6 +14,8 @@ interface GameBoardProps {
   disabled?: boolean;
   highlightedCell?: { x: number; y: number } | null;
   temporaryLetter?: { x: number; y: number; letter: string } | null;
+  dragPreviewCell?: { x: number; y: number } | null;
+  dragPreviewLetter?: string;
 }
 
 const GameBoard: React.FC<GameBoardProps> = ({ 
@@ -19,7 +23,9 @@ const GameBoard: React.FC<GameBoardProps> = ({
   onCellClick, 
   disabled = false,
   highlightedCell,
-  temporaryLetter
+  temporaryLetter,
+  dragPreviewCell,
+  dragPreviewLetter
 }) => {
   const handleCellClick = useCallback((x: number, y: number) => {
     if (!disabled) {
@@ -38,23 +44,36 @@ const GameBoard: React.FC<GameBoardProps> = ({
       className += ' temporary-placement';
     }
     
+    if (dragPreviewCell && dragPreviewCell.x === x && dragPreviewCell.y === y) {
+      className += ' placement-preview';
+    }
+    
     return className;
   };
 
   return (
     <div className="game-board" style={{ '--grid-size': grid.length } as React.CSSProperties}>
       {grid.map((row, y) => 
-        row.map((cell, x) => (
-          <Brick
-            key={`${x}-${y}`}
-            letter={cell.letter || (temporaryLetter && temporaryLetter.x === x && temporaryLetter.y === y ? temporaryLetter.letter : '')}
-            variant="board"
-            isSelected={highlightedCell?.x === x && highlightedCell?.y === y}
-            disabled={disabled}
-            onClick={() => handleCellClick(x, y)}
-            className={getCellClassName(x, y)}
-          />
-        ))
+        row.map((cell, x) => {
+          const isPreviewCell = dragPreviewCell && dragPreviewCell.x === x && dragPreviewCell.y === y;
+          const cellLetter = cell.letter || 
+            (temporaryLetter && temporaryLetter.x === x && temporaryLetter.y === y ? temporaryLetter.letter : '') ||
+            (isPreviewCell ? dragPreviewLetter : '');
+          
+          return (
+            <Brick
+              key={`${x}-${y}`}
+              letter={cellLetter || ''}
+              variant="board"
+              isSelected={highlightedCell?.x === x && highlightedCell?.y === y}
+              disabled={disabled}
+              onClick={() => handleCellClick(x, y)}
+              className={getCellClassName(x, y)}
+              data-cell-key={`${x}-${y}`}
+              data-preview-letter={isPreviewCell ? dragPreviewLetter : undefined}
+            />
+          );
+        })
       )}
     </div>
   );
@@ -65,29 +84,48 @@ interface LetterSelectorProps {
   availableLetters: string[];
   selectedLetter?: string;
   onLetterSelect: (letter: string) => void;
+  onDragStart?: (letter: string) => void;
+  onDragMove?: (x: number, y: number) => void;
+  onDragEnd?: (x: number, y: number) => void;
+  onDragCancel?: () => void;
   disabled?: boolean;
+  isDragActive?: boolean;
 }
 
 const LetterSelector: React.FC<LetterSelectorProps> = ({
   availableLetters,
   selectedLetter,
   onLetterSelect,
-  disabled = false
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  onDragCancel,
+  disabled = false,
+  isDragActive = false
 }) => {
   return (
-    <div className="letter-selector">
+    <div className={`letter-selector ${isDragActive ? 'drag-active' : ''}`}>
       <div className="letters-grid">
         {availableLetters.map(letter => (
-          <Brick
+          <DraggableBrick
             key={letter}
             letter={letter}
             variant="button"
             isSelected={selectedLetter === letter}
             onClick={() => onLetterSelect(letter)}
+            onDragStart={onDragStart}
+            onDragMove={onDragMove}
+            onDragEnd={onDragEnd}
+            onDragCancel={onDragCancel}
             disabled={disabled}
           />
         ))}
       </div>
+      {!disabled && (
+        <div className="drag-instructions">
+          <small>Håll inne på en bokstav och dra för att placera direkt</small>
+        </div>
+      )}
     </div>
   );
 };
@@ -112,6 +150,11 @@ const GameInterface: React.FC = () => {
   const [placingLetter, setPlacingLetter] = useState<boolean>(false);
   const [submitInProgress, setSubmitInProgress] = useState<boolean>(false);
   const [pendingLetter, setPendingLetter] = useState<string | null>(null);
+  
+  // Drag and drop state
+  const [isDragActive, setIsDragActive] = useState(false);
+  const [dragPreviewCell, setDragPreviewCell] = useState<{ x: number; y: number } | null>(null);
+  const [draggedLetter, setDraggedLetter] = useState<string | null>(null);
 
   const swedishLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'Å', 'Ä', 'Ö'];
 
@@ -205,6 +248,63 @@ const GameInterface: React.FC = () => {
     console.log(`📍 User moved placement from (${prevPlacement?.x}, ${prevPlacement?.y}) to (${x}, ${y}) for letter ${selectedLetter}`);
   };
 
+  // Drag and drop handlers
+  const handleDragStart = useCallback((letter: string) => {
+    if (!isMyTurn || gamePhase !== 'letter_placement') return;
+    
+    setIsDragActive(true);
+    setDraggedLetter(letter);
+    console.log(`🎯 Started dragging letter: ${letter}`);
+  }, [isMyTurn, gamePhase]);
+
+  const handleDragMove = useCallback((x: number, y: number) => {
+    if (!isDragActive || !currentPlayer) return;
+
+    // Check if cell is valid for placement
+    const cell = currentPlayer.grid[y]?.[x];
+    if (cell && !cell.letter) {
+      setDragPreviewCell({ x, y });
+    } else {
+      setDragPreviewCell(null);
+    }
+  }, [isDragActive, currentPlayer]);
+
+  const handleDragEnd = useCallback(async (x: number, y: number) => {
+    if (!isDragActive || !draggedLetter || !currentPlayer) return;
+
+    const cell = currentPlayer.grid[y]?.[x];
+    if (cell && !cell.letter) {
+      // Valid placement
+      console.log(`🎯 Drag placement: ${draggedLetter} to (${x}, ${y})`);
+      
+      // Set the letter selection if not already selected
+      if (selectedLetter !== draggedLetter) {
+        try {
+          await selectLetter(draggedLetter);
+        } catch (err) {
+          console.error('Failed to select letter during drag:', err);
+          handleDragCancel();
+          return;
+        }
+      }
+
+      // Set temporary placement
+      setTemporaryPlacement({ x, y, letter: draggedLetter });
+    }
+
+    // Clean up drag state
+    setIsDragActive(false);
+    setDragPreviewCell(null);
+    setDraggedLetter(null);
+  }, [isDragActive, draggedLetter, currentPlayer, selectedLetter, selectLetter]);
+
+  const handleDragCancel = useCallback(() => {
+    setIsDragActive(false);
+    setDragPreviewCell(null);
+    setDraggedLetter(null);
+    console.log('🎯 Drag cancelled');
+  }, []);
+
   const handleConfirmPlacement = async () => {
     await submitPlacement();
   };
@@ -261,6 +361,8 @@ const GameInterface: React.FC = () => {
           disabled={gamePhase !== 'letter_placement' || !selectedLetter}
           highlightedCell={gamePhase === 'letter_placement' ? temporaryPlacement : null}
           temporaryLetter={gamePhase === 'letter_placement' ? temporaryPlacement : null}
+          dragPreviewCell={dragPreviewCell}
+          dragPreviewLetter={draggedLetter || undefined}
         />
       </div>
 
@@ -286,6 +388,18 @@ const GameInterface: React.FC = () => {
 
       {gamePhase === 'letter_placement' && selectedLetter && (
         <div className="placement-section">
+          <LetterSelector
+            availableLetters={[selectedLetter]}
+            selectedLetter={selectedLetter}
+            onLetterSelect={() => {}} // No selection needed in placement phase
+            onDragStart={handleDragStart}
+            onDragMove={handleDragMove}
+            onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
+            disabled={false}
+            isDragActive={isDragActive}
+          />
+          
           {temporaryPlacement && selectedLetter && (
             <div className="confirm-section">
               <div className="confirm-buttons">

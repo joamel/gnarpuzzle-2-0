@@ -1,0 +1,153 @@
+/* Draggable Brick Styles */
+.brick.dragging {
+  opacity: 0.5;
+  transform: scale(0.9);
+  transition: transform 0.1s ease;
+}
+
+.dragging-ghost {
+  pointer-events: none !important;
+  transform: scale(1.1);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  border: 2px solid #667eea;
+  background: linear-gradient(145deg, #f8f9ff 0%, #e6edff 100%);
+  animation: ghost-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes ghost-pulse {
+  0% {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  }
+  100% {
+    box-shadow: 0 12px 24px rgba(102, 126, 234, 0.4);
+  }
+}
+
+/* Board cell hover states during drag */
+.game-board .brick-board.drag-hover {
+  background: linear-gradient(145deg, #e8f2ff 0%, #d1e7ff 100%);
+  border: 2px solid #667eea;
+  transform: scale(1.05);
+  transition: all 0.2s ease;
+}
+
+.game-board .brick-board.drag-hover.invalid {
+  background: linear-gradient(145deg, #ffe8e8 0%, #ffd1d1 100%);
+  border: 2px solid #e74c3c;
+}
+
+/* Letter selector during drag mode */
+.letter-selector.drag-active .brick-button {
+  transform: scale(0.95);
+  opacity: 0.7;
+}
+
+.letter-selector.drag-active .brick-button.dragging {
+  transform: scale(1.1);
+  opacity: 1;
+  animation: long-press-ready 0.5s ease infinite alternate;
+}
+
+@keyframes long-press-ready {
+  0% {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  100% {
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  }
+}
+
+/* Mobile optimizations */
+@media (pointer: coarse) {
+  .brick-button {
+    /* Slightly larger touch targets for mobile */
+    min-width: 50px;
+    min-height: 50px;
+  }
+  
+  .dragging-ghost {
+    /* Larger ghost on mobile for better visibility */
+    transform: scale(1.2);
+  }
+}
+
+/* Haptic feedback simulation for devices without vibration */
+.brick-button.long-press-feedback {
+  animation: haptic-feedback 0.1s ease;
+}
+
+@keyframes haptic-feedback {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.95);
+  }
+}
+
+/* Drag instructions hint */
+.drag-hint {
+  position: absolute;
+  bottom: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: #667eea;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.brick-button:hover .drag-hint,
+.brick-button:focus .drag-hint {
+  opacity: 1;
+}
+
+/* Preview placement indicator */
+.brick-board.placement-preview {
+  background: linear-gradient(145deg, #e8f5e8 0%, #d1edd1 100%) !important;
+  border: 2px dashed #27AE60 !important;
+  animation: preview-pulse 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes preview-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+}
+
+.brick-board.placement-preview::after {
+  content: attr(data-preview-letter);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #27AE60;
+  font-weight: bold;
+  font-size: 0.9em;
+  opacity: 0.7;
+}
+
+/* Drag instructions */
+.drag-instructions {
+  text-align: center;
+  margin-top: 8px;
+  padding: 4px 8px;
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 4px;
+  border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+.drag-instructions small {
+  color: #667eea;
+  font-size: 11px;
+  font-style: italic;
+}

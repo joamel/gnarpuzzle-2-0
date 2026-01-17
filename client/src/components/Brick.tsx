@@ -8,6 +8,8 @@ interface BrickProps {
   isSelected?: boolean;
   variant?: 'board' | 'button';
   className?: string;
+  'data-cell-key'?: string;
+  'data-preview-letter'?: string;
 }
 
 const Brick: React.FC<BrickProps> = ({
@@ -16,7 +18,9 @@ const Brick: React.FC<BrickProps> = ({
   disabled = false,
   isSelected = false,
   variant = 'board',
-  className = ''
+  className = '',
+  'data-cell-key': dataCellKey,
+  'data-preview-letter': dataPreviewLetter
 }) => {
   const baseClass = variant === 'board' ? 'brick brick-board' : 'brick brick-button';
   const selectedClass = isSelected ? 'selected' : '';
@@ -28,6 +32,8 @@ const Brick: React.FC<BrickProps> = ({
       className={`${baseClass} ${selectedClass} ${disabledClass} ${filledClass} ${className}`}
       onClick={onClick}
       disabled={disabled}
+      data-cell-key={dataCellKey}
+      data-preview-letter={dataPreviewLetter}
     >
       {letter}
     </button>
