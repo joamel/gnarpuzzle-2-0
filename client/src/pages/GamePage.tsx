@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useGame } from '../contexts/GameContext';
 import { useAuth } from '../contexts/AuthContext';
 import RoomLobby from '../components/RoomLobby';
@@ -14,10 +14,32 @@ const GameInterface = React.lazy(() => import('../components/GameInterface').the
 
 const GamePage: React.FC = () => {
   const { user } = useAuth();
-  const { currentRoom, currentGame, gamePhase, leaderboard, leaveRoom, gameEndReason, boardSize } = useGame();
+  const { currentRoom, currentGame, gamePhase, leaderboard, leaveRoom, gameEndReason, boardSize, joinRoom } = useGame();
   const navigate = useNavigate();
+  const location = useLocation();
   const [gameStarted, setGameStarted] = useState(false);
   const [selectedPlayerBoard, setSelectedPlayerBoard] = useState<number | null>(null);
+
+  // Handle URL parameters for direct room join
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const roomCode = urlParams.get('room');
+    const password = urlParams.get('password');
+    
+    if (roomCode && !currentRoom) {
+      // Auto-join room from shared link
+      console.log('🔗 Auto-joining room from shared link:', roomCode);
+      joinRoom(roomCode, password || undefined).then(() => {
+        console.log('✅ Successfully joined room from shared link');
+        // Clear URL parameters after joining
+        navigate('/game', { replace: true });
+      }).catch((error) => {
+        console.error('❌ Failed to join room from shared link:', error);
+        alert(`Kunde inte gå med i rummet: ${error.message || 'Okänt fel'}`);
+        navigate('/', { replace: true });
+      });
+    }
+  }, [location.search, currentRoom, joinRoom, navigate]);
 
   useEffect(() => {
     console.log('🎮 [GamePage] useEffect - currentRoom:', currentRoom?.code || 'NULL', 'currentGame:', !!currentGame, 'gamePhase:', gamePhase);

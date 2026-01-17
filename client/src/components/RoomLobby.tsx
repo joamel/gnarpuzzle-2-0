@@ -31,6 +31,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [readyPlayers, setReadyPlayers] = useState<Set<string>>(new Set());
   const [isReady, setIsReady] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // authUser is direct User object {id, username} - NOT {user: {id, username}}
   const isOwner = currentRoom && authUser && String(currentRoom.createdBy).trim() === String(authUser.id).trim();
@@ -279,6 +280,35 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
     }
   };
 
+  const handleShareRoom = async () => {
+    if (!currentRoom) return;
+    
+    const password = (currentRoom.settings as any)?.require_password ? (currentRoom.settings as any)?.password : '';
+    let shareUrl = `${window.location.origin}/game?room=${currentRoom.code}`;
+    
+    if (password) {
+      shareUrl += `&password=${encodeURIComponent(password)}`;
+    }
+    
+    try {
+      if (navigator.share) {
+        // Use Web Share API if available (mobile)
+        await navigator.share({
+          title: `GnarPuzzle - ${currentRoom.name}`,
+          text: `Gå med i mitt GnarPuzzle rum: ${currentRoom.name}`,
+          url: shareUrl,
+        });
+      } else {
+        // Fallback to clipboard
+        await navigator.clipboard.writeText(shareUrl);
+        alert('Länk kopierad till urklipp!');
+      }
+    } catch (err) {
+      // Fallback if clipboard fails
+      setShowShareModal(true);
+    }
+  };
+
   if (!currentRoom) {
     return <div>Loading room...</div>;
   }
@@ -288,20 +318,25 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
       <div className="lobby-content-scrollable">
         <div className="lobby-header">
           <h2>{currentRoom.name}</h2>
-          {(currentRoom.settings as any)?.require_password && (
-            <div className="room-code-section">
-              <div className="room-code">
-                <span>Kod: <strong>{currentRoom.code}</strong></span>
-              </div>
-              <button
-                onClick={() => navigator.clipboard.writeText(currentRoom.code)}
-                className="copy-code-button"
-                title="Kopiera rumkod"
-              >
-                📋
-              </button>
+          <div className="room-code-section">
+            <div className="room-code">
+              <span>Kod: <strong>{currentRoom.code}</strong></span>
             </div>
-          )}
+            <button
+              onClick={() => navigator.clipboard.writeText(currentRoom.code)}
+              className="copy-code-button"
+              title="Kopiera rumkod"
+            >
+              📋
+            </button>
+            <button
+              onClick={handleShareRoom}
+              className="share-room-button"
+              title="Dela rum-länk"
+            >
+              🔗
+            </button>
+          </div>
         </div>
 
         <RoomSettings 
@@ -398,6 +433,47 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
           placement_timer: currentRoom.settings?.placement_timer || 30
         }}
       />
+      
+      {/* Share Modal */}
+      {showShareModal && (
+        <div className="modal-overlay" onClick={() => setShowShareModal(false)}>
+          <div className="modal-content share-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Dela rum</h3>
+              <button onClick={() => setShowShareModal(false)} className="close-button">×</button>
+            </div>
+            <div className="modal-body">
+              <p>Kopiera denna länk och dela den med dina vänner:</p>
+              <div className="share-url-container">
+                <input 
+                  type="text" 
+                  value={`${window.location.origin}/game?room=${currentRoom.code}${(currentRoom.settings as any)?.require_password ? `&password=${encodeURIComponent((currentRoom.settings as any)?.password || '')}` : ''}`}
+                  readOnly 
+                  className="share-url-input"
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                />
+                <button 
+                  onClick={() => {
+                    const input = document.querySelector('.share-url-input') as HTMLInputElement;
+                    input.select();
+                    document.execCommand('copy');
+                    alert('Länk kopierad!');
+                    setShowShareModal(false);
+                  }}
+                  className="copy-url-button"
+                >
+                  Kopiera
+                </button>
+              </div>
+              {(currentRoom.settings as any)?.require_password && (
+                <p className="password-warning">
+                  ⚠️ Denna länk inkluderar lösenordet för rummet
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

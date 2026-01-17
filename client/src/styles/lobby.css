@@ -104,6 +104,30 @@
   transform: none;
 }
 
+.share-room-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  background: #27AE60;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.share-room-button:hover {
+  opacity: 1;
+  background: #2ECC71;
+}
+
+.share-room-button:active {
+  transform: translateY(0);
+  transition: transform 0.1s;
+}
+
 /* Room Settings */
 .room-settings {
   background: white;
@@ -665,4 +689,48 @@
 
 .player-item:not(.empty) {
   animation: slideIn 0.3s ease-out;
+}
+
+/* Share Modal Styles */
+.share-modal {
+  min-width: 400px;
+  max-width: 90vw;
+}
+
+.share-url-container {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+  align-items: center;
+}
+
+.share-url-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 2px solid #667eea;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  background: #f8f9ff;
+}
+
+.copy-url-button {
+  padding: 8px 16px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.copy-url-button:hover {
+  background: #5a67d8;
+}
+
+.password-warning {
+  color: #E67E22;
+  font-size: 12px;
+  text-align: center;
+  margin-top: 8px;
 }
