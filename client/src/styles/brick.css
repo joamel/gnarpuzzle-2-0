@@ -97,9 +97,9 @@
 /* Button variant - smaller with proportional text */
 .brick.brick-button {
   aspect-ratio: 1;
-  font-size: 18px;
-  width: 40px;
-  height: 40px;
+  font-size: 16px;
+  width: 34px;
+  height: 34px;
   flex-shrink: 0;
 }
 
@@ -127,9 +127,9 @@
 /* Mobile optimizations */
 @media (max-width: 480px) {
   .brick.brick-button {
-    font-size: 14px;
-    width: 32px;
-    height: 32px;
+    font-size: 12px;
+    width: 28px;
+    height: 28px;
   }
 
   .brick.brick-board {

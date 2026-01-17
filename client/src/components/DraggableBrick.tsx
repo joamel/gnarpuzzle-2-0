@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import '../styles/brick.css';
 import '../styles/draggable-brick.css';
 
@@ -37,6 +37,7 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
   className = ''
 }) => {
   const [isDragging, setIsDragging] = useState(false);
+  const [isPressing, setIsPressing] = useState(false);
   const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
   const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isDragStartedRef = useRef(false);
@@ -49,7 +50,27 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
   const disabledClass = disabled ? 'disabled' : '';
   const filledClass = letter ? 'filled' : '';
   const draggingClass = isDragging ? 'dragging' : '';
-  const browsingClass = mode === 'selection' && isDragging ? 'browsing' : '';
+  const pressingClass = isPressing ? 'pressing' : '';
+  const browsingClass = (mode === 'selection' && (isDragging || isHovered)) ? 'browsing' : '';
+
+  // Setup non-passive touch events to allow preventDefault
+  useEffect(() => {
+    const element = elementRef.current;
+    if (!element) return;
+
+    const handleTouchMoveNative = (e: TouchEvent) => {
+      if (isDragging) {
+        e.preventDefault(); // Prevent scrolling during drag
+      }
+    };
+
+    // Add non-passive touchmove listener
+    element.addEventListener('touchmove', handleTouchMoveNative, { passive: false });
+
+    return () => {
+      element.removeEventListener('touchmove', handleTouchMoveNative);
+    };
+  }, [isDragging]);
 
   // Helper to get coordinates relative to viewport
   const getEventCoordinates = (e: React.TouchEvent | React.MouseEvent) => {
@@ -88,28 +109,30 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
   const startLongPress = useCallback((coords: { x: number, y: number }) => {
     if (disabled) return;
 
-    // Different behavior for different modes
+    // Different behavior for different modes - optimized for mobile
     if (mode === 'selection' && variant === 'button') {
-      // In selection mode, allow browsing all letters
+      // In selection mode, just enable browsing - no dragging away from position
       longPressTimeoutRef.current = setTimeout(() => {
-        // Haptic feedback if available
+        // Haptic feedback for mobile
         if (navigator.vibrate) {
-          navigator.vibrate(30);
+          navigator.vibrate([30, 10, 30]); // Double vibration for browsing mode
         }
         
         setIsDragging(true);
         isDragStartedRef.current = true;
         initialTouchRef.current = coords;
+        // Keep position at original location for browsing
         setDragPosition(coords);
         
-        onDragStart?.(letter);
-      }, 200); // Shorter longpress for letter selection
+        // Signal browsing mode start
+        onLetterHover?.(letter);
+      }, 150); // Faster for mobile browsing
     } else if (mode === 'placement' && variant === 'button') {
       // In placement mode, drag to place on board
       longPressTimeoutRef.current = setTimeout(() => {
-        // Haptic feedback if available
+        // Strong haptic feedback for placement drag
         if (navigator.vibrate) {
-          navigator.vibrate(50);
+          navigator.vibrate([50, 20, 100]); // Strong pattern for drag start
         }
         
         setIsDragging(true);
@@ -118,9 +141,9 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
         setDragPosition(coords);
         
         onDragStart?.(letter);
-      }, 350); // Standard longpress for placement
+      }, 250); // Faster for mobile placement
     }
-  }, [disabled, mode, variant, letter, onDragStart]);
+  }, [disabled, mode, variant, letter, onDragStart, onLetterHover]);
 
   const cancelLongPress = useCallback(() => {
     if (longPressTimeoutRef.current) {
@@ -130,6 +153,7 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
   }, []);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    setIsPressing(true);
     const coords = getEventCoordinates(e);
     startLongPress(coords);
   }, [startLongPress]);
@@ -145,25 +169,34 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
   const handleMove = useCallback((coords: { x: number, y: number }) => {
     if (!isDragStartedRef.current) {
       // If we're not dragging yet, check if we moved too far (cancel long press)
+      // More sensitive threshold for mobile
       const deltaX = Math.abs(coords.x - initialTouchRef.current.x);
       const deltaY = Math.abs(coords.y - initialTouchRef.current.y);
-      if (deltaX > 10 || deltaY > 10) {
+      if (deltaX > 8 || deltaY > 8) {
         cancelLongPress();
       }
+      
+      // For selection mode, allow immediate browsing even before longpress timeout
+      if (mode === 'selection' && longPressTimeoutRef.current) {
+        const hoveredLetter = findLetterUnderCoordinates(coords.x, coords.y);
+        if (hoveredLetter) {
+          onLetterHover?.(hoveredLetter);
+        }
+      }
+      
       return;
     }
 
     if (isDragging) {
-      setDragPosition(coords);
-      
       if (mode === 'selection') {
-        // Find letter under cursor for browsing
+        // In selection mode, don't update drag position - just browse letters
         const hoveredLetter = findLetterUnderCoordinates(coords.x, coords.y);
         if (hoveredLetter) {
           onLetterHover?.(hoveredLetter);
         }
       } else if (mode === 'placement') {
-        // Find cell under cursor for placement
+        // In placement mode, update position and show letter following cursor
+        setDragPosition(coords);
         const cell = findCellUnderCoordinates(coords.x, coords.y);
         if (cell) {
           onDragMove?.(cell.x, cell.y);
@@ -173,7 +206,7 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
   }, [isDragging, cancelLongPress, mode, onDragMove, onLetterHover]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    e.preventDefault(); // Prevent scrolling while dragging
+    // Don't call preventDefault on React events - use native events instead
     const coords = getEventCoordinates(e);
     handleMove(coords);
   }, [handleMove]);
@@ -184,6 +217,7 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
   }, [handleMove]);
 
   const handleEnd = useCallback((coords: { x: number, y: number }) => {
+    setIsPressing(false);
     cancelLongPress();
 
     if (isDragStartedRef.current && isDragging) {
@@ -257,7 +291,7 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
     <>
       <button
         ref={elementRef}
-        className={`${baseClass} ${selectedClass} ${disabledClass} ${filledClass} ${draggingClass} ${hoveredClass} ${browsingClass} ${className || ''}`}
+        className={`${baseClass} ${selectedClass} ${disabledClass} ${filledClass} ${draggingClass} ${pressingClass} ${hoveredClass} ${browsingClass} ${className || ''}`}
         onClick={isDragStartedRef.current ? undefined : onClick}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -267,13 +301,13 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
         onMouseUp={handleMouseUp}
         disabled={disabled}
         data-letter={letter}
-        style={isDragging ? { opacity: 0.5 } : {}}
+        style={isDragging && mode === 'placement' ? { opacity: 0.5 } : {}}
       >
-        {isDragging ? '' : letter}
+        {isDragging && mode === 'placement' ? '' : letter}
       </button>
       
-      {/* Dragging ghost element */}
-      {isDragging && (
+      {/* Dragging ghost element - only show for placement mode */}
+      {isDragging && mode === 'placement' && (
         <div
           className={`${baseClass} ${filledClass} dragging-ghost`}
           style={dragStyle}

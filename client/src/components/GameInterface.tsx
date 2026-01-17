@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { GridCell } from '../types/game';
 import { useGame } from '../contexts/GameContext';
 import Brick from './Brick';
@@ -82,7 +82,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
 // Letter selection component
 interface LetterSelectorProps {
   availableLetters: string[];
-  selectedLetter?: string | null;
   pendingLetter?: string | null;
   browsingLetter?: string | null;
   onLetterSelect: (letter: string) => void;
@@ -94,11 +93,11 @@ interface LetterSelectorProps {
   onDragCancel?: () => void;
   disabled?: boolean;
   isDragActive?: boolean;
+  mode?: 'selection' | 'placement';
 }
 
 const LetterSelector: React.FC<LetterSelectorProps> = ({
   availableLetters,
-  selectedLetter,
   pendingLetter,
   browsingLetter,
   onLetterSelect,
@@ -109,23 +108,26 @@ const LetterSelector: React.FC<LetterSelectorProps> = ({
   onDragEnd,
   onDragCancel,
   disabled = false,
-  isDragActive = false
+  isDragActive = false,
+  mode = 'selection'
 }) => {
   return (
     <div className={`letter-selector ${isDragActive ? 'drag-active' : ''}`}>
       <div className="letters-grid">
         {availableLetters.map(letter => {
-          const isSelected = selectedLetter === letter;
           const isPending = pendingLetter === letter;
           const isBrowsing = browsingLetter === letter;
+          // Show browsing state when browsing, otherwise show pending state
+          const shouldShowSelected = isPending && !isBrowsing;
           
           return (
             <DraggableBrick
               key={letter}
               letter={letter}
               variant="button"
-              mode="selection"
-              isSelected={isSelected || isPending}
+              mode={mode}
+              isSelected={shouldShowSelected}
+              isHovered={isBrowsing}
               onClick={() => onLetterSelect(letter)}
               onLetterHover={onLetterHover}
               onLetterSelect={onLetterBrowseSelect}
@@ -135,9 +137,8 @@ const LetterSelector: React.FC<LetterSelectorProps> = ({
               onDragCancel={onDragCancel}
               disabled={disabled}
               className={`
-                ${isSelected ? 'selected' : ''} 
-                ${isPending ? 'pending' : ''} 
                 ${isBrowsing ? 'browsing' : ''}
+                ${shouldShowSelected ? 'pending' : ''}
               `}
             />
           );
@@ -166,8 +167,7 @@ const GameInterface: React.FC = () => {
     gamePhase, 
     isMyTurn, 
     selectedLetter,
-    selectLetter, 
-    placeLetter, 
+    selectLetter,
     confirmPlacement,
     gameTimer
   } = useGame();
@@ -175,7 +175,6 @@ const GameInterface: React.FC = () => {
   // Removed excessive debug logging for cleaner console
 
   const [temporaryPlacement, setTemporaryPlacement] = useState<{ x: number; y: number; letter: string } | null>(null);
-  const [placingLetter, setPlacingLetter] = useState<boolean>(false);
   const [submitInProgress, setSubmitInProgress] = useState<boolean>(false);
   const [pendingLetter, setPendingLetter] = useState<string | null>(null);
   
@@ -194,6 +193,14 @@ const GameInterface: React.FC = () => {
       setTemporaryPlacement(null);
     }
   }, [gamePhase, temporaryPlacement]);
+
+  // Clear browsing state when game phase changes away from letter_selection
+  useEffect(() => {
+    if (gamePhase !== 'letter_selection') {
+      setBrowsingLetter(null);
+      setPendingLetter(null);
+    }
+  }, [gamePhase]);
 
   const swedishLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'Å', 'Ä', 'Ö'];
 
@@ -249,6 +256,7 @@ const GameInterface: React.FC = () => {
       return;
     }
     setPendingLetter(letter);
+    setBrowsingLetter(null); // Clear browsing when selecting
   };
 
   const handleConfirmLetter = async () => {
@@ -264,6 +272,7 @@ const GameInterface: React.FC = () => {
   // Letter browsing handlers
   const handleLetterHover = useCallback((letter: string) => {
     if (!isMyTurn || gamePhase !== 'letter_selection') return;
+    console.log(`🔤 Browsing letter: ${letter}`);
     setBrowsingLetter(letter);
   }, [isMyTurn, gamePhase]);
 
@@ -274,7 +283,7 @@ const GameInterface: React.FC = () => {
   }, [isMyTurn, gamePhase]);
 
   // Move placement when cell is clicked
-  const handleCellClick = async (x: number, y: number) => {
+  const handleCellClick = (x: number, y: number) => {
     if (!currentPlayer || !selectedLetter || gamePhase !== 'letter_placement') {
       console.log('❌ Cannot click cell:', { selectedLetter, gamePhase, hasCurrentPlayer: !!currentPlayer });
       return;
@@ -293,22 +302,8 @@ const GameInterface: React.FC = () => {
     }
     
     const prevPlacement = temporaryPlacement;
-    
-    // Immediately place letter on server so auto-placement can find it
-    try {
-      console.log(`📤 Placing letter "${selectedLetter}" at (${x}, ${y}) on server...`);
-      setPlacingLetter(true);
-      await placeLetter(x, y);
-      
-      // Set temporary placement for UI feedback  
-      setTemporaryPlacement({ x, y, letter: selectedLetter });
-      console.log(`✅ Letter placed on server and temporary placement updated`);
-    } catch (err) {
-      console.error('❌ Failed to place letter on server:', err);
-      // Don't update temporary placement if server call failed
-    } finally {
-      setPlacingLetter(false);
-    }
+    // Move temporary placement to clicked cell
+    setTemporaryPlacement({ x, y, letter: selectedLetter });
     
     console.log(`📍 User moved placement from (${prevPlacement?.x}, ${prevPlacement?.y}) to (${x}, ${y}) for letter ${selectedLetter}`);
   };
@@ -435,7 +430,6 @@ const GameInterface: React.FC = () => {
         <div className="letter-selection-section">
           <LetterSelector
             availableLetters={swedishLetters}
-            selectedLetter={selectedLetter}
             pendingLetter={pendingLetter}
             browsingLetter={browsingLetter}
             onLetterSelect={handleLetterSelect}
@@ -452,7 +446,7 @@ const GameInterface: React.FC = () => {
             <button 
               onClick={handleConfirmLetter}
               className="confirm-button primary-button"
-              disabled={!pendingLetter || placingLetter}
+              disabled={!pendingLetter}
             >
               Bekräfta bokstav
             </button>
@@ -464,7 +458,6 @@ const GameInterface: React.FC = () => {
         <div className="placement-section">
           <LetterSelector
             availableLetters={[selectedLetter]}
-            selectedLetter={selectedLetter}
             onLetterSelect={() => {}} // No selection needed in placement phase
             onDragStart={handleDragStart}
             onDragMove={handleDragMove}
@@ -472,6 +465,7 @@ const GameInterface: React.FC = () => {
             onDragCancel={handleDragCancel}
             disabled={false}
             isDragActive={isDragActive}
+            mode="placement"
           />
           
           {temporaryPlacement && selectedLetter && (
@@ -480,9 +474,9 @@ const GameInterface: React.FC = () => {
                 <button 
                   onClick={handleConfirmPlacement}
                   className="confirm-button primary-button"
-                  disabled={placingLetter}
+                  disabled={false}
                 >
-                  {placingLetter ? 'Placerar...' : 'Bekräfta placering'}
+                  Bekräfta placering
                 </button>
               </div>
             </div>

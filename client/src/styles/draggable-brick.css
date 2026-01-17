@@ -49,6 +49,12 @@
 }
 
 /* Letter browsing states */
+.brick-button.pressing {
+  transform: scale(0.98);
+  background: linear-gradient(145deg, #e67e22 0%, #d35400 100%);
+  transition: all 0.1s ease;
+}
+
 .brick-button.browsing {
   background: linear-gradient(145deg, #fff3cd 0%, #ffeaa7 100%);
   border: 2px solid #f39c12;
@@ -58,10 +64,14 @@
 }
 
 .brick-button.pending {
-  background: linear-gradient(145deg, #e8f5e8 0%, #c8e6c9 100%);
-  border: 2px solid #4caf50;
-  transform: scale(1.02);
-  box-shadow: 0 3px 8px rgba(76, 175, 80, 0.3);
+  background: linear-gradient(145deg, #4caf50 0%, #388e3c 100%);
+  border: 3px solid #2e7d32;
+  color: white;
+  transform: scale(1.1);
+  box-shadow: 
+    0 6px 20px rgba(76, 175, 80, 0.5),
+    inset 0 1px 3px rgba(255, 255, 255, 0.3);
+  font-weight: 900;
 }
 
 .brick-button.browsing.dragging {
