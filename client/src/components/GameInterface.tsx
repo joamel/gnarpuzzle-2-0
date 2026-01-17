@@ -187,67 +187,56 @@ const GameInterface: React.FC = () => {
   // Letter browsing state
   const [browsingLetter, setBrowsingLetter] = useState<string | null>(null);
   
-  // Auto-submit tracking to prevent duplicate submissions
-  const autoSubmitTriggeredRef = useRef<boolean>(false);
+  // Clear temporaryPlacement when game phase changes away from letter_placement
+  useEffect(() => {
+    if (gamePhase !== 'letter_placement' && temporaryPlacement) {
+      console.log('🧹 Clearing temporaryPlacement due to phase change:', gamePhase);
+      setTemporaryPlacement(null);
+    }
+  }, [gamePhase, temporaryPlacement]);
 
   const swedishLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'Å', 'Ä', 'Ö'];
 
-  // Single function to submit current placement - used by both OK button and timeout
-  const submitPlacement = async () => {
+  // Confirm current placement (letter already placed on server when cell was clicked)
+  const confirmCurrentPlacement = async () => {
     if (!temporaryPlacement) {
+      console.log('❌ confirmCurrentPlacement called but no temporaryPlacement');
       return;
     }
     
     if (submitInProgress) {
+      console.log('❌ confirmCurrentPlacement called but submitInProgress is true');
       return;
     }
     
+    console.log('✅ Confirming placement:', {
+      temporaryPlacement,
+      currentPlayer: currentPlayer?.username,
+      gamePhase
+    });
+    
     try {
       setSubmitInProgress(true);
-      setPlacingLetter(true);
-      await placeLetter(temporaryPlacement.x, temporaryPlacement.y);
+      // Letter already placed on server, just confirm it
       await confirmPlacement();
       setTemporaryPlacement(null);
-      autoSubmitTriggeredRef.current = false; // Reset auto-submit flag after successful submission
+      console.log('✅ Placement confirmed successfully');
     } catch (err) {
-      console.error('❌ Failed to submit placement:', err);
-      // Still reset the flags even on error
-      setSubmitInProgress(false);
-      setPlacingLetter(false);
+      console.error('❌ Failed to confirm placement:', err);
       throw err;
     } finally {
-      setPlacingLetter(false);
       setSubmitInProgress(false);
     }
   };
 
-  // Auto-submit when timeout is imminent - only if player has actively chosen a position
-  // This saves the player's choice if they clicked a cell but didn't press "Bekräfta" in time
-  // Submit with 3 seconds left to account for network latency and server processing
-  useEffect(() => {
-    if (gamePhase === 'letter_placement' && gameTimer && gameTimer.remainingSeconds <= 3 && temporaryPlacement && !submitInProgress && !autoSubmitTriggeredRef.current) {
-      console.log('⏰ 3 seconds left - auto-submitting player choice:', temporaryPlacement);
-      autoSubmitTriggeredRef.current = true;
-      submitPlacement().catch(err => {
-        console.error('❌ Auto-submit failed:', err);
-        autoSubmitTriggeredRef.current = false; // Reset flag on failure
-      });
-    }
-  }, [gameTimer?.remainingSeconds, gamePhase, temporaryPlacement, submitInProgress]);
+  // Note: No automatic timeout submission on client side.
+  // If the player doesn't place their letter in time, the server handles 
+  // auto-placement via handlePlacementTimeout -> autoPlaceLetter
+  // Emergency save only when phase changes (server forced move)
 
-  // Emergency save when phase changes away from letter_placement
-  const previousGamePhaseRef = useRef(gamePhase);
-  useEffect(() => {
-    // Only trigger if we're leaving letter_placement phase (not entering it)
-    if (previousGamePhaseRef.current === 'letter_placement' && gamePhase !== 'letter_placement' && temporaryPlacement && !submitInProgress && !autoSubmitTriggeredRef.current) {
-      console.log('⏰ Phase changed away from letter_placement - emergency saving:', temporaryPlacement);
-      autoSubmitTriggeredRef.current = true;
-      submitPlacement().catch(err => {
-        console.error('❌ Emergency save failed:', err);
-      });
-    }
-    previousGamePhaseRef.current = gamePhase;
-  }, [gamePhase, temporaryPlacement, submitInProgress]);
+  // Note: No client-side auto-placement or emergency save
+  // Server handles all timeout scenarios via handlePlacementTimeout -> autoPlaceLetter
+  // This prevents timing conflicts and 400 errors from trying to place after phase changes
 
   // Note: No automatic random placement is created on client side.
   // If the player doesn't place their letter in time, the server handles 
@@ -291,6 +280,12 @@ const GameInterface: React.FC = () => {
       return;
     }
 
+    // Validate coordinates
+    if (!currentPlayer.grid || !currentPlayer.grid[y] || !currentPlayer.grid[y][x]) {
+      console.error('❌ Invalid cell coordinates:', { x, y, gridSize: currentPlayer.grid?.length });
+      return;
+    }
+
     const cell = currentPlayer.grid[y][x];
     if (cell.letter) {
       console.log(`❌ Cell (${x}, ${y}) already occupied with letter: ${cell.letter}`);
@@ -298,11 +293,22 @@ const GameInterface: React.FC = () => {
     }
     
     const prevPlacement = temporaryPlacement;
-    // Move temporary placement to clicked cell
-    setTemporaryPlacement({ x, y, letter: selectedLetter });
     
-    // Reset auto-submit flag when user makes new placement
-    autoSubmitTriggeredRef.current = false;
+    // Immediately place letter on server so auto-placement can find it
+    try {
+      console.log(`📤 Placing letter "${selectedLetter}" at (${x}, ${y}) on server...`);
+      setPlacingLetter(true);
+      await placeLetter(x, y);
+      
+      // Set temporary placement for UI feedback  
+      setTemporaryPlacement({ x, y, letter: selectedLetter });
+      console.log(`✅ Letter placed on server and temporary placement updated`);
+    } catch (err) {
+      console.error('❌ Failed to place letter on server:', err);
+      // Don't update temporary placement if server call failed
+    } finally {
+      setPlacingLetter(false);
+    }
     
     console.log(`📍 User moved placement from (${prevPlacement?.x}, ${prevPlacement?.y}) to (${x}, ${y}) for letter ${selectedLetter}`);
   };
@@ -365,7 +371,7 @@ const GameInterface: React.FC = () => {
   }, []);
 
   const handleConfirmPlacement = async () => {
-    await submitPlacement();
+    await confirmCurrentPlacement();
   };
 
   if (!currentPlayer) {

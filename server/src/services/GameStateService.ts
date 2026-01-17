@@ -260,6 +260,8 @@ export class GameStateService {
    * Place letter on player's grid
    */
   async placeLetter(gameId: number, playerId: number, x: number, y: number): Promise<void> {
+    console.log(`🔍 placeLetter called: gameId=${gameId}, playerId=${playerId}, position=(${x},${y})`);
+    
     const game = await this.getGameById(gameId);
     if (!game || game.current_phase !== 'letter_placement') {
       console.log(`❌ placeLetter failed: phase=${game?.current_phase}, expected=letter_placement`);
@@ -274,8 +276,13 @@ export class GameStateService {
     `, gameId, playerId) as Player;
 
     if (!player || !player.current_letter) {
+      console.log(`❌ placeLetter failed: player=${!!player}, current_letter=${player?.current_letter}`);
       throw new Error('No letter to place');
     }
+
+    console.log(`📝 Player data before placement:`);
+    console.log(`  - current_letter: "${player.current_letter}"`);
+    console.log(`  - placement_confirmed: ${player.placement_confirmed}`);
 
     // Update player's grid
     let gridState: GridCell[][];
@@ -283,22 +290,30 @@ export class GameStateService {
       gridState = typeof player.grid_state === 'string' 
         ? JSON.parse(player.grid_state) 
         : player.grid_state;
+      console.log(`  - grid_state parsed, size: ${gridState.length}x${gridState[0]?.length}`);
     } catch {
+      console.log(`❌ placeLetter failed: Invalid grid state`);
       throw new Error('Invalid grid state');
     }
     
     if (gridState[y] && gridState[y][x] && !gridState[y][x].letter) {
+      console.log(`✅ Cell (${x}, ${y}) is available - placing "${player.current_letter}"`);
+      
       gridState[y][x] = {
         letter: player.current_letter,
         x,
         y
       };
 
+      console.log(`💾 Saving updated grid_state to database...`);
       await db.run(`
         UPDATE players 
         SET grid_state = ?
         WHERE game_id = ? AND user_id = ?
       `, JSON.stringify(gridState), gameId, playerId);
+
+      console.log(`✅ Grid state saved to database`);
+      console.log(`📍 Cell (${x}, ${y}) now contains: "${gridState[y][x].letter}"`);
 
       // Emit placement event
       this.socketService.broadcastToRoom(`game:${gameId}`, 'letter:placed', {
@@ -308,7 +323,11 @@ export class GameStateService {
         x,
         y
       });
+      
+      console.log(`📡 Broadcasted letter:placed event`);
     } else {
+      const cellStatus = gridState[y]?.[x]?.letter ? 'occupied' : 'invalid';
+      console.log(`❌ placeLetter failed: Cell (${x}, ${y}) is ${cellStatus}`);
       throw new Error('Cell not available');
     }
   }
@@ -612,16 +631,21 @@ export class GameStateService {
     `, gameId, playerId) as Player;
 
     if (!player) {
+      console.log(`❌ autoPlaceLetter: Player ${playerId} not found`);
       return;
     }
 
-    console.log(`🔍 Fresh player data - current_letter: "${player.current_letter}", placement_confirmed: ${player.placement_confirmed}`);
+    console.log(`🔍 autoPlaceLetter DEBUG: Processing player ${playerId}`);
+    console.log(`  - current_letter: "${player.current_letter}" (${typeof player.current_letter})`);
+    console.log(`  - placement_confirmed: ${player.placement_confirmed}`);
+    console.log(`  - target letter: "${letter}" (${typeof letter})`);
     
     let gridState: GridCell[][];
     try {
       gridState = typeof player.grid_state === 'string' 
         ? JSON.parse(player.grid_state)
         : player.grid_state;
+      console.log(`  - grid_state parsed successfully, size: ${gridState.length}x${gridState[0]?.length}`);
     } catch (error) {
       console.error(`❌ Failed to parse grid_state:`, error);
       return;
@@ -631,15 +655,22 @@ export class GameStateService {
     let foundExistingPlacement = false;
     let existingPosition = { x: 0, y: 0 };
     
+    console.log(`🔍 Searching for letter "${letter}" in grid...`);
     for (let y = 0; y < gridState.length; y++) {
       for (let x = 0; x < gridState[y].length; x++) {
         const cellLetter = gridState[y][x].letter;
+        
+        // Log every cell for debugging
+        if (cellLetter) {
+          console.log(`  - Cell (${x}, ${y}): "${cellLetter}" (${typeof cellLetter})`);
+        }
         
         // Normalize both letters for comparison (trim whitespace, convert to uppercase)
         const normalizedCellLetter = cellLetter ? String(cellLetter).trim().toUpperCase() : null;
         const normalizedLetter = letter ? String(letter).trim().toUpperCase() : null;
         
         if (normalizedCellLetter && normalizedLetter && normalizedCellLetter === normalizedLetter) {
+          console.log(`  ✅ MATCH FOUND! Cell (${x}, ${y}): "${cellLetter}" matches "${letter}"`);
           foundExistingPlacement = true;
           existingPosition = { x, y };
           break;
@@ -648,6 +679,21 @@ export class GameStateService {
       if (foundExistingPlacement) break;
     }
     
+    if (foundExistingPlacement) {
+      console.log(`✅ Found existing placement at (${existingPosition.x}, ${existingPosition.y}) - confirming it`);
+    } else {
+      console.log(`❌ Letter "${letter}" NOT found in grid - will place randomly`);
+      console.log(`🔍 Grid dump for debugging:`);
+      for (let y = 0; y < gridState.length; y++) {
+        let row = '';
+        for (let x = 0; x < gridState[y].length; x++) {
+          const cell = gridState[y][x];
+          row += cell?.letter ? `"${cell.letter}"`.padEnd(4) : 'null'.padEnd(4);
+        }
+        console.log(`  Row ${y}: [${row}]`);
+      }
+    }
+
     // If letter already placed, just confirm it - don't move it!
     if (foundExistingPlacement) {
       // Letter already placed, just broadcast the existing placement

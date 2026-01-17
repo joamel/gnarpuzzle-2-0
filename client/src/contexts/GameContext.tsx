@@ -825,19 +825,35 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     }
   }, [currentGame, currentPlayer, isMyTurn]);
 
-  const placeLetter = useCallback(async (x: number, y: number) => {
-    if (!currentGame || !currentPlayer || !selectedLetter) {
-      throw new Error('Cannot place letter');
+  const placeLetter = useCallback(async (x: number, y: number, letterOverride?: string) => {
+    const letterToUse = letterOverride || selectedLetter;
+    
+    if (!currentGame || !currentPlayer || !letterToUse) {
+      const error = `Cannot place letter: game=${!!currentGame}, player=${!!currentPlayer}, letter=${letterToUse}`;
+      console.error('❌', error);
+      throw new Error(error);
     }
+
+    console.log('📍 placeLetter called:', {
+      gameId: currentGame.id,
+      playerId: currentPlayer.userId,
+      position: `(${x}, ${y})`,
+      selectedLetter,
+      letterOverride,
+      letterToUse,
+      gamePhase
+    });
 
     try {
       await apiService.placeLetter(currentGame.id, currentPlayer.userId, x, y);
+      console.log('✅ placeLetter API call successful');
     } catch (err) {
+      console.error('❌ placeLetter API call failed:', err);
       const message = err instanceof Error ? err.message : 'Failed to place letter';
       setError(message);
       throw err;
     }
-  }, [currentGame, currentPlayer, selectedLetter]);
+  }, [currentGame, currentPlayer, selectedLetter, gamePhase]);
 
   const confirmPlacement = useCallback(async () => {
     if (!currentGame || !currentPlayer) {
