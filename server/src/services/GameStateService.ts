@@ -333,6 +333,23 @@ export class GameStateService {
   }
 
   /**
+   * Mark that player has started placing (temporary placement intent)
+   * This prevents auto-placement from triggering for active players
+   */
+  async setPlacementIntent(gameId: number, playerId: number): Promise<void> {
+    const dbManager = await DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+
+    await db.run(`
+      UPDATE players 
+      SET placement_confirmed = 2
+      WHERE game_id = ? AND user_id = ? AND placement_confirmed = 0
+    `, gameId, playerId);
+
+    console.log(`📍 Player ${playerId} set placement intent for game ${gameId}`);
+  }
+
+  /**
    * Confirm letter placement and calculate score
    */
   async confirmPlacement(gameId: number, playerId: number): Promise<void> {
@@ -342,7 +359,7 @@ export class GameStateService {
     await db.run(`
       UPDATE players 
       SET placement_confirmed = 1
-      WHERE game_id = ? AND user_id = ?
+      WHERE game_id = ? AND user_id = ? AND placement_confirmed IN (0, 2)
     `, gameId, playerId);
 
     console.log(`✅ Player ${playerId} confirmed placement for game ${gameId}`);
@@ -651,68 +668,16 @@ export class GameStateService {
       return;
     }
     
-    // First check if the letter is already placed somewhere in the grid
-    let foundExistingPlacement = false;
-    let existingPosition = { x: 0, y: 0 };
-    
-    console.log(`🔍 Searching for letter "${letter}" in grid...`);
+    // Since each player has their own individual grid, just place the letter randomly
+    console.log(`🤖 Auto-placing letter "${letter}" for player ${playerId} (each player has their own grid)`);
+    console.log(`📊 Current grid state for player ${playerId}:`);
     for (let y = 0; y < gridState.length; y++) {
+      let row = '';
       for (let x = 0; x < gridState[y].length; x++) {
-        const cellLetter = gridState[y][x].letter;
-        
-        // Log every cell for debugging
-        if (cellLetter) {
-          console.log(`  - Cell (${x}, ${y}): "${cellLetter}" (${typeof cellLetter})`);
-        }
-        
-        // Normalize both letters for comparison (trim whitespace, convert to uppercase)
-        const normalizedCellLetter = cellLetter ? String(cellLetter).trim().toUpperCase() : null;
-        const normalizedLetter = letter ? String(letter).trim().toUpperCase() : null;
-        
-        if (normalizedCellLetter && normalizedLetter && normalizedCellLetter === normalizedLetter) {
-          console.log(`  ✅ MATCH FOUND! Cell (${x}, ${y}): "${cellLetter}" matches "${letter}"`);
-          foundExistingPlacement = true;
-          existingPosition = { x, y };
-          break;
-        }
+        const cell = gridState[y][x];
+        row += cell?.letter ? `"${cell.letter}"`.padEnd(4) : 'null'.padEnd(4);
       }
-      if (foundExistingPlacement) break;
-    }
-    
-    if (foundExistingPlacement) {
-      console.log(`✅ Found existing placement at (${existingPosition.x}, ${existingPosition.y}) - confirming it`);
-    } else {
-      console.log(`❌ Letter "${letter}" NOT found in grid - will place randomly`);
-      console.log(`🔍 Grid dump for debugging:`);
-      for (let y = 0; y < gridState.length; y++) {
-        let row = '';
-        for (let x = 0; x < gridState[y].length; x++) {
-          const cell = gridState[y][x];
-          row += cell?.letter ? `"${cell.letter}"`.padEnd(4) : 'null'.padEnd(4);
-        }
-        console.log(`  Row ${y}: [${row}]`);
-      }
-    }
-
-    // If letter already placed, just confirm it - don't move it!
-    if (foundExistingPlacement) {
-      // Letter already placed, just broadcast the existing placement
-      this.socketService.broadcastToRoom(`game:${gameId}`, 'letter:placed', {
-        gameId,
-        playerId,
-        letter,
-        x: existingPosition.x,
-        y: existingPosition.y,
-        auto: true,
-        confirmed: true
-      });
-      
-      return; // Letter already placed, no need to move it
-    }
-    
-    // If letter not found, log a warning and place randomly
-    if (!foundExistingPlacement) {
-      console.log(`⚠️ Letter "${letter}" not found in grid for player ${playerId}, placing in random empty cell`);
+      console.log(`  Row ${y}: [${row}]`);
     }
     
     // Letter not found in grid, place it in a random empty cell
