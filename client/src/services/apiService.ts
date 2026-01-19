@@ -11,6 +11,10 @@ class ApiService {
     this.token = localStorage.getItem('auth_token');
   }
 
+  getToken(): string | null {
+    return this.token;
+  }
+
   setToken(token: string): void {
     this.token = token;
     localStorage.setItem('auth_token', token);
@@ -19,6 +23,16 @@ class ApiService {
   clearToken(): void {
     this.token = null;
     localStorage.removeItem('auth_token');
+  }
+
+  async refreshToken(): Promise<{ token: string; user: any }> {
+    if (!this.token) {
+      throw new Error('No token to refresh');
+    }
+    
+    return this.request<{ token: string; user: any }>('/api/auth/refresh', {
+      method: 'POST',
+    });
   }
 
   private async request<T>(
@@ -43,6 +57,47 @@ class ApiService {
       });
 
       if (!response.ok) {
+        // Handle authentication errors with intelligent retry
+        if (response.status === 403 || response.status === 401) {
+          // Don't retry for login/refresh endpoints to avoid infinite loops
+          if (endpoint === '/api/auth/login' || endpoint === '/api/auth/refresh' || endpoint === '/api/auth/me') {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          console.warn(`Authentication failed (${response.status}) - attempting token refresh`);
+          
+          try {
+            // Try to refresh the token
+            const refreshResponse = await this.refreshToken();
+            this.setToken(refreshResponse.token);
+            console.log('✅ Token refreshed successfully, retrying original request');
+            
+            // Retry the original request with new token
+            const retryHeaders = {
+              ...headers,
+              Authorization: `Bearer ${refreshResponse.token}`
+            };
+            
+            const retryResponse = await fetch(url, {
+              ...options,
+              headers: retryHeaders,
+            });
+            
+            if (!retryResponse.ok) {
+              const errorData = await retryResponse.json().catch(() => ({}));
+              throw new Error(errorData.error || `HTTP ${retryResponse.status}: ${retryResponse.statusText}`);
+            }
+            
+            return await retryResponse.json();
+          } catch (refreshError) {
+            console.warn('❌ Token refresh failed, redirecting to login:', refreshError);
+            this.clearToken();
+            window.location.href = '/';
+            return Promise.reject(new Error('Session expired - please log in again'));
+          }
+        }
+        
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }

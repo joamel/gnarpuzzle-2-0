@@ -382,20 +382,28 @@ export class GameStateService {
       SELECT COUNT(*) as count FROM players WHERE game_id = ?
     `, gameId) as { count: number };
 
+    console.log(`📊 Placement confirmation status: ${confirmedCount.count}/${totalPlayers.count} players confirmed`);
+
     if (confirmedCount.count === totalPlayers.count) {
+      console.log('✅ All players confirmed - advancing game');
       this.clearGameTimer(gameId);
       
       // Validate we're still in placement phase before advancing
       const updatedGame = await this.getGameById(gameId);
       if (updatedGame?.current_phase !== 'letter_placement') {
+        console.log('⚠️ Game phase changed during confirmation - skipping advance');
         return;
       }
       
       // Check if this ends the game or advances turn
       const gameEnded = await this.checkGameEnd(gameId);
+      console.log('🎮 Game end check result:', gameEnded);
       if (!gameEnded) {
+        console.log('🔄 Advancing to next turn');
         await this.advanceToNextTurn(gameId);
       }
+    } else {
+      console.log(`⏳ Waiting for remaining ${totalPlayers.count - confirmedCount.count} players to confirm`);
     }
   }
 
@@ -403,19 +411,28 @@ export class GameStateService {
    * Advance to next turn or check game end
    */
   async advanceToNextTurn(gameId: number): Promise<void> {
+    console.log(`🔄 advanceToNextTurn called for game ${gameId}`);
+    
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
 
     const game = await this.getGameById(gameId);
-    if (!game) return;
+    if (!game) {
+      console.log(`❌ Game ${gameId} not found in advanceToNextTurn`);
+      return;
+    }
+
+    console.log(`📊 Current game state: phase=${game.current_phase}, turn=${game.current_turn}`);
 
     // Prevent race conditions - only advance if in placement phase
     if (game.current_phase !== 'letter_placement') {
+      console.log(`⚠️ Cannot advance turn - game is in ${game.current_phase} phase, expected letter_placement`);
       return;
     }
 
     // Check if game is finished (grid full)
     if (await this.isGameFinished(gameId)) {
+      console.log('🏁 Game is finished - ending game');
       await this.finishGame(gameId);
       return;
     }

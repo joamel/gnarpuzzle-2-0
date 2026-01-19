@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Auth</title>
+</head>
+<body>
+    <h1>Test Authentication</h1>
+    <div>
+        <button onclick="login()">Login as TestUser</button>
+        <button onclick="testConfirmPlacement()">Test Confirm Placement</button>
+    </div>
+    <div id="results"></div>
+
+    <script>
+        let token = null;
+        const API_BASE = 'http://localhost:3001';
+        
+        async function login() {
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username: 'TestUser' + Date.now() })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    token = data.token;
+                    document.getElementById('results').innerHTML = `
+                        <p>Login successful!</p>
+                        <p>User: ${data.user.username}</p>
+                        <p>Token: ${token.substring(0, 20)}...</p>
+                    `;
+                } else {
+                    document.getElementById('results').innerHTML = `<p>Login failed: ${data.message}</p>`;
+                }
+            } catch (error) {
+                document.getElementById('results').innerHTML = `<p>Error: ${error.message}</p>`;
+            }
+        }
+        
+        async function testConfirmPlacement() {
+            if (!token) {
+                alert('Please login first');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/games/999/confirm-placement`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({})
+                });
+                
+                const data = await response.json();
+                document.getElementById('results').innerHTML += `
+                    <p>Confirm placement response: ${response.status}</p>
+                    <p>Data: ${JSON.stringify(data)}</p>
+                `;
+            } catch (error) {
+                document.getElementById('results').innerHTML += `<p>Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

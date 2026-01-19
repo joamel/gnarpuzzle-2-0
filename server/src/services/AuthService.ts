@@ -39,8 +39,15 @@ export class AuthService {
   // Verify JWT token
   static verifyToken(token: string): JWTPayload | null {
     try {
-      return jwt.verify(token, JWT_SECRET) as JWTPayload;
+      const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
+      console.log('🔐 JWT decoded payload:', decoded);
+      return decoded;
     } catch (error) {
+      console.error('❌ JWT verification failed:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        tokenLength: token ? token.length : 0,
+        tokenPrefix: token ? token.substring(0, 20) + '...' : 'null'
+      });
       logger.warn('Invalid token verification:', error);
       return null;
     }
@@ -190,7 +197,15 @@ export class AuthService {
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
+    console.log('🔐 Authentication attempt:', {
+      url: req.url,
+      method: req.method,
+      hasAuthHeader: !!authHeader,
+      tokenLength: token ? token.length : 0
+    });
+
     if (!token) {
+      console.log('❌ No token provided');
       res.status(401).json({
         error: 'Access denied',
         message: 'Authorization token required'
@@ -200,6 +215,7 @@ export class AuthService {
 
     const decoded = AuthService.verifyToken(token);
     if (!decoded) {
+      console.log('❌ Token verification failed');
       res.status(403).json({
         error: 'Invalid token',
         message: 'Token verification failed'
@@ -210,6 +226,7 @@ export class AuthService {
     // Verify user still exists in database
     const user = await UserModel.findById(decoded.userId);
     if (!user) {
+      console.log(`❌ User not found in database: ${decoded.userId} (${decoded.username})`);
       logger.warn(`Token references non-existent user: ${decoded.userId} (${decoded.username})`);
       res.status(403).json({
         error: 'Invalid token',

@@ -102,23 +102,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       try {
+        // Try to get current user - this will trigger automatic token refresh if needed
         apiService.setToken(token);
         const user = await apiService.getCurrentUser();
         
         setAuthState({
           user,
-          token,
+          token: apiService.getToken() || token, // Use refreshed token if available
           isAuthenticated: true,
           isLoading: false,
         });
 
-        // Connect socket
-        await socketService.connect(token);
+        // Connect socket with current token
+        await socketService.connect(apiService.getToken() || token);
         
       } catch (error) {
-        console.error('Auth check failed:', error);
-        apiService.clearToken();
-        localStorage.removeItem('auth_token');
+        console.warn('Authentication check failed - token may be invalid:', error);
+        // apiService.getCurrentUser() already handles token refresh and cleanup
+        // so we just need to update our state
         setAuthState({
           user: null,
           token: null,
