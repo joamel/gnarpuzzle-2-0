@@ -184,10 +184,6 @@
 /* Game Board - Uses unified styles from board.css */
 /* Remove duplicate styles and keep only game-specific overrides if needed */
 
-.grid-cell {
-  /* Base styles from board.css are used */
-}
-
 .grid-cell:hover:not(.disabled):not(.filled) {
   animation: cell-letter-pulse 0.8s ease-in-out infinite;
 }

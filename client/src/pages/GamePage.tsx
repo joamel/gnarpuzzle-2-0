@@ -4,6 +4,7 @@ import { useGame } from '../contexts/GameContext';
 import { useAuth } from '../contexts/AuthContext';
 import RoomLobby from '../components/RoomLobby';
 import GameResultBoard from '../components/GameResultBoard';
+import OnlineStats from '../components/OnlineStats';
 import Logo from '@/assets/Logo';
 import { socketService } from '../services/socketService';
 
@@ -184,7 +185,10 @@ const GamePage: React.FC = () => {
     return (
       <div className="game-page">
         <header className="page-header">
-          <Logo size="small" showText={true} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Logo size="small" showText={true} />
+            <OnlineStats />
+          </div>
           <button 
             onClick={handleLeaveRoom}
             className="header-btn"
@@ -210,7 +214,10 @@ const GamePage: React.FC = () => {
   return (
     <div className="game-page">
       <header className="page-header">
-        <Logo size="small" showText={true} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Logo size="small" showText={true} />
+          <OnlineStats />
+        </div>
         <button 
           onClick={handleLeaveRoom}
           className="header-btn"

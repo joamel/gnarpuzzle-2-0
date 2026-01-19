@@ -242,6 +242,11 @@ class ApiService {
   async getGameByRoomId(roomId: number): Promise<any> {
     return this.request<any>(`/api/games/room/${roomId}`);
   }
+
+  // Stats endpoints
+  async getOnlineStats(): Promise<{ online: { total: number; authenticated: number; anonymous: number } }> {
+    return this.request<{ online: { total: number; authenticated: number; anonymous: number } }>('/api/stats/online');
+  }
 }
 
 // Singleton instance

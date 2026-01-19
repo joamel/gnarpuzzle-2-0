@@ -77,10 +77,12 @@ app.get('/api/health', (_req, res) => {
 import { authRoutes } from './routes/auth';
 import { roomRoutes } from './routes/rooms';
 import { gameRoutes } from './routes/games';
+import statsRoutes from './routes/stats';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/games', gameRoutes);
+app.use('/api/stats', statsRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {

@@ -27,11 +27,6 @@
 }
 
 /* Grid cell styling is now in brick.css using .brick.brick-board */
-.board-cell,
-.grid-cell {
-  /* Uses .brick styles from brick.css */
-}
-
 .board-cell.empty,
 .grid-cell.empty {
   cursor: pointer;

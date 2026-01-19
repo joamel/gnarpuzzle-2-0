@@ -23,10 +23,34 @@
   color: #667eea;
   font-weight: 500;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .user-info strong {
   font-size: 15px;
+}
+
+/* Online stats styling */
+.online-stats {
+  font-size: 12px;
+  color: #667eea;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.online-stats-inline {
+  margin-left: 4px;
+}
+
+.online-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.8;
 }
 
 /* Unified header style - same as game-header */

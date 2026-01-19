@@ -6,6 +6,7 @@ import { apiService } from '../services/apiService';
 import { socketService } from '../services/socketService';
 import { Room } from '../types/game';
 import Logo from '../assets/Logo';
+import OnlineStats from '../components/OnlineStats';
 import '../styles/home.css';
 
 const HomePage: React.FC = () => {
@@ -159,17 +160,19 @@ const HomePage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <Logo size="small" showText={true} />
           </div>
-          <button 
-            onClick={async () => {
-              localStorage.clear();
-              await logout();
-              window.location.reload();
-            }}
-            className="logout-button"
-            aria-label="Logga ut"
-          >
-            Logga ut
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button 
+              onClick={async () => {
+                localStorage.clear();
+                await logout();
+                window.location.reload();
+              }}
+              className="logout-button"
+              aria-label="Logga ut"
+            >
+              Logga ut
+            </button>
+          </div>
         </header>
 
         <div className="home-content">
@@ -192,6 +195,7 @@ const HomePage: React.FC = () => {
               {user && (
                 <div className="user-info">
                   Inloggad som: <strong>{user.username}</strong>
+                  <OnlineStats className="online-stats-inline" />
                 </div>
               )}
             </div>
