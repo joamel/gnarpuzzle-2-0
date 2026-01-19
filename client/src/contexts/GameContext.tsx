@@ -327,10 +327,12 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         }
 
         // Update room status back to waiting
-        if (currentRoom) {
+        if (currentRoom && currentRoom.code) {
           console.log('🎮 game:ended event handler - updating room status');
-          // NEVER clear currentRoom from game:ended event - keep room, just update status
-          setCurrentRoom(prev => prev ? { ...prev, status: 'waiting' } : prev);
+          // Only update if we have a valid room with a code
+          setCurrentRoom(prev => prev && prev.code ? { ...prev, status: 'waiting' } : prev);
+        } else if (currentRoom) {
+          console.warn('⚠️ Cannot update room status - room missing code property:', currentRoom);
         }
       } catch (error) {
         logger.game.error('Error handling game ended event', { error, data });
@@ -977,7 +979,13 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   }, []);
 
   const leaveRoom = useCallback(async (intentional: boolean = false) => {
-    if (!currentRoom) return;
+    if (!currentRoom || !currentRoom.code) {
+      console.log('🚪 leaveRoom() skipped - no room or invalid room code:', { 
+        hasRoom: !!currentRoom, 
+        roomCode: currentRoom?.code 
+      });
+      return;
+    }
     
     try {
       console.log('🚪 leaveRoom() called - intentional:', intentional, 'room:', currentRoom.code);

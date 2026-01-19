@@ -79,6 +79,13 @@ const GamePage: React.FC = () => {
 
   // Leave room and go back to home
   const handleLeaveRoom = async () => {
+    // If no current room, just navigate home (game may have ended already)
+    if (!currentRoom) {
+      console.log('🎮 [GamePage] No current room to leave, navigating to home');
+      navigate('/');
+      return;
+    }
+    
     // Confirm before leaving if game is in progress
     if (gamePhase && gamePhase !== 'finished') {
       const confirmed = window.confirm('Är du säker på att du vill lämna spelet? Du kommer att försvinna från rummet.');
