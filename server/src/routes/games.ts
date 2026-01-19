@@ -339,6 +339,53 @@ router.post('/:id/place-letter', AuthService.authenticateToken, async (req, res)
 });
 
 /**
+ * POST /api/games/:id/placement-intent
+ * Mark placement intent (temporary placement started)
+ * Requires authentication
+ */
+router.post('/:id/placement-intent', AuthService.authenticateToken, async (req, res) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const gameId = parseInt(req.params.id);
+
+    if (isNaN(gameId)) {
+      res.status(400).json({
+        error: 'Invalid game ID',
+        message: 'Game ID must be a number'
+      });
+      return;
+    }
+
+    // Get GameStateService instance
+    const { GameStateService } = await import('../services/GameStateService');
+    const { getSocketService } = await import('../index');
+    const socketService = getSocketService();
+    
+    if (!socketService) {
+      throw new Error('Socket service not available');
+    }
+    
+    const gameStateService = GameStateService.getInstance(socketService);
+    
+    // Set placement intent
+    await gameStateService.setPlacementIntent(gameId, authReq.user!.id);
+
+    res.json({
+      success: true,
+      message: 'Placement intent set successfully'
+    });
+
+  } catch (error) {
+    logger.error('Set placement intent error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to set placement intent';
+    res.status(400).json({
+      error: 'Unable to set placement intent',
+      message: message
+    });
+  }
+});
+
+/**
  * POST /api/games/:id/confirm-placement
  * Confirm letter placement
  * Requires authentication
