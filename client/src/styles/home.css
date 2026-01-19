@@ -11,24 +11,30 @@
 .rooms-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   margin-bottom: 16px;
   padding-bottom: 12px;
   border-bottom: 2px solid #dce6ff;
 }
 
-.user-info {
+.rooms-list-title {
+  margin: 0;
+  line-height: 1.2;
+}
+
+.rooms-user-info {
   font-size: 13px;
   color: #667eea;
   font-weight: 500;
   white-space: nowrap;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
 }
 
-.user-info strong {
+.rooms-user-line strong {
   font-size: 15px;
 }
 
@@ -42,8 +48,8 @@
   gap: 4px;
 }
 
-.online-stats-inline {
-  margin-left: 4px;
+.online-stats-under {
+  margin-top: 2px;
 }
 
 .online-indicator {

@@ -193,9 +193,11 @@ const HomePage: React.FC = () => {
             <div className="rooms-header">
               <h2 className="card-title rooms-list-title">Tillgängliga rum ({availableRooms.length})</h2>
               {user && (
-                <div className="user-info">
-                  Inloggad som: <strong>{user.username}</strong>
-                  <OnlineStats className="online-stats-inline" />
+                <div className="rooms-user-info">
+                  <div className="rooms-user-line">
+                    Inloggad som: <strong>{user.username}</strong>
+                  </div>
+                  <OnlineStats className="online-stats-under" />
                 </div>
               )}
             </div>
