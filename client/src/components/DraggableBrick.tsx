@@ -84,11 +84,13 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
   // Find the board cell under coordinates
   const findCellUnderCoordinates = (x: number, y: number) => {
     const element = document.elementFromPoint(x, y);
+    console.log('🔧 findCellUnderCoordinates:', { x, y, element: element?.className, tagName: element?.tagName });
     if (element?.classList.contains('brick-board')) {
       const cellElement = element as HTMLElement;
       const key = cellElement.getAttribute('data-cell-key');
       if (key) {
         const [cellX, cellY] = key.split('-').map(Number);
+        console.log('🔧 Found board cell:', { cellX, cellY, key });
         return { x: cellX, y: cellY };
       }
     }
@@ -129,7 +131,9 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
       }, 150); // Faster for mobile browsing
     } else if (mode === 'placement' && variant === 'button') {
       // In placement mode, drag to place on board
+      console.log('🚀 Starting placement longpress for letter:', letter);
       longPressTimeoutRef.current = setTimeout(() => {
+        console.log('🚀 Placement longpress triggered for letter:', letter);
         // Strong haptic feedback for placement drag
         if (navigator.vibrate) {
           navigator.vibrate([50, 20, 100]); // Strong pattern for drag start
@@ -140,6 +144,7 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
         initialTouchRef.current = coords;
         setDragPosition(coords);
         
+        console.log('🚀 Calling onDragStart with letter:', letter);
         onDragStart?.(letter);
       }, 250); // Faster for mobile placement
     }
@@ -153,10 +158,11 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
   }, []);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    console.log('🔧 DraggableBrick touch start:', { mode, variant, letter, disabled });
     setIsPressing(true);
     const coords = getEventCoordinates(e);
     startLongPress(coords);
-  }, [startLongPress]);
+  }, [startLongPress, mode, variant, letter, disabled]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Only handle left mouse button
@@ -198,6 +204,7 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
         // In placement mode, update position and show letter following cursor
         setDragPosition(coords);
         const cell = findCellUnderCoordinates(coords.x, coords.y);
+        console.log('🎯 Placement drag move to coords:', coords, 'found cell:', cell);
         if (cell) {
           onDragMove?.(cell.x, cell.y);
         }
@@ -208,8 +215,9 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     // Don't call preventDefault on React events - use native events instead
     const coords = getEventCoordinates(e);
+    console.log('🔧 DraggableBrick touch move:', { isDragging, mode, coords });
     handleMove(coords);
-  }, [handleMove]);
+  }, [handleMove, isDragging, mode]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const coords = getEventCoordinates(e);
@@ -248,9 +256,10 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
   }, [isDragging, cancelLongPress, mode, onDragEnd, onDragCancel, onLetterSelect, onClick]);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    console.log('🔧 DraggableBrick touch end:', { isDragging, mode });
     const coords = getEventCoordinates(e);
     handleEnd(coords);
-  }, [handleEnd]);
+  }, [handleEnd, isDragging, mode]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
     const coords = getEventCoordinates(e);
@@ -269,12 +278,29 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
       handleEnd({ x: e.clientX, y: e.clientY });
     };
 
+    const handleGlobalTouchMove = (e: TouchEvent) => {
+      if (e.touches[0]) {
+        e.preventDefault(); // Prevent scroll during drag
+        handleMove({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+      }
+    };
+
+    const handleGlobalTouchEnd = (e: TouchEvent) => {
+      if (e.changedTouches[0]) {
+        handleEnd({ x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY });
+      }
+    };
+
     document.addEventListener('mousemove', handleGlobalMouseMove);
     document.addEventListener('mouseup', handleGlobalMouseUp);
+    document.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
+    document.addEventListener('touchend', handleGlobalTouchEnd);
 
     return () => {
       document.removeEventListener('mousemove', handleGlobalMouseMove);
       document.removeEventListener('mouseup', handleGlobalMouseUp);
+      document.removeEventListener('touchmove', handleGlobalTouchMove);
+      document.removeEventListener('touchend', handleGlobalTouchEnd);
     };
   }, [isDragging, handleMove, handleEnd]);
 

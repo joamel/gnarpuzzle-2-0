@@ -5,6 +5,11 @@
   transition: transform 0.1s ease;
 }
 
+/* Allow full touch control for draggable bricks */
+.brick-button {
+  touch-action: none; /* Allow custom touch handling for drag */
+}
+
 .dragging-ghost {
   pointer-events: none !important;
   transform: scale(1.1);
