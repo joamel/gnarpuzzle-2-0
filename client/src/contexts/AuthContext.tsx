@@ -84,12 +84,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     
     try {
       const user = await apiService.getCurrentUser();
+      
+      // Check if user ID changed (indicating user was recreated)
+      if (authState.user && user.id !== authState.user.id) {
+        console.log('ℹ️ User ID changed during refresh - user was likely recreated. Maintaining session.');
+      }
+      
       setAuthState(prev => ({ ...prev, user, isAuthenticated: true }));
     } catch (error) {
       console.error('Failed to refresh user:', error);
       await logout();
     }
-  }, [authState.token, logout]);
+  }, [authState.token, authState.user, logout]);
 
   // Check authentication on mount
   useEffect(() => {

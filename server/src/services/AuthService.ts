@@ -5,7 +5,7 @@ import { UserModel } from '../models';
 import { logger } from '../utils/logger';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-this';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '2h';
 
 // Ensure JWT_SECRET is always a string
 if (!JWT_SECRET) {
@@ -136,11 +136,37 @@ export class AuthService {
       // Get fresh user data
       const user = await UserModel.findById(decoded.userId);
       if (!user) {
-        res.status(401).json({
-          error: 'User not found',
-          message: 'User associated with token no longer exists'
-        });
-        return;
+        console.log(`⚠️ User ${decoded.userId} (${decoded.username}) not found during refresh - recreating user`);
+        logger.warn(`User ${decoded.userId} (${decoded.username}) not found during token refresh - recreating`);
+        
+        // Try to recreate the user since they existed when the token was created
+        try {
+          const recreatedUser = await UserModel.create(decoded.username);
+          console.log(`✅ Recreated user: ${recreatedUser.id} (${recreatedUser.username})`);
+          
+          // Generate new token for recreated user
+          const newToken = AuthService.generateToken(recreatedUser);
+          
+          res.status(200).json({
+            success: true,
+            user: {
+              id: recreatedUser.id,
+              username: recreatedUser.username,
+              created_at: recreatedUser.created_at
+            },
+            token: newToken,
+            expiresIn: JWT_EXPIRES_IN,
+            recreated: true
+          });
+          return;
+        } catch (createError) {
+          console.error(`❌ Failed to recreate user ${decoded.username}:`, createError);
+          res.status(401).json({
+            error: 'User not found',
+            message: 'User associated with token no longer exists and could not be recreated'
+          });
+          return;
+        }
       }
 
       // Update last active and generate new token

@@ -159,6 +159,7 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     console.log('🔧 DraggableBrick touch start:', { mode, variant, letter, disabled });
+    e.preventDefault(); // Prevent default touch behaviors
     setIsPressing(true);
     const coords = getEventCoordinates(e);
     startLongPress(coords);
@@ -213,11 +214,14 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
   }, [isDragging, cancelLongPress, mode, onDragMove, onLetterHover]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    // Don't call preventDefault on React events - use native events instead
+    // Always prevent default for touch move during placement
+    if (mode === 'placement' && (isDragging || isPressing)) {
+      e.preventDefault();
+    }
     const coords = getEventCoordinates(e);
     console.log('🔧 DraggableBrick touch move:', { isDragging, mode, coords });
     handleMove(coords);
-  }, [handleMove, isDragging, mode]);
+  }, [handleMove, isDragging, mode, isPressing]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const coords = getEventCoordinates(e);
@@ -257,6 +261,7 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     console.log('🔧 DraggableBrick touch end:', { isDragging, mode });
+    e.preventDefault(); // Prevent ghost clicks
     const coords = getEventCoordinates(e);
     handleEnd(coords);
   }, [handleEnd, isDragging, mode]);
@@ -280,13 +285,15 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
 
     const handleGlobalTouchMove = (e: TouchEvent) => {
       if (e.touches[0]) {
-        e.preventDefault(); // Prevent scroll during drag
+        e.preventDefault(); // Always prevent scroll during drag
+        e.stopPropagation(); // Prevent event bubbling
         handleMove({ x: e.touches[0].clientX, y: e.touches[0].clientY });
       }
     };
 
     const handleGlobalTouchEnd = (e: TouchEvent) => {
       if (e.changedTouches[0]) {
+        e.preventDefault(); // Prevent ghost clicks
         handleEnd({ x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY });
       }
     };
@@ -327,6 +334,7 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
         onMouseUp={handleMouseUp}
         disabled={disabled}
         data-letter={letter}
+        data-mode={mode}
         style={isDragging && mode === 'placement' ? { opacity: 0.5 } : {}}
       >
         {isDragging && mode === 'placement' ? '' : letter}

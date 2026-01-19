@@ -781,45 +781,7 @@ export class SocketService {
                   // Also remove from room
                   const removed = await RoomModel.removeMember(roomId, userId);
                   if (removed) {
-                    // Notify room
-                    this.io.to(`room:${userData.roomCode}`).emit('room:member_left', {
-                      user: {
-                        id: userId,
-                        username: userData.username
-                      },
-                      roomCode: userData.roomCode,
-                      wasCreator: room.created_by === userId
-                    });
-                    
-                    // Handle creator transfer if needed
-                    if (room.created_by === userId) {
-                      const remainingMembers = await RoomModel.getRoomMembers(roomId);
-                      if (remainingMembers.length > 0) {
-                        const newCreator = remainingMembers[0];
-                        await RoomModel.transferOwnership(roomId, newCreator.id);
-                        
-                        this.io.to(`room:${userData.roomCode}`).emit('room:ownership_transferred', {
-                          newCreator: {
-                            id: newCreator.id,
-                            username: newCreator.username
-                          },
-                          roomCode: userData.roomCode,
-                          previousCreator: userData.username
-                        });
-                        
-                        logger.info(`Auto-transfer ownership of room ${userData.roomCode} from ${userData.username} to ${newCreator.username}`);
-                      }
-                    }
-                    
-                    // Emit updated room data
-                    const updatedRoom = await RoomModel.findByCode(userData.roomCode!);
-                    if (updatedRoom) {
-                      this.io.to(`room:${userData.roomCode}`).emit('room:updated', {
-                        room: updatedRoom
-                      });
-                    }
-                    
-                    logger.info(`Removed disconnected user ${userData.username} from room ${userData.roomCode} after grace period`);
+                    await this.notifyRoomOfMemberLeaving(userData.roomCode!, userId, userData.username!, room.created_by === userId);
                   }
                 } else {
                   logger.info(`Player ${userData.username} (${userId}) reconnected within grace period - not removing from game`);
@@ -843,6 +805,14 @@ export class SocketService {
               });
               
               return;
+            } else {
+              // No active game - remove immediately from waiting rooms
+              logger.info(`Player ${userData.username} (${userId}) disconnected from waiting room ${userData.roomCode} - removing immediately`);
+              
+              const removed = await RoomModel.removeMember(roomId, userId);
+              if (removed) {
+                await this.notifyRoomOfMemberLeaving(userData.roomCode, userId, userData.username!, room.created_by === userId);
+              }
             }
           }
         } catch (error) {
@@ -954,6 +924,60 @@ export class SocketService {
         service: 'gnarpuzzle-server',
         socketId: socket.id
       });
+    }
+  }
+
+  /**
+   * Helper to notify room members when someone leaves
+   */
+  private async notifyRoomOfMemberLeaving(roomCode: string, userId: number, username: string, wasCreator: boolean): Promise<void> {
+    try {
+      const RoomModel = (await import('../models/RoomModel')).RoomModel;
+      
+      // Notify room of member leaving
+      this.io.to(`room:${roomCode}`).emit('room:member_left', {
+        user: {
+          id: userId,
+          username: username
+        },
+        roomCode: roomCode,
+        wasCreator: wasCreator
+      });
+      
+      // Handle creator transfer if needed
+      if (wasCreator) {
+        const room = await RoomModel.findByCode(roomCode);
+        if (room && room.id) {
+          const remainingMembers = await RoomModel.getRoomMembers(room.id as number);
+          if (remainingMembers.length > 0) {
+            const newCreator = remainingMembers[0];
+            await RoomModel.transferOwnership(room.id as number, newCreator.id);
+            
+            this.io.to(`room:${roomCode}`).emit('room:ownership_transferred', {
+              newCreator: {
+                id: newCreator.id,
+                username: newCreator.username
+              },
+              roomCode: roomCode,
+              previousCreator: username
+            });
+            
+            logger.info(`Auto-transfer ownership of room ${roomCode} from ${username} to ${newCreator.username}`);
+          }
+        }
+      }
+      
+      // Emit updated room data
+      const updatedRoom = await RoomModel.findByCode(roomCode);
+      if (updatedRoom) {
+        this.io.to(`room:${roomCode}`).emit('room:updated', {
+          room: updatedRoom
+        });
+      }
+      
+      logger.info(`Notified room ${roomCode} of member ${username} leaving`);
+    } catch (error) {
+      logger.error(`Error notifying room ${roomCode} of member leaving:`, error);
     }
   }
 

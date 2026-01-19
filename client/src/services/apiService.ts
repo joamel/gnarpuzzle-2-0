@@ -71,7 +71,13 @@ class ApiService {
             // Try to refresh the token
             const refreshResponse = await this.refreshToken();
             this.setToken(refreshResponse.token);
-            console.log('✅ Token refreshed successfully, retrying original request');
+            
+            // Log if user was recreated
+            if ((refreshResponse as any).recreated) {
+              console.log('ℹ️ User was recreated during token refresh - continuing with new token');
+            } else {
+              console.log('✅ Token refreshed successfully, retrying original request');
+            }
             
             // Retry the original request with new token
             const retryHeaders = {

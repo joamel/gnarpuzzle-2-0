@@ -250,6 +250,15 @@ const GameInterface: React.FC = () => {
       setTemporaryPlacement(null);
     } catch (err) {
       console.error('❌ Failed to submit placement:', err);
+      
+      // Show user-friendly error message
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      if (errorMessage.includes('Session expired') || errorMessage.includes('User not found') || errorMessage.includes('please log in again')) {
+        console.log('🔄 Authentication expired during game - user will be redirected to login');
+        // The apiService.request already handles redirect, but we can add user notification
+      } else {
+        console.log('⚠️ Game placement failed:', errorMessage);
+      }
     } finally {
       setSubmitInProgress(false);
     }

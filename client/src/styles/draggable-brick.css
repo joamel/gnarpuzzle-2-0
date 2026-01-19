@@ -8,6 +8,14 @@
 /* Allow full touch control for draggable bricks */
 .brick-button {
   touch-action: none; /* Allow custom touch handling for drag */
+  -webkit-touch-callout: none; /* Disable callout on long touch */
+  -webkit-user-select: none; /* Disable text selection */
+  user-select: none;
+}
+
+/* Specific mobile touch behavior for placement mode */
+.brick-button[data-mode="placement"] {
+  touch-action: none !important; /* Force no touch action for placement mode */
 }
 
 .dragging-ghost {

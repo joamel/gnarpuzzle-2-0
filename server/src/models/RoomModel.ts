@@ -155,29 +155,40 @@ export class RoomModel {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
     
+    console.log(`🚪 RoomModel.removeMember: Removing user ${userId} from room ${roomId}`);
+    
     const result = await db.run(`
       DELETE FROM room_members 
       WHERE room_id = ? AND user_id = ?
     `, roomId, userId);
     
     if (result.changes > 0) {
+      console.log(`✅ Successfully removed user ${userId} from room ${roomId}`);
+      
       // Check if room is now empty and reset status to waiting if needed
       const memberCount = await this.getMemberCount(roomId);
+      console.log(`📊 Room ${roomId} now has ${memberCount} members`);
       
       if (memberCount === 0) {
-        console.log(`🔄 Room ${roomId} is now empty, resetting to waiting status...`);
+        console.log(`🔄 Room ${roomId} is now empty, cleaning up...`);
         
         // Delete any ongoing games for this room
         try {
           await db.run('DELETE FROM players WHERE game_id IN (SELECT id FROM games WHERE room_id = ?)', roomId);
-          await db.run('DELETE FROM games WHERE room_id = ?', roomId);
+          const gameDeleteResult = await db.run('DELETE FROM games WHERE room_id = ?', roomId);
+          if (gameDeleteResult.changes > 0) {
+            console.log(`🗑️ Cleaned up ${gameDeleteResult.changes} games for empty room ${roomId}`);
+          }
         } catch (error) {
           console.warn('⚠️ Failed to clean up games for empty room:', error);
         }
         
         // Reset room status to waiting
         await db.run('UPDATE rooms SET status = ? WHERE id = ?', 'waiting', roomId);
+        console.log(`♻️ Reset room ${roomId} status to waiting`);
       }
+    } else {
+      console.warn(`⚠️ No changes when trying to remove user ${userId} from room ${roomId} - user may not have been member`);
     }
     
     return result.changes > 0;
