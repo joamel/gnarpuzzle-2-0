@@ -23,6 +23,7 @@ interface GameContextType {
   startGame: (roomId: number) => Promise<void>;
   selectLetter: (letter: string) => Promise<void>;
   placeLetter: (x: number, y: number) => Promise<void>;
+  setPlacementIntent: () => Promise<void>;
   confirmPlacement: () => Promise<void>;
   
   // Room actions
@@ -855,6 +856,23 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     }
   }, [currentGame, currentPlayer, selectedLetter, gamePhase]);
 
+  const setPlacementIntent = useCallback(async () => {
+    if (!currentGame) {
+      console.error('❌ setPlacementIntent: No current game');
+      throw new Error('No active game');
+    }
+
+    try {
+      await apiService.setPlacementIntent(currentGame.id);
+      console.log('✅ Placement intent set successfully');
+    } catch (err) {
+      console.error('❌ setPlacementIntent failed:', err);
+      const message = err instanceof Error ? err.message : 'Failed to set placement intent';
+      setError(message);
+      throw err;
+    }
+  }, [currentGame]);
+
   const confirmPlacement = useCallback(async () => {
     if (!currentGame || !currentPlayer) {
       throw new Error('Cannot confirm placement');
@@ -1084,6 +1102,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     startGame,
     selectLetter,
     placeLetter,
+    setPlacementIntent,
     confirmPlacement,
     joinRoom,
     leaveRoom,

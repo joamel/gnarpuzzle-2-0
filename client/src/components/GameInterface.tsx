@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { GridCell } from '../types/game';
 import { useGame } from '../contexts/GameContext';
 import Brick from './Brick';
@@ -117,8 +117,8 @@ const LetterSelector: React.FC<LetterSelectorProps> = ({
         {availableLetters.map(letter => {
           const isPending = pendingLetter === letter;
           const isBrowsing = browsingLetter === letter;
-          // Show browsing state when browsing, otherwise show pending state
-          const shouldShowSelected = isPending && !isBrowsing;
+          // When browsing, hide pending state and show browsing instead
+          const shouldShowPending = isPending && !browsingLetter;
           
           return (
             <DraggableBrick
@@ -126,7 +126,7 @@ const LetterSelector: React.FC<LetterSelectorProps> = ({
               letter={letter}
               variant="button"
               mode={mode}
-              isSelected={shouldShowSelected}
+              isSelected={shouldShowPending}
               isHovered={isBrowsing}
               onClick={() => onLetterSelect(letter)}
               onLetterHover={onLetterHover}
@@ -138,7 +138,7 @@ const LetterSelector: React.FC<LetterSelectorProps> = ({
               disabled={disabled}
               className={`
                 ${isBrowsing ? 'browsing' : ''}
-                ${shouldShowSelected ? 'pending' : ''}
+                ${shouldShowPending ? 'pending' : ''}
               `}
             />
           );
@@ -168,6 +168,7 @@ const GameInterface: React.FC = () => {
     isMyTurn, 
     selectedLetter,
     selectLetter,
+    placeLetter,
     confirmPlacement,
     gameTimer
   } = useGame();
@@ -194,6 +195,25 @@ const GameInterface: React.FC = () => {
     }
   }, [gamePhase, temporaryPlacement]);
 
+  // Emergency save when phase changes away from letter_placement  
+  const previousGamePhaseRef = useRef(gamePhase);
+  useEffect(() => {
+    // Only trigger if we're leaving letter_placement phase (not entering it)
+    if (previousGamePhaseRef.current === 'letter_placement' && gamePhase !== 'letter_placement' && temporaryPlacement) {
+      console.log('⏰ Phase changed away from letter_placement - emergency saving:', temporaryPlacement);
+      submitPlacement();
+    }
+    previousGamePhaseRef.current = gamePhase;
+  }, [gamePhase, temporaryPlacement]);
+
+  // Auto-submit when timeout is imminent
+  useEffect(() => {
+    if (gamePhase === 'letter_placement' && gameTimer && gameTimer.remainingSeconds <= 1 && temporaryPlacement) {
+      console.log('⏰ 1 second left - auto-submitting placement:', temporaryPlacement);
+      submitPlacement();
+    }
+  }, [gameTimer?.remainingSeconds, gamePhase, temporaryPlacement]);
+
   // Clear browsing state when game phase changes away from letter_selection
   useEffect(() => {
     if (gamePhase !== 'letter_selection') {
@@ -204,50 +224,36 @@ const GameInterface: React.FC = () => {
 
   const swedishLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'Å', 'Ä', 'Ö'];
 
-  // Confirm current placement (letter already placed on server when cell was clicked)
-  const confirmCurrentPlacement = async () => {
+  // Single function to submit current placement - used by both OK button and timeout
+  const submitPlacement = async () => {
     if (!temporaryPlacement) {
-      console.log('❌ confirmCurrentPlacement called but no temporaryPlacement');
+      console.log('❌ No temporary placement to submit');
       return;
     }
     
     if (submitInProgress) {
-      console.log('❌ confirmCurrentPlacement called but submitInProgress is true');
+      console.log('⚠️ Submit already in progress, skipping...');
       return;
     }
     
-    console.log('✅ Confirming placement:', {
-      temporaryPlacement,
-      currentPlayer: currentPlayer?.username,
-      gamePhase
-    });
+    console.log('📤 submitPlacement called with position:', temporaryPlacement);
+    console.log('📤 Current gamePhase:', gamePhase);
+    console.log('📤 Current gameTimer:', gameTimer?.remainingSeconds);
     
     try {
       setSubmitInProgress(true);
-      // Letter already placed on server, just confirm it
+      console.log('📤 Calling placeLetter with coordinates:', temporaryPlacement.x, temporaryPlacement.y);
+      await placeLetter(temporaryPlacement.x, temporaryPlacement.y);
+      console.log('📤 Calling confirmPlacement...');
       await confirmPlacement();
+      console.log('✅ Placement submitted successfully at position:', temporaryPlacement);
       setTemporaryPlacement(null);
-      console.log('✅ Placement confirmed successfully');
     } catch (err) {
-      console.error('❌ Failed to confirm placement:', err);
-      throw err;
+      console.error('❌ Failed to submit placement:', err);
     } finally {
       setSubmitInProgress(false);
     }
   };
-
-  // Note: No automatic timeout submission on client side.
-  // If the player doesn't place their letter in time, the server handles 
-  // auto-placement via handlePlacementTimeout -> autoPlaceLetter
-  // Emergency save only when phase changes (server forced move)
-
-  // Note: No client-side auto-placement or emergency save
-  // Server handles all timeout scenarios via handlePlacementTimeout -> autoPlaceLetter
-  // This prevents timing conflicts and 400 errors from trying to place after phase changes
-
-  // Note: No automatic random placement is created on client side.
-  // If the player doesn't place their letter in time, the server handles 
-  // auto-placement via handlePlacementTimeout -> autoPlaceLetter
 
   const handleLetterSelect = (letter: string) => {
     // Local confirm step: choose letter, then confirm explicitly
@@ -282,7 +288,7 @@ const GameInterface: React.FC = () => {
     setBrowsingLetter(null); // Clear browsing state
   }, [isMyTurn, gamePhase]);
 
-  // Move placement when cell is clicked
+  // Move placement when cell is clicked  
   const handleCellClick = (x: number, y: number) => {
     if (!currentPlayer || !selectedLetter || gamePhase !== 'letter_placement') {
       console.log('❌ Cannot click cell:', { selectedLetter, gamePhase, hasCurrentPlayer: !!currentPlayer });
@@ -366,7 +372,7 @@ const GameInterface: React.FC = () => {
   }, []);
 
   const handleConfirmPlacement = async () => {
-    await confirmCurrentPlacement();
+    await submitPlacement();
   };
 
   if (!currentPlayer) {

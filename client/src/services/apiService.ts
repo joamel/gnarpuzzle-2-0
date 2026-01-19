@@ -153,6 +153,12 @@ class ApiService {
     });
   }
 
+  async setPlacementIntent(gameId: number): Promise<any> {
+    return this.request<any>(`/api/games/${gameId}/placement-intent`, {
+      method: 'POST'
+    });
+  }
+
   async confirmPlacement(gameId: number, playerId: number): Promise<any> {
     return this.request<any>(`/api/games/${gameId}/confirm-placement`, {
       method: 'POST',
