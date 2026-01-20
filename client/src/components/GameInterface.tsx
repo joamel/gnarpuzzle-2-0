@@ -401,29 +401,29 @@ const GameInterface: React.FC = () => {
             {gamePhase === 'letter_placement' && 'Placering'}
             {gamePhase === 'finished' && 'Spelet slutat'}
           </span>
+
+          <span className="turn-text">
+            {gamePhase === 'letter_selection' ? (
+              isMyTurn ? (
+                <span className="my-turn">Din tur</span>
+              ) : (
+                <span className="other-turn">{currentTurnPlayer?.username || 'Okänd'}s tur</span>
+              )
+            ) : gamePhase === 'letter_placement' ? (
+              selectedLetter ? (
+                <span className="waiting">Placera: <span className="selected-letter">{selectedLetter}</span></span>
+              ) : (
+                <span className="waiting">Väntar på bokstav...</span>
+              )
+            ) : (
+              <span className="other-turn">Väntar...</span>
+            )}
+          </span>
           
           {gameTimer && (
             <span className={`timer ${gameTimer.isWarning ? 'warning' : ''}`}>
               {gameTimer.remainingSeconds}s
             </span>
-          )}
-        </div>
-
-        <div className="turn-indicator">
-          {gamePhase === 'letter_selection' ? (
-            isMyTurn ? (
-              <span className="my-turn">🎯 Din tur!</span>
-            ) : (
-              <span className="other-turn">⏳ {currentTurnPlayer?.username || 'Okänd spelare'}s tur</span>
-            )
-          ) : gamePhase === 'letter_placement' ? (
-            selectedLetter ? (
-              <span className="waiting">🎯 Placera bokstav: <span className="selected-letter">{selectedLetter}</span></span>
-            ) : (
-              <span className="waiting">⌛ Väntar på bokstav...</span>
-            )
-          ) : (
-            <span className="other-turn">Väntar på andra spelare</span>
           )}
         </div>
       </div>

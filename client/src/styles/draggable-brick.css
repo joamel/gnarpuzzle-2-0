@@ -128,10 +128,10 @@
 
 /* Mobile optimizations */
 @media (pointer: coarse) {
-  .brick-button {
-    /* Slightly larger touch targets for mobile */
-    min-width: 50px;
-    min-height: 50px;
+  .brick-button[data-mode="placement"] {
+    /* Larger touch targets for placement dragging on mobile */
+    min-width: 40px;
+    min-height: 40px;
   }
   
   .dragging-ghost {

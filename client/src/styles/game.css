@@ -35,6 +35,19 @@
   font-weight: 600;
   color: #333;
   font-size: 12px;
+  white-space: nowrap;
+}
+
+.turn-text {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #444;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .timer {
@@ -59,28 +72,20 @@
   100% { transform: scale(1); }
 }
 
-.turn-indicator {
-  text-align: center;
-  margin: 4px 0;
-  font-size: 12px;
-  font-weight: bold;
-}
-
 .my-turn {
   color: #28a745;
   font-weight: 600;
-  font-size: 14px;
-  animation: pulse 2s ease-in-out infinite;
+  font-size: 12px;
 }
 
 .other-turn {
   color: #666;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .waiting {
   color: #ffc107;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .letter-placement-info {
@@ -167,15 +172,35 @@
 }
 
 .letters-grid {
+  --letter-gap: 2px;
+  --letter-cols: 8;
+  --letter-max: 34px;
+  --grid-padding: 12px; /* 6px left + 6px right */
   display: flex;
   flex-wrap: wrap;
-  gap: 1px;
+  justify-content: center;
+  gap: var(--letter-gap);
   width: 100%;
-  max-width: 420px;
+  /* Keep the grid from growing wider than 8 columns */
+  max-width: calc(
+    (var(--letter-cols) * var(--letter-max)) +
+    ((var(--letter-cols) - 1) * var(--letter-gap)) +
+    var(--grid-padding)
+  );
   margin: 0 auto;
   padding: 0 6px;
-  justify-content: center;
-  align-items: center;
+}
+
+/* Force 8 letters per row (8/8/8/5 for Swedish alphabet) */
+.letter-selector .brick.brick-button {
+  flex: 0 0 calc(
+    (100% - ((var(--letter-cols) - 1) * var(--letter-gap))) / var(--letter-cols)
+  );
+  width: auto !important;
+  height: auto !important;
+  aspect-ratio: 1;
+  max-width: var(--letter-max);
+  font-size: clamp(11px, 3.2vw, 14px);
 }
 
 /* Letter buttons styling is now in brick.css */
@@ -393,18 +418,11 @@
   .cell-letter {
     font-size: 14px;
   }
-  
+
+  /* Keep 8/8/8/5 on mobile, just slightly tighter */
   .letters-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1px;
-    width: 100%;
-    max-width: 350px;
-    margin: 0 auto;
-    padding: 0 6px;
-    justify-content: center;
-    align-items: center;
-  }
+    --letter-gap: 1px;
+    --letter-max: 30px;
   }
   
   /* Letter button mobile styling is now in brick.css @media query */
@@ -418,6 +436,7 @@
     width: 100%;
     min-width: auto;
   }
+}
 
 /* Touch optimizations */
 @media (hover: none) {
@@ -478,3 +497,5 @@
 .current-board-section .game-board:hover {
   transform: scale(0.92);
 }
+
+/* (Intentionally no second mobile override for .letters-grid) */

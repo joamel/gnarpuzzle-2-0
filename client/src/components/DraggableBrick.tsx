@@ -42,6 +42,8 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
   const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isDragStartedRef = useRef(false);
   const initialTouchRef = useRef({ x: 0, y: 0 });
+  const lastHoveredLetterRef = useRef<string | null>(null);
+  const suppressClickRef = useRef(false);
   const elementRef = useRef<HTMLButtonElement | null>(null);
 
   const baseClass = variant === 'board' ? 'brick brick-board' : 'brick brick-button';
@@ -108,6 +110,14 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
     return null;
   };
 
+  const updateHoveredLetter = useCallback((x: number, y: number) => {
+    const hoveredLetter = findLetterUnderCoordinates(x, y);
+    if (hoveredLetter) {
+      lastHoveredLetterRef.current = hoveredLetter;
+      onLetterHover?.(hoveredLetter);
+    }
+  }, [onLetterHover]);
+
   const startLongPress = useCallback((coords: { x: number, y: number }) => {
     if (disabled) return;
 
@@ -122,6 +132,7 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
         
         setIsDragging(true);
         isDragStartedRef.current = true;
+        suppressClickRef.current = true;
         initialTouchRef.current = coords;
         // Keep position at original location for browsing
         setDragPosition(coords);
@@ -141,6 +152,7 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
         
         setIsDragging(true);
         isDragStartedRef.current = true;
+        suppressClickRef.current = true;
         initialTouchRef.current = coords;
         setDragPosition(coords);
         
@@ -162,16 +174,43 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
     e.preventDefault(); // Prevent default touch behaviors
     setIsPressing(true);
     const coords = getEventCoordinates(e);
+    initialTouchRef.current = coords;
+    lastHoveredLetterRef.current = null;
     startLongPress(coords);
   }, [startLongPress, mode, variant, letter, disabled]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Only handle left mouse button
     if (e.button !== 0) return;
-    
+
+    if (disabled) return;
+
     const coords = getEventCoordinates(e);
+    initialTouchRef.current = coords;
+    lastHoveredLetterRef.current = null;
+
+    // Desktop: start drag/browse immediately (no long-press).
+    if (variant === 'button') {
+      if (mode === 'selection') {
+        setIsDragging(true);
+        isDragStartedRef.current = true;
+        suppressClickRef.current = true;
+        setDragPosition(coords);
+        updateHoveredLetter(coords.x, coords.y);
+        return;
+      }
+      if (mode === 'placement') {
+        setIsDragging(true);
+        isDragStartedRef.current = true;
+        suppressClickRef.current = true;
+        setDragPosition(coords);
+        onDragStart?.(letter);
+        return;
+      }
+    }
+
     startLongPress(coords);
-  }, [startLongPress]);
+  }, [disabled, getEventCoordinates, letter, mode, onDragStart, startLongPress, updateHoveredLetter, variant]);
 
   const handleMove = useCallback((coords: { x: number, y: number }) => {
     if (!isDragStartedRef.current) {
@@ -179,16 +218,15 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
       // More sensitive threshold for mobile
       const deltaX = Math.abs(coords.x - initialTouchRef.current.x);
       const deltaY = Math.abs(coords.y - initialTouchRef.current.y);
-      if (deltaX > 8 || deltaY > 8) {
-        cancelLongPress();
-      }
-      
-      // For selection mode, allow immediate browsing even before longpress timeout
-      if (mode === 'selection' && longPressTimeoutRef.current) {
-        const hoveredLetter = findLetterUnderCoordinates(coords.x, coords.y);
-        if (hoveredLetter) {
-          onLetterHover?.(hoveredLetter);
+      if (mode !== 'selection') {
+        if (deltaX > 8 || deltaY > 8) {
+          cancelLongPress();
         }
+      }
+
+      // For selection mode, allow immediate browsing even before longpress timeout
+      if (mode === 'selection') {
+        updateHoveredLetter(coords.x, coords.y);
       }
       
       return;
@@ -197,10 +235,7 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
     if (isDragging) {
       if (mode === 'selection') {
         // In selection mode, don't update drag position - just browse letters
-        const hoveredLetter = findLetterUnderCoordinates(coords.x, coords.y);
-        if (hoveredLetter) {
-          onLetterHover?.(hoveredLetter);
-        }
+        updateHoveredLetter(coords.x, coords.y);
       } else if (mode === 'placement') {
         // In placement mode, update position and show letter following cursor
         setDragPosition(coords);
@@ -211,7 +246,7 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
         }
       }
     }
-  }, [isDragging, cancelLongPress, mode, onDragMove, onLetterHover]);
+  }, [isDragging, cancelLongPress, mode, onDragMove, updateHoveredLetter]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     // Always prevent default for touch move during placement
@@ -235,7 +270,7 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
     if (isDragStartedRef.current && isDragging) {
       if (mode === 'selection') {
         // For letter browsing, we just update selection without placing
-        const hoveredLetter = findLetterUnderCoordinates(coords.x, coords.y);
+        const hoveredLetter = findLetterUnderCoordinates(coords.x, coords.y) || lastHoveredLetterRef.current;
         if (hoveredLetter) {
           onLetterSelect?.(hoveredLetter);
         }
@@ -253,7 +288,20 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
       setIsDragging(false);
       isDragStartedRef.current = false;
       setDragPosition({ x: 0, y: 0 });
+      lastHoveredLetterRef.current = null;
+
+      // Suppress the synthetic click that happens after mouseup/touchend.
+      // Clear on next tick so future taps still work.
+      setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 0);
     } else if (!isDragStartedRef.current) {
+      // Selection sweep without long-press: if we hovered something, pick it.
+      if (mode === 'selection' && lastHoveredLetterRef.current) {
+        onLetterSelect?.(lastHoveredLetterRef.current);
+        lastHoveredLetterRef.current = null;
+        return;
+      }
       // This was a regular tap/click, not a drag
       onClick?.();
     }
@@ -325,7 +373,10 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
       <button
         ref={elementRef}
         className={`${baseClass} ${selectedClass} ${disabledClass} ${filledClass} ${draggingClass} ${pressingClass} ${hoveredClass} ${browsingClass} ${className || ''}`}
-        onClick={isDragStartedRef.current ? undefined : onClick}
+        onClick={() => {
+          if (suppressClickRef.current) return;
+          onClick?.();
+        }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
