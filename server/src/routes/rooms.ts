@@ -924,45 +924,6 @@ router.post('/:id/start', AuthService.authenticateToken, async (req, res) => {
   }
 });
 
-// Debug endpoint to see room members
-router.get('/:code/debug', AuthService.authenticateToken, async (req, res) => {
-  const { code } = req.params;
-
-  try {
-    const room = await RoomModel.findByCode(code);
-    if (!room) {
-      res.status(404).json({ error: 'Room not found' });
-      return;
-    }
-
-    const members = await RoomModel.getRoomMembers(room.id);
-    const memberCount = await RoomModel.getMemberCount(room.id);
-    
-    // Also query raw data from room_members table
-    const dbManager = await DatabaseManager.getInstance();
-    const db = dbManager.getDatabase();
-    const rawMembers = await db.all(`SELECT * FROM room_members WHERE room_id = ?`, room.id);
-    
-    res.json({
-      room: {
-        id: room.id,
-        code: room.code,
-        name: room.name,
-        status: room.status,
-        created_by: room.created_by
-      },
-      members,
-      memberCount,
-      rawMembers,
-      timestamp: new Date().toISOString()
-    });
-
-  } catch (error) {
-    logger.error('Debug room error:', error);
-    res.status(500).json({ error: 'Debug failed' });
-  }
-});
-
 // Reset room to waiting status (for testing/debugging)
 router.post('/:code/reset', AuthService.authenticateToken, async (req, res) => {
   const authReq = req as AuthenticatedRequest;

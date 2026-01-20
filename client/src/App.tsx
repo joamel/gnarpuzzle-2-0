@@ -2,7 +2,6 @@ import React, { useEffect, Suspense, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { GameProvider } from './contexts/GameContext';
-import DebugPanel from './components/DebugPanel';
 import './styles/global.css';
 import './styles/mobile.css';
 // Removed PWA styles to avoid conflicts
@@ -18,8 +17,6 @@ const LoginPage = React.lazy(() => import('./pages/LoginPage'));
 const HomePage = React.lazy(() => import('./pages/HomePage'));
 const GamePage = React.lazy(() => import('./pages/GamePage'));
 const GameTestPage = React.lazy(() => import('./pages/GameTestPage'));
-const DebugResultsPage = React.lazy(() => import('./pages/DebugResultsPage'));
-const DebugPlacementPage = React.lazy(() => import('./pages/DebugPlacementPage'));
 
 function App() {
   const [isOnline, setIsOnline] = useState(true);
@@ -174,22 +171,6 @@ function App() {
                   </div>
                 } 
               />
-              <Route 
-                path="/debug/results" 
-                element={
-                  <Suspense fallback={<div>Loading...</div>}>
-                    <DebugResultsPage />
-                  </Suspense>
-                } 
-              />
-              <Route 
-                path="/debug/placement" 
-                element={
-                  <Suspense fallback={<div>Loading...</div>}>
-                    <DebugPlacementPage />
-                  </Suspense>
-                } 
-              />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Router>
@@ -202,9 +183,6 @@ function App() {
           📱 Du är offline - Vissa funktioner är begränsade
         </div>
       )}
-      
-      {/* Debug Panel for Mobile Debugging */}
-      <DebugPanel />
     </div>
   );
 }
