@@ -11,7 +11,7 @@ import '../styles/home.css';
 
 const HomePage: React.FC = () => {
   const { logout, user } = useAuth();
-  const { joinRoom, currentRoom } = useGame();
+  const { joinRoom, leaveRoom, currentRoom } = useGame();
   const navigate = useNavigate();
   const shouldNavigate = useRef(false);
   
@@ -163,9 +163,13 @@ const HomePage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button 
               onClick={async () => {
-                localStorage.clear();
-                await logout();
-                window.location.reload();
+                try {
+                  if (currentRoom?.code) {
+                    await leaveRoom(true);
+                  }
+                } finally {
+                  await logout();
+                }
               }}
               className="logout-button"
               aria-label="Logga ut"

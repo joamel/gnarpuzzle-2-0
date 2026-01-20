@@ -9,6 +9,7 @@ class SocketService {
   private maxReconnectAttempts = 5;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private pendingRoomJoins: string[] = [];
+  private activeRoomCodes: Set<string> = new Set();
 
   connect(token: string): Promise<Socket> {
     if (this.socket?.connected) {
@@ -47,6 +48,15 @@ class SocketService {
       this.socket.on('connect', () => {
         this.isConnecting = false;
         this.reconnectAttempts = 0; // Reset on successful connection
+
+        // Re-join rooms we consider "active". Socket.IO reconnect does not
+        // guarantee the server will treat us as re-joined for app-level state,
+        // so we explicitly re-emit room:join to receive fresh snapshots.
+        if (this.activeRoomCodes.size > 0) {
+          Array.from(this.activeRoomCodes).forEach(roomCode => {
+            this.socket?.emit('room:join', { roomCode });
+          });
+        }
         
         // Process any pending room joins
         if (this.pendingRoomJoins.length > 0) {
@@ -90,6 +100,11 @@ class SocketService {
       this.reconnectTimer = null;
     }
 
+    // Reset any remembered room intent so a new login session
+    // doesn't accidentally rejoin old rooms.
+    this.pendingRoomJoins = [];
+    this.activeRoomCodes.clear();
+
     // Clear all event listeners to prevent memory leaks
     this.eventListeners.clear();
 
@@ -118,6 +133,7 @@ class SocketService {
 
   // Join a room for real-time updates
   joinRoom(roomCode: string): void {
+    this.activeRoomCodes.add(roomCode);
     if (!this.socket?.connected) {
       console.warn('⚠️ Socket not connected yet, queueing room join:', roomCode);
       // Queue the join to be processed when socket connects
@@ -134,6 +150,7 @@ class SocketService {
 
   // Leave a room
   leaveRoom(roomCode: string): void {
+    this.activeRoomCodes.delete(roomCode);
     if (!this.socket?.connected) {
       console.warn('⚠️ Socket not connected, cannot leave room:', roomCode);
       return;

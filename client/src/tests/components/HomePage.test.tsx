@@ -42,10 +42,12 @@ vi.mock('@/assets/Logo', () => ({
 // Mock apiService
 const mockGetRooms = vi.fn();
 const mockCreateRoom = vi.fn();
+const mockGetOnlineStats = vi.fn();
 vi.mock('../../services/apiService', () => ({
   apiService: {
     getRooms: () => mockGetRooms(),
     createRoom: (...args: any[]) => mockCreateRoom(...args),
+    getOnlineStats: () => mockGetOnlineStats(),
   },
 }));
 
@@ -55,6 +57,7 @@ vi.mock('../../services/socketService', () => ({
     isConnected: () => false,
     on: vi.fn(),
     off: vi.fn(),
+    getSocket: vi.fn(() => null),
   },
 }));
 
@@ -69,7 +72,9 @@ const renderHomePage = () => {
 describe('HomePage Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
     mockGetRooms.mockResolvedValue([]);
+    mockGetOnlineStats.mockResolvedValue({ online: { total: 1, authenticated: 1, anonymous: 0 } });
     mockJoinRoom.mockResolvedValue({ success: true });
     mockLeaveRoom.mockResolvedValue(undefined);
   });
@@ -167,6 +172,12 @@ describe('HomePage Component', () => {
       ]);
 
       renderHomePage();
+
+      // Simulate backend behavior: first join attempt fails with "Password required",
+      // then succeeds once the user enters the code.
+      mockJoinRoom
+        .mockRejectedValueOnce(new Error('Password required'))
+        .mockResolvedValueOnce({ success: true });
 
       const card = await screen.findByText('Locked Room');
       fireEvent.click(card.closest('.card')!);

@@ -13,6 +13,7 @@ vi.mock('../../services/socketService', () => ({
     emit: vi.fn(),
     joinRoom: vi.fn(),
     joinGame: vi.fn(),
+    getSocket: vi.fn(() => null),
     isConnected: vi.fn(() => true)
   }
 }));

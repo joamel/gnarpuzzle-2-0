@@ -31,9 +31,45 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isLoading: true,
   });
 
+  const leaveAnyJoinedRooms = useCallback(async () => {
+    try {
+      const sessionKeys = Object.keys(sessionStorage).filter(key => key.startsWith('room_joined_'));
+      if (sessionKeys.length === 0) return;
+
+      for (const key of sessionKeys) {
+        const roomCode = key.replace('room_joined_', '');
+        if (!roomCode) continue;
+
+        try {
+          await apiService.leaveRoom(roomCode, true);
+        } catch (err) {
+          // Best-effort: if token is expired/invalid, server will reject; we still clear local markers.
+          console.warn('⚠️ Failed to leave room during logout/account switch:', roomCode, err);
+        } finally {
+          sessionStorage.removeItem(key);
+        }
+      }
+    } catch {
+      // ignore storage errors (private mode, etc)
+    }
+  }, []);
+
   const login = useCallback(async (username: string) => {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true }));
+
+      // If we're already logged in and the user chooses a different username,
+      // treat it as an account switch: leave any joined room(s) and fully reset.
+      if (authState.isAuthenticated && authState.user?.username && authState.user.username !== username) {
+        await leaveAnyJoinedRooms();
+        try {
+          await apiService.logout();
+        } catch {
+          // ignore
+        }
+        apiService.clearToken();
+        localStorage.removeItem('auth_token');
+      }
       
       // Disconnect old socket before logging in with new user
       socketService.disconnect();
@@ -57,10 +93,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setAuthState(prev => ({ ...prev, isLoading: false }));
       throw error;
     }
-  }, []);
+  }, [authState.isAuthenticated, authState.user?.username, leaveAnyJoinedRooms]);
 
   const logout = useCallback(async () => {
     try {
+      await leaveAnyJoinedRooms();
       await apiService.logout();
     } catch (error) {
       console.error('Logout error:', error);
@@ -77,7 +114,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       localStorage.removeItem('auth_token');
     }
-  }, []);
+  }, [leaveAnyJoinedRooms]);
 
   const refreshUser = useCallback(async () => {
     if (!authState.token) return;

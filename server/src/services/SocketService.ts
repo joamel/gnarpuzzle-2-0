@@ -150,6 +150,8 @@ export class SocketService {
 
   private async handleAuthentication(socket: Socket, data: { token: string }): Promise<void> {
     try {
+      const previousUserData = this.connectedUsers.get(socket.id);
+
       // Validate JWT token
       const decoded = AuthService.verifyToken(data.token);
       if (!decoded) {
@@ -168,6 +170,32 @@ export class SocketService {
         userId: decoded.userId,
         username: decoded.username
       };
+
+      // If this socket previously had a different authenticated user, ensure we leave
+      // all prior rooms to avoid receiving events for the old identity.
+      if (previousUserData?.userId && previousUserData.userId !== userData.userId) {
+        try {
+          for (const roomName of socket.rooms) {
+            if (roomName === socket.id || roomName === 'lobby') {
+              continue;
+            }
+            socket.leave(roomName);
+          }
+
+          logger.info('Socket re-authenticated as a different user; left previous rooms', {
+            service: 'gnarpuzzle-server',
+            socketId: socket.id,
+            previousUserId: previousUserData.userId,
+            newUserId: userData.userId
+          });
+        } catch (leaveError) {
+          logger.warn('Failed to leave previous rooms during re-authentication', {
+            service: 'gnarpuzzle-server',
+            socketId: socket.id,
+            error: (leaveError as Error).message
+          });
+        }
+      }
 
       // Validate required fields
       if (!userData.userId || !userData.username) {
@@ -196,6 +224,37 @@ export class SocketService {
 
       // Auto-join to lobby for room updates
       socket.join('lobby');
+
+      // If the user is already a member of one (or more) rooms in the DB,
+      // make sure this socket is joined to those Socket.IO rooms as well.
+      // This prevents "invisible" players after reconnects.
+      try {
+        const { RoomModel } = await import('../models');
+        const userRooms = await RoomModel.getUserRooms(userData.userId);
+
+        for (const room of userRooms) {
+          socket.join(`room:${room.code}`);
+        }
+
+        // Track one roomCode for convenience (the app intends 0-1 rooms per user)
+        if (userRooms.length > 0) {
+          this.connectedUsers.set(socket.id, { ...userData, roomCode: userRooms[0].code });
+        }
+
+        if (userRooms.length > 1) {
+          logger.warn(`User ${userData.username} is member of multiple rooms; joined all socket rooms`, {
+            service: 'gnarpuzzle-server',
+            userId: userData.userId,
+            roomCodes: userRooms.map(r => r.code)
+          });
+        }
+      } catch (roomJoinError) {
+        logger.warn('Failed to auto-join authenticated socket to existing rooms', {
+          service: 'gnarpuzzle-server',
+          userId: userData.userId,
+          error: (roomJoinError as Error).message
+        });
+      }
 
       socket.emit('authenticated', {
         success: true,
@@ -255,6 +314,13 @@ export class SocketService {
 
       // NOW get members (after adding the user)
       const members = await RoomModel.getRoomMembers(room.id);
+
+      // Ensure all connected sockets for current members are actually in the Socket.IO room.
+      // This prevents missing broadcasts after reconnects.
+      this.ensureRoomSocketsForMembers(roomCode, members.map(m => String(m.id)));
+
+      // Remove any stale ready entries for users no longer in the room.
+      this.reconcileRoomReadyStatus(roomCode, members.map(m => String(m.id)));
 
       // Notify others in the room
       socket.to(`room:${roomCode}`).emit('room:member_joined', {
@@ -1051,7 +1117,6 @@ export class SocketService {
             service: 'gnarpuzzle-server'
           });
         }
-        break;
       }
     }
     
@@ -1065,6 +1130,41 @@ export class SocketService {
         }))
       });
     }
+  }
+
+  public ensureRoomSocketsForMembers(roomCode: string, memberIds: Iterable<string>): void {
+    for (const memberId of memberIds) {
+      this.joinRoom(String(memberId), roomCode);
+    }
+  }
+
+  public getRoomReadyPlayers(roomCode: string): Set<string> {
+    return new Set(Array.from(this.roomPlayerReadyStatus.get(roomCode) || []).map(String));
+  }
+
+  public reconcileRoomReadyStatus(roomCode: string, memberIds: Iterable<string>): void {
+    const readySet = this.roomPlayerReadyStatus.get(roomCode);
+    if (!readySet) {
+      return;
+    }
+
+    const memberIdSet = new Set<number>();
+    for (const id of memberIds) {
+      const numericId = Number(id);
+      if (!Number.isNaN(numericId)) {
+        memberIdSet.add(numericId);
+      }
+    }
+
+    for (const readyUserId of Array.from(readySet)) {
+      if (!memberIdSet.has(readyUserId)) {
+        readySet.delete(readyUserId);
+      }
+    }
+  }
+
+  public clearRoomReadyStatus(roomCode: string): void {
+    this.roomPlayerReadyStatus.delete(roomCode);
   }
 
   public joinPlayersToGame(roomCode: string, gameId: number): void {

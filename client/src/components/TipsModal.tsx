@@ -36,17 +36,17 @@ const TipsModal: React.FC<TipsModalProps> = ({
           
           <div className="rule-section">
             <h4>🎯 Målet</h4>
-            <p>Bygg ord på ditt rutnät och få flest poäng! Spelet pågår i omgångar där alla spelare får samma bokstäver.</p>
+            <p>Bygg ord på ditt rutnät och få flest poäng! Spelet pågår i omgångar där alla spelare får samma bokstäver. Spelet är slut när rutnätet är fullt.</p>
           </div>
 
           <div className="rule-section">
             <h4>🎮 Spelgång</h4>
             <ol>
               <li><strong>Vänta på din tur</strong> - Spelarna turas om att välja bokstäver</li>
-              <li><strong>Välj bokstav</strong> - När det är din tur, välj en av de tillgängliga bokstäverna</li>
+              <li><strong>Välj bokstav</strong> - När det är din tur, välj en bokstav du vill placera ut</li>
               <li><strong>Placera bokstaven</strong> - Klicka på en tom ruta på ditt {gridSize}×{gridSize} rutnät</li>
               <li><strong>Bekräfta placeringen</strong> - Tryck på "Bekräfta placering" när du är nöjd</li>
-              <li><strong>Nästa spelare</strong> - Nu får nästa spelare välja från kvarvarande bokstäver</li>
+              <li><strong>Nästa spelare</strong> - Nu får nästa spelare välja bokstav</li>
             </ol>
           </div>
 
@@ -55,7 +55,7 @@ const TipsModal: React.FC<TipsModalProps> = ({
             <ul>
               <li><strong>Baspoäng:</strong> 1 poäng per bokstav i varje giltigt svenskt ord</li>
               <li><strong>Bonuspoäng:</strong> +2 extra poäng för varje hel rad eller kolumn som bildar ETT ord</li>
-              <li><strong>Endast svenska ord:</strong> Alla ord valideras mot svensk ordlista</li>
+              <li><strong>Endast giltiga ord:</strong> Alla ord valideras mot ordlista</li>
               <li><strong>Minst 2 bokstäver:</strong> Ord måste vara minst 2 bokstäver långa</li>
             </ul>
           </div>
@@ -70,8 +70,6 @@ const TipsModal: React.FC<TipsModalProps> = ({
             <ul>
               <li>Planera för längre ord - de ger mer poäng!</li>
               <li>Sikta på kompletta rader/kolumner för bonuspoäng</li>
-              <li>Tänk på bokstavsordningen när du väljer placering</li>
-              <li>Håll koll på vilka bokstäver som redan valts</li>
             </ul>
           </div>
         </div>

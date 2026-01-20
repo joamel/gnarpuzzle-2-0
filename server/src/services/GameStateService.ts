@@ -860,7 +860,7 @@ export class GameStateService {
 
     // Get room data associated with this game (including board_size)
     const game = await db.get(`
-      SELECT g.room_id, r.board_size FROM games g
+      SELECT g.room_id, r.board_size, r.code FROM games g
       JOIN rooms r ON g.room_id = r.id
       WHERE g.id = ?
     `, gameId) as any;
@@ -871,6 +871,31 @@ export class GameStateService {
         UPDATE rooms SET status = 'waiting' WHERE id = ?
       `, game.room_id);
       console.log(`📍 Room ${game.room_id} reset to waiting status`);
+    }
+
+    // Ready state is a lobby-only concept; clear it when a game ends.
+    if (game?.code) {
+      this.socketService.clearRoomReadyStatus(game.code);
+
+      try {
+        const { RoomModel } = await import('../models');
+        const members = await RoomModel.getRoomMembers(game.room_id);
+
+        for (const member of members) {
+          this.socketService.emitToRoom(game.code, 'player:ready_changed', {
+            userId: String(member.id),
+            username: member.username,
+            isReady: false,
+            roomCode: game.code
+          });
+        }
+      } catch (readyResetError) {
+        gameLogger.warn('Failed to broadcast ready reset after game end', {
+          gameId,
+          roomCode: game.code,
+          error: (readyResetError as Error).message
+        });
+      }
     }
 
     // Calculate final scores

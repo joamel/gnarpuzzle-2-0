@@ -18,11 +18,18 @@ const mockStartGame = vi.fn().mockResolvedValue({
   phase_timer_end: Date.now() + 10000
 });
 const mockHandlePlayerLeft = vi.fn().mockResolvedValue(undefined);
-const mockSocketService = {
+const mockSocketService: any = {
   emitToRoom: vi.fn(),
   broadcastToRoom: vi.fn(),
   joinPlayersToGame: vi.fn(),
-  roomPlayerReadyStatus: new Map<string, Set<string>>(),
+  ensureRoomSocketsForMembers: vi.fn(),
+  reconcileRoomReadyStatus: vi.fn(),
+  getRoomReadyPlayers: vi.fn((roomCode: string) => {
+    const set = mockSocketService.roomPlayerReadyStatus.get(roomCode);
+    return new Set(Array.from(set || []).map(String));
+  }),
+  clearRoomReadyStatus: vi.fn(),
+  roomPlayerReadyStatus: new Map<string, Set<number>>(),
   io: {
     to: vi.fn().mockReturnThis(),
     emit: vi.fn()
@@ -53,6 +60,8 @@ describe('Room Routes - Start Game Integration', () => {
   
   beforeEach(() => {
     vi.clearAllMocks();
+
+    mockSocketService.roomPlayerReadyStatus.clear();
     
     // Mock AuthService.authenticateToken to add user to request
     vi.mocked(AuthService.authenticateToken).mockImplementation(async (req: any, res: any, next: any) => {
@@ -90,6 +99,9 @@ describe('Room Routes - Start Game Integration', () => {
       vi.mocked(RoomModel.findById).mockResolvedValueOnce(mockRoom);
       vi.mocked(RoomModel.getRoomMembers).mockResolvedValueOnce(mockMembers);
       vi.mocked(RoomModel.updateStatus).mockResolvedValueOnce(true);
+
+      // Non-owner player must be ready per server-side enforcement
+      mockSocketService.getRoomReadyPlayers.mockReturnValueOnce(new Set(['124']));
 
       const response = await request(app)
         .post('/api/rooms/1/start');
@@ -180,7 +192,7 @@ describe('Room Routes - Start Game Integration', () => {
     };
 
     it('should immediately remove player and invoke game handler on intentional leave', async () => {
-      const readySet = new Set<string>(['123']);
+      const readySet = new Set<number>([123]);
       mockSocketService.roomPlayerReadyStatus.set(room.code, readySet);
 
       vi.mocked(RoomModel.findByCode).mockResolvedValueOnce(room as any);
@@ -203,7 +215,7 @@ describe('Room Routes - Start Game Integration', () => {
       expect(response.body.success).toBe(true);
       expect(mockHandlePlayerLeft).toHaveBeenCalledWith(99, 123, true);
       expect(mockSocketService.io.to).toHaveBeenCalledWith('room:TEST01');
-      expect(mockSocketService.roomPlayerReadyStatus.get(room.code)?.has('123')).toBe(false);
+      expect(mockSocketService.roomPlayerReadyStatus.get(room.code)?.has(123)).toBe(false);
     });
 
     it('should return 404 when room is missing', async () => {

@@ -478,6 +478,14 @@ router.post('/:code/join', AuthService.authenticateToken, async (req, res) => {
     if (socketService) {
       // Join the user to the Socket.IO room
       socketService.joinRoom(authReq.user!.id.toString(), code);
+
+      // Ensure all currently-connected members are joined to the Socket.IO room
+      // so broadcasts reach everyone even after reconnects.
+      socketService.ensureRoomSocketsForMembers(code, members.map((m: any) => String(m.id || m.userId)));
+
+      // Reconcile ready state to current membership and include it in the snapshot.
+      socketService.reconcileRoomReadyStatus(code, members.map((m: any) => String(m.id || m.userId)));
+      const readyPlayers = Array.from(socketService.getRoomReadyPlayers(code));
       
       // Emit to all room members about the new member
       socketService.emitToRoom(code, 'room:member_joined', {
@@ -491,7 +499,9 @@ router.post('/:code/join', AuthService.authenticateToken, async (req, res) => {
           name: room.name,
           members: members
         },
-        memberCount: members.length
+        memberCount: members.length,
+        roomCode: code,
+        readyPlayers
       });
     }
 
@@ -845,6 +855,25 @@ router.post('/:id/start', AuthService.authenticateToken, async (req, res) => {
     }
     
     const gameStateService = GameStateService.getInstance(socketService);
+
+    // Ensure all connected sockets for members are in the room before we rely on it
+    // for game start broadcasts and joining players to game rooms.
+    socketService.ensureRoomSocketsForMembers(room.code, members.map(m => String(m.id)));
+
+    // Enforce readiness server-side (client expects all non-owner players ready).
+    socketService.reconcileRoomReadyStatus(room.code, members.map(m => String(m.id)));
+    const readyPlayers = socketService.getRoomReadyPlayers(room.code);
+    const nonOwnerIds = members
+      .filter(m => m.id !== room.created_by)
+      .map(m => String(m.id));
+    const allNonOwnersReady = nonOwnerIds.length === 0 || nonOwnerIds.every(id => readyPlayers.has(id));
+    if (!allNonOwnersReady) {
+      res.status(400).json({
+        error: 'Players not ready',
+        message: 'All non-owner players must be ready to start the game'
+      });
+      return;
+    }
     
     // Create game using GameStateService
     const game = await gameStateService.startGame(roomId);
@@ -854,6 +883,9 @@ router.post('/:id/start', AuthService.authenticateToken, async (req, res) => {
 
     // Join all room members to the game socket room for real-time updates
     socketService.joinPlayersToGame(room.code, game.id);
+
+    // Ready is lobby-only; clear it now that the match has started.
+    socketService.clearRoomReadyStatus(room.code);
 
     // Notify all room members that the game has started
     socketService.broadcastToRoom(`room:${room.code}`, 'game:started', {

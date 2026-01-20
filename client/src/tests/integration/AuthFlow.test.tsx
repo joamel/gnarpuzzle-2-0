@@ -7,17 +7,29 @@ import LoginPage from '../../pages/LoginPage';
 import HomePage from '../../pages/HomePage';
 
 // Mock API service
-vi.mock('../../services/apiService', () => ({
-  apiService: {
-    login: vi.fn(),
-    getRooms: vi.fn(),
-    createRoom: vi.fn(),
-    joinRoom: vi.fn(),
-    setToken: vi.fn(),
-    clearToken: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue({ id: 1, username: 'testuser' })
-  }
-}));
+vi.mock('../../services/apiService', () => {
+  let token: string | null = null;
+
+  return {
+    apiService: {
+      login: vi.fn(),
+      logout: vi.fn().mockResolvedValue(undefined),
+      getRooms: vi.fn(),
+      createRoom: vi.fn(),
+      joinRoom: vi.fn(),
+      leaveRoom: vi.fn().mockResolvedValue(undefined),
+      getOnlineStats: vi.fn().mockResolvedValue({ online: { total: 1, authenticated: 1, anonymous: 0 } }),
+      setToken: vi.fn((t: string) => {
+        token = t;
+      }),
+      getToken: vi.fn(() => token),
+      clearToken: vi.fn(() => {
+        token = null;
+      }),
+      getCurrentUser: vi.fn().mockResolvedValue({ id: 1, username: 'testuser' })
+    }
+  };
+});
 
 // Mock socket service
 vi.mock('../../services/socketService', () => ({
@@ -27,8 +39,10 @@ vi.mock('../../services/socketService', () => ({
     on: vi.fn(),
     off: vi.fn(),
     emit: vi.fn(),
+    getSocket: vi.fn(() => null),
     joinRoom: vi.fn(),
     leaveRoom: vi.fn(),
+    joinGame: vi.fn(),
     isConnected: vi.fn().mockReturnValue(false)
   }
 }));
@@ -49,6 +63,7 @@ describe('Authentication Flow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    sessionStorage.clear();
   });
 
   it('should allow user to login with valid username', async () => {
@@ -112,6 +127,7 @@ describe('Room Management', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.setItem('auth_token', 'mock-token');
+    sessionStorage.clear();
   });
 
   it('should display available rooms', async () => {
