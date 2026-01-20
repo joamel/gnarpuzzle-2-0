@@ -16,6 +16,11 @@ interface GameBoardProps {
   temporaryLetter?: { x: number; y: number; letter: string } | null;
   dragPreviewCell?: { x: number; y: number } | null;
   dragPreviewLetter?: string;
+  placementLetter?: string;
+  onDragStart?: (letter: string) => void;
+  onDragMove?: (x: number, y: number) => void;
+  onDragEnd?: (x: number, y: number) => void;
+  onDragCancel?: () => void;
 }
 
 const GameBoard: React.FC<GameBoardProps> = ({ 
@@ -25,7 +30,12 @@ const GameBoard: React.FC<GameBoardProps> = ({
   highlightedCell,
   temporaryLetter,
   dragPreviewCell,
-  dragPreviewLetter
+  dragPreviewLetter,
+  placementLetter,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  onDragCancel
 }) => {
   const handleCellClick = useCallback((x: number, y: number) => {
     if (!disabled) {
@@ -56,9 +66,35 @@ const GameBoard: React.FC<GameBoardProps> = ({
       {grid.map((row, y) => 
         row.map((cell, x) => {
           const isPreviewCell = dragPreviewCell && dragPreviewCell.x === x && dragPreviewCell.y === y;
+          const isTemporaryCell = !!temporaryLetter && temporaryLetter.x === x && temporaryLetter.y === y;
           const cellLetter = cell.letter || 
-            (temporaryLetter && temporaryLetter.x === x && temporaryLetter.y === y ? temporaryLetter.letter : '') ||
+            (isTemporaryCell ? temporaryLetter!.letter : '') ||
             (isPreviewCell ? dragPreviewLetter : '');
+
+          const canDragPlacementHere = !!placementLetter && !!onDragStart && !disabled && !cell.letter;
+
+          // Allow dragging the temporary placed letter to another empty cell.
+          // Also allow starting placement by long-pressing any empty cell.
+          if (!cell.letter && (isTemporaryCell || canDragPlacementHere)) {
+            return (
+              <DraggableBrick
+                key={`${x}-${y}`}
+                letter={cellLetter || ''}
+                variant="board"
+                mode="placement"
+                isSelected={highlightedCell?.x === x && highlightedCell?.y === y}
+                disabled={disabled}
+                onClick={() => handleCellClick(x, y)}
+                onDragStart={onDragStart}
+                onDragMove={onDragMove}
+                onDragEnd={onDragEnd}
+                onDragCancel={onDragCancel}
+                className={getCellClassName(x, y)}
+                dataCellKey={`${x}-${y}`}
+                dragLetter={!isTemporaryCell ? placementLetter : undefined}
+              />
+            );
+          }
           
           return (
             <Brick
@@ -324,13 +360,24 @@ const GameInterface: React.FC = () => {
   };
 
   // Drag and drop handlers
-  const handleDragStart = useCallback((letter: string) => {
-    if (!isMyTurn || gamePhase !== 'letter_placement') return;
+  const handleDragStart = useCallback((letter: string, startCell?: { x: number; y: number }) => {
+    // During placement phase, *all* players place simultaneously.
+    // So drag-to-place must work even when isMyTurn === false.
+    if (gamePhase !== 'letter_placement') return;
     
     setIsDragActive(true);
     setDraggedLetter(letter);
+    // If the drag was initiated from a board cell (long-press), preview immediately.
+    if (startCell && currentPlayer) {
+      const cell = currentPlayer.grid[startCell.y]?.[startCell.x];
+      if (cell && !cell.letter) {
+        setTemporaryPlacement({ x: startCell.x, y: startCell.y, letter });
+        setDragPreviewCell({ x: startCell.x, y: startCell.y });
+      }
+    }
+
     console.log(`🎯 Started dragging letter: ${letter}`);
-  }, [isMyTurn, gamePhase]);
+  }, [gamePhase, currentPlayer]);
 
   const handleDragMove = useCallback((x: number, y: number) => {
     if (!isDragActive || !currentPlayer) return;
@@ -438,6 +485,11 @@ const GameInterface: React.FC = () => {
           temporaryLetter={gamePhase === 'letter_placement' ? temporaryPlacement : null}
           dragPreviewCell={dragPreviewCell}
           dragPreviewLetter={draggedLetter || undefined}
+          placementLetter={gamePhase === 'letter_placement' ? (selectedLetter || undefined) : undefined}
+          onDragStart={handleDragStart}
+          onDragMove={handleDragMove}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
         />
       </div>
 
@@ -471,22 +523,16 @@ const GameInterface: React.FC = () => {
 
       {gamePhase === 'letter_placement' && selectedLetter && (
         <div className="placement-section">
-          <LetterSelector
-            availableLetters={[selectedLetter]}
-            onLetterSelect={() => {}} // No selection needed in placement phase
-            onDragStart={handleDragStart}
-            onDragMove={handleDragMove}
-            onDragEnd={handleDragEnd}
-            onDragCancel={handleDragCancel}
-            disabled={false}
-            isDragActive={isDragActive}
-            mode="placement"
-          />
-          
-          {temporaryPlacement && selectedLetter && (
+          <div className="drag-instructions">
+            <small>
+              Tryck på en ruta för att placera <strong>{selectedLetter}</strong>. Dra sedan bokstaven på brädet för att flytta den.
+            </small>
+          </div>
+
+          {temporaryPlacement && (
             <div className="confirm-section">
               <div className="confirm-buttons">
-                <button 
+                <button
                   onClick={handleConfirmPlacement}
                   className="confirm-button primary-button"
                   disabled={false}

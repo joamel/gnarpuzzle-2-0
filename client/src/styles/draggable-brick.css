@@ -18,6 +18,13 @@
   touch-action: none !important; /* Force no touch action for placement mode */
 }
 
+/* Board bricks are also draggable during placement (moving temporary placement) */
+.brick-board[data-mode="placement"] {
+  touch-action: none !important;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .dragging-ghost {
   pointer-events: none !important;
   transform: scale(1.1);

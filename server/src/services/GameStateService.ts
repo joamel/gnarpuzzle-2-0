@@ -975,7 +975,7 @@ export class GameStateService {
         message: 'Spelet avslutades eftersom en spelare lämnade',
         leaderboard: remainingPlayers.length === 1 ? [{
           userId: remainingPlayers[0].user_id,
-          username: 'Winner',
+          username: 'Vinnare',
           score: 0,
           words: []
         }] : [],
