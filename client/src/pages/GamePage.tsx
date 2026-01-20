@@ -63,6 +63,52 @@ const GamePage: React.FC = () => {
     // but GamePage will render leaderboard because gamePhase === 'finished'
   }, [currentGame, gamePhase, currentRoom]);
 
+  // Prevent screen lock during active gameplay (best-effort)
+  useEffect(() => {
+    let wakeLock: any = null;
+
+    const requestWakeLock = async () => {
+      try {
+        const nav: any = navigator as any;
+        if (!nav.wakeLock?.request) return;
+        wakeLock = await nav.wakeLock.request('screen');
+      } catch (e) {
+        // Wake Lock is best-effort (requires secure context and user gesture in some browsers)
+        console.debug('WakeLock request failed:', (e as Error).message);
+      }
+    };
+
+    const releaseWakeLock = async () => {
+      try {
+        await wakeLock?.release?.();
+      } catch {
+        // ignore
+      } finally {
+        wakeLock = null;
+      }
+    };
+
+    const shouldHoldLock = gameStarted && gamePhase !== 'finished';
+    if (shouldHoldLock) {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+
+    const onVisibilityChange = () => {
+      // Re-acquire after returning to foreground
+      if (!document.hidden && shouldHoldLock) {
+        requestWakeLock();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      releaseWakeLock();
+    };
+  }, [gameStarted, gamePhase]);
+
   const handleStartGame = () => {
     setGameStarted(true);
   };
