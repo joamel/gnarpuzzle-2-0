@@ -221,17 +221,10 @@ const HomePage: React.FC = () => {
                       className="card p-4 cursor-pointer"
                       onClick={() => {
                         if ((room.member_count || 0) < (room.max_players || 4) && !isJoiningRoom) {
-                          // Check if room requires password BEFORE attempting to join
-                          const roomSettings = room.settings as any;
-                          if (roomSettings?.require_password === true) {
-                            // Show password prompt immediately
-                            setPendingRoomCode(room.code);
-                            setShowPasswordPrompt(true);
-                            setPasswordInput('');
-                          } else {
-                            // Join directly without password
-                            joinRoomByCode(room.code);
-                          }
+                          // Always attempt to join first without prompting.
+                          // If this is a password room and the user is not already a member,
+                          // the server will respond with "Password required" and we show the prompt.
+                          joinRoomByCode(room.code);
                         }
                       }}
                     >
