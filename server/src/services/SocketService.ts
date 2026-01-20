@@ -806,13 +806,22 @@ export class SocketService {
               
               return;
             } else {
-              // No active game - remove immediately from waiting rooms
-              logger.info(`Player ${userData.username} (${userId}) disconnected from waiting room ${userData.roomCode} - removing immediately`);
+              // No active game (or game already finished) - remove immediately
+              logger.info(`Player ${userData.username} (${userId}) disconnected from room ${userData.roomCode} (no active game) - removing immediately`);
               
               const removed = await RoomModel.removeMember(roomId, userId);
               if (removed) {
                 await this.notifyRoomOfMemberLeaving(userData.roomCode, userId, userData.username!, room.created_by === userId);
               }
+
+              // We've handled removal + notifications; don't fall through to legacy cleanup.
+              this.connectedUsers.delete(socket.id);
+              logger.info(`Client disconnected (removed immediately): ${userData.username}`, {
+                service: 'gnarpuzzle-server',
+                socketId: socket.id,
+                userId: userData.userId
+              });
+              return;
             }
           }
         } catch (error) {

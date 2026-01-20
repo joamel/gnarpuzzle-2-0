@@ -359,12 +359,43 @@ router.post('/:code/join', AuthService.authenticateToken, async (req, res) => {
       
       const { getSocketService } = await import('../index');
       const socketService = getSocketService();
+      const { GameStateService } = await import('../services/GameStateService');
+      const gameStateService = socketService ? GameStateService.getInstance(socketService as any) : null;
+      const { GameModel } = await import('../models');
       
       for (const prevRoom of previousRooms) {
+        // If the user is leaving an active game by joining another room, treat it as an intentional leave
+        // so the old game doesn't keep running with a "ghost" player.
+        try {
+          const activeGame = await GameModel.findByRoomId(prevRoom.id);
+          if (activeGame && activeGame.state !== 'finished' && gameStateService) {
+            await gameStateService.handlePlayerLeft(activeGame.id, authReq.user!.id, true);
+          }
+        } catch (e) {
+          logger.warn('Failed to handle active game leave while switching rooms', {
+            prevRoomCode: prevRoom.code,
+            userId: authReq.user!.id,
+            error: (e as Error).message
+          });
+        }
+
         await RoomModel.removeMember(prevRoom.id, authReq.user!.id);
         
         // Notify the old room that user left
         if (socketService) {
+          // Clear any ready-state for this user in the old room
+          try {
+            (socketService as any).roomPlayerReadyStatus?.get(prevRoom.code)?.delete(authReq.user!.id);
+            (socketService as any).io?.to(`room:${prevRoom.code}`)?.emit('player:ready_changed', {
+              userId: String(authReq.user!.id),
+              username: authReq.user!.username,
+              isReady: false,
+              roomCode: prevRoom.code
+            });
+          } catch {
+            // best-effort
+          }
+
           socketService.emitToRoom(prevRoom.code, 'room:member_left', {
             roomId: prevRoom.id,
             roomCode: prevRoom.code,
@@ -539,7 +570,8 @@ router.delete('/:code/leave', AuthService.authenticateToken, async (req, res) =>
     // Remove ready status from Socket service and notify others
     const socketService = getSocketService();
     if (socketService) {
-      (socketService as any).roomPlayerReadyStatus?.get(code)?.delete(String(userId));
+      // roomPlayerReadyStatus is a Set<number>
+      (socketService as any).roomPlayerReadyStatus?.get(code)?.delete(userId);
       
       // Notify others that player left
       (socketService as any).io?.to(`room:${code}`)?.emit('room:member_left', {
