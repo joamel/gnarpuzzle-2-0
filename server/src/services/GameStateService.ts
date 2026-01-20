@@ -42,11 +42,12 @@ export class GameStateService {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
 
-    // Get first player from room to set as current turn
+    // Pick a random starting player (still keeps the overall turn order by join-position)
+    // This makes the "first picker" fair across matches.
     const firstMember = await db.get(`
       SELECT user_id FROM room_members 
       WHERE room_id = ? 
-      ORDER BY joined_at ASC 
+      ORDER BY RANDOM() 
       LIMIT 1
     `, roomId) as { user_id: number } | null;
 
