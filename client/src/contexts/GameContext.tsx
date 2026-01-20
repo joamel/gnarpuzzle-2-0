@@ -905,6 +905,21 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
 
       const room = await apiService.joinRoom(code, password);
 
+      // Keep only one active "joined room" marker.
+      // This avoids reconnect logic pulling the user back into an old room
+      // after they joined a new one.
+      try {
+        const keys = Object.keys(sessionStorage).filter(k => k.startsWith('room_joined_'));
+        for (const key of keys) {
+          if (key !== `room_joined_${code}`) {
+            sessionStorage.removeItem(key);
+          }
+        }
+        sessionStorage.setItem(`room_joined_${code}`, 'true');
+      } catch {
+        // ignore storage errors (private mode, etc)
+      }
+
       console.log('🏠 Room object keys:', Object.keys(room));
       console.log('📝 Room object:', JSON.stringify({
         code: room.code,
