@@ -43,6 +43,55 @@
   margin-bottom: 24px;
 }
 
+.auth-mode-tabs {
+  display: flex;
+  gap: 6px;
+  background: #f2f2f7;
+  padding: 6px;
+  border-radius: 14px;
+  margin-bottom: 22px;
+}
+
+.auth-mode-tab {
+  position: relative;
+  flex: 1;
+}
+
+.auth-mode-tab input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.auth-mode-tab span {
+  display: block;
+  text-align: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #666;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.auth-mode-tab input:checked + span {
+  background: #fff;
+  color: #333;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+.auth-mode-tab input:focus-visible + span {
+  outline: 3px solid rgba(102, 126, 234, 0.5);
+  outline-offset: 2px;
+}
+
+.auth-mode-tab input:disabled + span {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 .login-form .form-group {
   text-align: left;
   margin-bottom: 24px;
@@ -54,7 +103,8 @@
   margin-bottom: 8px;
 }
 
-.login-form input {
+.login-form input[type="text"],
+.login-form input[type="password"] {
   font-size: 16px;
   padding: 14px 16px;
   border-radius: 12px;
@@ -62,7 +112,8 @@
   transition: all 0.3s ease;
 }
 
-.login-form input:focus {
+.login-form input[type="text"]:focus,
+.login-form input[type="password"]:focus {
   border-color: #667eea;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }

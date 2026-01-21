@@ -20,7 +20,7 @@ describe('GuestCleanupService', () => {
       }
     };
     await AuthService.loginOrRegister({ body: { username: guestUsername } } as any, guestRes as any);
-    expect(guestUser?.id).toBeTypeOf('number');
+    expect(typeof guestUser?.id).toBe('number');
 
     // Create another user (also guest/legacy is fine for this test)
     let memberUser: any = null;
@@ -31,7 +31,7 @@ describe('GuestCleanupService', () => {
       }
     };
     await AuthService.loginOrRegister({ body: { username: memberUsername } } as any, memberRes as any);
-    expect(memberUser?.id).toBeTypeOf('number');
+    expect(typeof memberUser?.id).toBe('number');
 
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
@@ -84,7 +84,7 @@ describe('GuestCleanupService', () => {
       }
     };
     await AuthService.loginOrRegister({ body: { username: guestUsername } } as any, guestRes as any);
-    expect(guestUser?.id).toBeTypeOf('number');
+    expect(typeof guestUser?.id).toBe('number');
 
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();

@@ -4,7 +4,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { UserModel } from '../models';
 import { DatabaseManager } from '../config/database';
-import { logger } from '../utils/logger';
+import { authLogger, logger } from '../utils/logger';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-this';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '2h';
@@ -42,15 +42,26 @@ export class AuthService {
   static verifyToken(token: string): JWTPayload | null {
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
-      console.log('🔐 JWT decoded payload:', decoded);
       return decoded;
     } catch (error) {
-      console.error('❌ JWT verification failed:', {
-        error: error instanceof Error ? error.message : 'Unknown error',
+      const message = error instanceof Error ? error.message : String(error ?? 'Unknown error');
+      const meta = {
+        error: message,
         tokenLength: token ? token.length : 0,
-        tokenPrefix: token ? token.substring(0, 20) + '...' : 'null'
-      });
-      logger.warn('Invalid token verification:', error);
+        tokenPrefix: token ? token.substring(0, 20) + '...' : null
+      };
+
+      // These are common/expected in real traffic (stale token, random garbage, etc).
+      if (
+        message.includes('jwt malformed') ||
+        message.includes('invalid token') ||
+        message.includes('jwt expired')
+      ) {
+        // Keep quiet to avoid noisy logs for expected/benign failures.
+        // Use LOG_LEVEL=debug and add explicit logs at call sites if needed.
+      } else {
+        authLogger.warn('JWT verification failed', meta);
+      }
       return null;
     }
   }
@@ -502,13 +513,13 @@ export class AuthService {
           const dbManager = await DatabaseManager.getInstance();
           const db = dbManager.getDatabase();
 
-          const ownedRooms = await db.all<{ id: number }[]>(
+          const ownedRooms = (await db.all(
             'SELECT id FROM rooms WHERE created_by = ?',
             authReq.user.id
-          );
+          )) as Array<{ id: number }>;
 
           for (const room of ownedRooms) {
-            const nextOwner = await db.get<{ user_id: number }>(
+            const nextOwner = (await db.get(
               `
               SELECT user_id
               FROM room_members
@@ -518,7 +529,7 @@ export class AuthService {
               `,
               room.id,
               authReq.user.id
-            );
+            )) as { user_id: number } | null;
 
             if (nextOwner?.user_id) {
               await db.run(
@@ -565,15 +576,7 @@ export class AuthService {
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
-    console.log('🔐 Authentication attempt:', {
-      url: req.url,
-      method: req.method,
-      hasAuthHeader: !!authHeader,
-      tokenLength: token ? token.length : 0
-    });
-
     if (!token) {
-      console.log('❌ No token provided');
       res.status(401).json({
         error: 'Access denied',
         message: 'Authorization token required'
@@ -583,7 +586,6 @@ export class AuthService {
 
     const decoded = AuthService.verifyToken(token);
     if (!decoded) {
-      console.log('❌ Token verification failed');
       res.status(403).json({
         error: 'Invalid token',
         message: 'Token verification failed'
@@ -594,7 +596,6 @@ export class AuthService {
     // Verify user still exists in database
     const user = await UserModel.findById(decoded.userId);
     if (!user) {
-      console.log(`❌ User not found in database: ${decoded.userId} (${decoded.username})`);
       logger.warn(`Token references non-existent user: ${decoded.userId} (${decoded.username})`);
       res.status(403).json({
         error: 'Invalid token',

@@ -103,6 +103,32 @@ const LoginPage: React.FC = () => {
       </header>
       <div className="login-container">
         <form onSubmit={handleSubmit} className="login-form">
+          <div className="auth-mode-tabs" aria-label="Välj läge">
+            <label className="auth-mode-tab">
+              <input
+                type="radio"
+                name="auth-mode"
+                checked={mode === 'login'}
+                onChange={() => {
+                  setMode('login');
+                  setConfirmPassword('');
+                }}
+                disabled={isLoading}
+              />
+              <span>Logga in</span>
+            </label>
+            <label className="auth-mode-tab">
+              <input
+                type="radio"
+                name="auth-mode"
+                checked={mode === 'register'}
+                onChange={() => setMode('register')}
+                disabled={isLoading}
+              />
+              <span>Skapa konto</span>
+            </label>
+          </div>
+
           <div className="form-group">
             <label htmlFor="username">Användarnamn</label>
             <input
@@ -147,32 +173,6 @@ const LoginPage: React.FC = () => {
               />
             </div>
           )}
-
-          <div className="form-group" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input
-                type="radio"
-                name="auth-mode"
-                checked={mode === 'login'}
-                onChange={() => {
-                  setMode('login');
-                  setConfirmPassword('');
-                }}
-                disabled={isLoading}
-              />
-              Logga in
-            </label>
-            <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input
-                type="radio"
-                name="auth-mode"
-                checked={mode === 'register'}
-                onChange={() => setMode('register')}
-                disabled={isLoading}
-              />
-              Skapa konto
-            </label>
-          </div>
 
           {error && (
             <div className="error-message">
