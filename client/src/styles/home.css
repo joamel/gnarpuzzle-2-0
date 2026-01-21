@@ -34,6 +34,12 @@
   gap: 2px;
 }
 
+.rooms-user-label {
+  font-size: 12px;
+  opacity: 0.85;
+  font-weight: 600;
+}
+
 .rooms-user-line strong {
   font-size: 15px;
 }
@@ -41,7 +47,7 @@
 /* Online stats styling */
 .online-stats {
   font-size: 12px;
-  color: #667eea;
+  color: #ffffff;
   font-weight: 500;
   display: flex;
   align-items: center;

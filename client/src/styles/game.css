@@ -172,35 +172,30 @@
 }
 
 .letters-grid {
-  --letter-gap: 2px;
-  --letter-cols: 8;
-  --letter-max: 34px;
-  --grid-padding: 12px; /* 6px left + 6px right */
+  --letter-gap: 6px;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  flex-direction: column;
   gap: var(--letter-gap);
-  width: 100%;
-  /* Keep the grid from growing wider than 8 columns */
-  max-width: calc(
-    (var(--letter-cols) * var(--letter-max)) +
-    ((var(--letter-cols) - 1) * var(--letter-gap)) +
-    var(--grid-padding)
-  );
+  width: min(520px, 100%);
   margin: 0 auto;
-  padding: 0 6px;
+  padding: 0 8px;
 }
 
-/* Force 8 letters per row (8/8/8/5 for Swedish alphabet) */
-.letter-selector .brick.brick-button {
-  flex: 0 0 calc(
-    (100% - ((var(--letter-cols) - 1) * var(--letter-gap))) / var(--letter-cols)
-  );
+.letters-row {
+  display: flex;
+  width: 100%;
+  gap: var(--letter-gap);
+  justify-content: space-between;
+}
+
+/* Full-width rows; 10/10/9 letters are rendered in component */
+.letter-selector .letters-row .brick.brick-button {
+  flex: 1 1 0;
   width: auto !important;
   height: auto !important;
   aspect-ratio: 1;
-  max-width: var(--letter-max);
-  font-size: clamp(11px, 3.2vw, 14px);
+  max-width: 44px;
+  font-size: clamp(11px, 2.8vw, 14px);
 }
 
 /* Letter buttons styling is now in brick.css */

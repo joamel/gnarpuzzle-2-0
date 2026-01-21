@@ -28,9 +28,11 @@
 .lobby-title-row {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   gap: 10px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  width: 100%;
+  margin-bottom: 8px;
 }
 
 .lobby-header h2 {
@@ -38,12 +40,16 @@
   color: #C994DD;
   font-size: 18px;
   margin-bottom: 4px;
+  flex: 1;
+  text-align: left;
+  min-width: 0;
 }
 
 .room-code-section {
   display: flex;
   align-items: stretch;
   gap: 4px;
+  margin-top: 4px;
   margin-bottom: 2px;
   height: 28px;
   flex-shrink: 0;
@@ -430,18 +436,33 @@
 }
 
 .leave-room-button {
-  background: white;
-  color: #666;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #555;
+  border: 1px solid rgba(201, 148, 221, 0.35);
+  border-radius: 999px;
+  padding: 7px 14px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  margin-left: 12px;
 }
 
 .leave-room-button:hover:not(:disabled) {
   border-color: #ff4757;
   color: #ff4757;
+}
+
+@media (max-width: 420px) {
+  .lobby-title-row {
+    justify-content: space-between;
+    flex-wrap: nowrap;
+  }
+
+  .lobby-header h2 {
+    text-align: left;
+    flex: 1;
+  }
 }
 
 /* Tips Modal */

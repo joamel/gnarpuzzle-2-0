@@ -186,7 +186,7 @@ const HomePage: React.FC = () => {
               {user && (
                 <div className="rooms-user-info">
                   <div className="rooms-user-line">
-                    Inloggad som: <strong>{user.username}</strong>
+                    <span className="rooms-user-label">Inloggad som:</span> <strong>{user.username}</strong>
                   </div>
                 </div>
               )}

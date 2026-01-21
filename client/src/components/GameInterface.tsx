@@ -148,38 +148,51 @@ const LetterSelector: React.FC<LetterSelectorProps> = ({
   isDragActive = false,
   mode = 'selection'
 }) => {
+  const rows = useRef<string[][]>([]);
+  // Recompute rows when letters array changes reference/contents.
+  // Swedish alphabet is 29 letters => 10/10/9.
+  rows.current = [
+    availableLetters.slice(0, 10),
+    availableLetters.slice(10, 20),
+    availableLetters.slice(20, 29),
+  ];
+
   return (
     <div className={`letter-selector ${isDragActive ? 'drag-active' : ''}`}>
       <div className="letters-grid">
-        {availableLetters.map(letter => {
-          const isPending = pendingLetter === letter;
-          const isBrowsing = browsingLetter === letter;
-          // When browsing, hide pending state and show browsing instead
-          const shouldShowPending = isPending && !browsingLetter;
-          
-          return (
-            <DraggableBrick
-              key={letter}
-              letter={letter}
-              variant="button"
-              mode={mode}
-              isSelected={shouldShowPending}
-              isHovered={isBrowsing}
-              onClick={() => onLetterSelect(letter)}
-              onLetterHover={onLetterHover}
-              onLetterSelect={onLetterBrowseSelect}
-              onDragStart={onDragStart}
-              onDragMove={onDragMove}
-              onDragEnd={onDragEnd}
-              onDragCancel={onDragCancel}
-              disabled={disabled}
-              className={`
-                ${isBrowsing ? 'browsing' : ''}
-                ${shouldShowPending ? 'pending' : ''}
-              `}
-            />
-          );
-        })}
+        {rows.current.map((rowLetters, rowIndex) => (
+          <div key={rowIndex} className="letters-row">
+            {rowLetters.map(letter => {
+              const isPending = pendingLetter === letter;
+              const isBrowsing = browsingLetter === letter;
+              // When browsing, hide pending state and show browsing instead
+              const shouldShowPending = isPending && !browsingLetter;
+
+              return (
+                <DraggableBrick
+                  key={letter}
+                  letter={letter}
+                  variant="button"
+                  mode={mode}
+                  isSelected={shouldShowPending}
+                  isHovered={isBrowsing}
+                  onClick={() => onLetterSelect(letter)}
+                  onLetterHover={onLetterHover}
+                  onLetterSelect={onLetterBrowseSelect}
+                  onDragStart={onDragStart}
+                  onDragMove={onDragMove}
+                  onDragEnd={onDragEnd}
+                  onDragCancel={onDragCancel}
+                  disabled={disabled}
+                  className={`
+                    ${isBrowsing ? 'browsing' : ''}
+                    ${shouldShowPending ? 'pending' : ''}
+                  `}
+                />
+              );
+            })}
+          </div>
+        ))}
       </div>
       <div className="drag-instructions">
         <small>
@@ -325,7 +338,7 @@ const GameInterface: React.FC = () => {
       await selectLetter(pendingLetter);
       setPendingLetter(null);
     } catch (err) {
-      console.error('Failed to confirm letter:', err);
+      logger.game.warn('Failed to confirm letter', { err });
     }
   };
 

@@ -224,21 +224,26 @@ const UserMenu: React.FC<UserMenuProps> = ({ className }) => {
         <div className="header-user-menu-dropdown" role="menu">
           <div className="header-user-menu-username">{user.username}</div>
           <button type="button" className="header-user-menu-item" onClick={handleChangeUsername}>
-            ✏️ Ändra användarnamn
+            <span className="header-user-menu-icon" aria-hidden="true">✏️</span>
+            <span className="header-user-menu-label">Ändra användarnamn</span>
           </button>
           <button type="button" className="header-user-menu-item" onClick={handleOpenChangePassword}>
-            🔒 Byt lösenord
+            <span className="header-user-menu-icon" aria-hidden="true">🔒</span>
+            <span className="header-user-menu-label">Byt lösenord</span>
           </button>
           <button type="button" className="header-user-menu-item" onClick={handleOpenStats}>
-            📊 Min statistik
+            <span className="header-user-menu-icon" aria-hidden="true">📊</span>
+            <span className="header-user-menu-label">Min statistik</span>
           </button>
           {canShowLeaveRoom && (
             <button type="button" className="header-user-menu-item danger" onClick={handleLeaveRoom}>
-              🚪 Lämna rummet
+              <span className="header-user-menu-icon" aria-hidden="true">🚪</span>
+              <span className="header-user-menu-label">Lämna rummet</span>
             </button>
           )}
           <button type="button" className="header-user-menu-item danger" onClick={handleLogout}>
-            ⎋ Logga ut
+            <span className="header-user-menu-icon" aria-hidden="true">⎋</span>
+            <span className="header-user-menu-label">Logga ut</span>
           </button>
         </div>
       )}
