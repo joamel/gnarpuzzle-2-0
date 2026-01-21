@@ -186,7 +186,7 @@ const HomePage: React.FC = () => {
               {user && (
                 <div className="rooms-user-info">
                   <div className="rooms-user-line">
-                    <span className="rooms-user-label">Inloggad som:</span> <strong>{user.username}</strong>
+                    <strong>{user.username}</strong>
                   </div>
                 </div>
               )}
@@ -227,8 +227,8 @@ const HomePage: React.FC = () => {
                           <div className="flex items-center gap-4 text-xs text-gray-400">
                             <span>👥 {room.member_count || 0}/{room.max_players || 6}</span>
                             <span>📏 {room.board_size || 5}×{room.board_size || 5}</span>
-                            <span>🔤 {(room.settings as any)?.letter_timer || 20}s</span>
-                            <span>✋ {(room.settings as any)?.placement_timer || 30}s</span>
+                            <span>🔤 {(room.settings as any)?.letter_timer || 20} s</span>
+                            <span>✋ {(room.settings as any)?.placement_timer || 30} s</span>
                           </div>
                         </div>
                         <div className="text-xs font-semibold text-gray-500">
@@ -319,7 +319,7 @@ const HomePage: React.FC = () => {
 
               <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px'}}>
                 <div className="form-group">
-                  <label className="form-label">Tid för val: {letterTimer}s</label>
+                  <label className="form-label">Tid för val: {letterTimer} s</label>
                   <input
                     type="range"
                     value={letterTimer}
@@ -332,7 +332,7 @@ const HomePage: React.FC = () => {
                 </div>
                 
                 <div className="form-group">
-                  <label className="form-label">Tid för placering: {placementTimer}s</label>
+                  <label className="form-label">Tid för placering: {placementTimer} s</label>
                   <input
                     type="range"
                     value={placementTimer}

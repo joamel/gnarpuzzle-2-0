@@ -25,12 +25,12 @@ html, body {
 }
 
 :root {
-  --page-header-height: 92px;
+  --page-header-height: 84px;
   --page-header-padding-x: 16px;
   --page-header-padding-y: 10px;
-  --page-header-logo-size: 68px;
-  --page-header-title-size: 2.35rem;
-  --page-header-tagline-size: 0.8rem;
+  --page-header-logo-size: 56px;
+  --page-header-title-size: 2.05rem;
+  --page-header-tagline-size: 0.78rem;
 }
 
 /* ======================
@@ -228,6 +228,36 @@ html, body {
   font-size: 12px;
   opacity: 0.9;
   white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  :root {
+    --page-header-height: 72px;
+    --page-header-padding-x: 12px;
+    --page-header-padding-y: 8px;
+    --page-header-logo-size: 48px;
+    --page-header-title-size: 1.75rem;
+  }
+
+  /* Keep header compact so lobby actions remain visible */
+  .page-header-actions {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+
+  .header-online-stats {
+    font-size: 11px;
+    line-height: 1.05;
+    white-space: nowrap;
+    text-align: right;
+  }
+}
+
+@media (max-width: 340px) {
+  .header-online-stats {
+    display: none;
+  }
 }
 
 /* Header titles */

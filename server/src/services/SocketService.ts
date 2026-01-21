@@ -836,7 +836,7 @@ export class SocketService {
             
             // If there's an active game, set a grace period timer
             if (activeGame && activeGame.state !== 'finished') {
-              logger.info(`Player ${userData.username} (${userId}) disconnected from active game ${activeGame.id} - starting ${this.DISCONNECT_GRACE_PERIOD_MS/1000}s grace period`);
+              logger.info(`Player ${userData.username} (${userId}) disconnected from active game ${activeGame.id} - starting ${this.DISCONNECT_GRACE_PERIOD_MS/1000} s grace period`);
               
               // Clear any existing timer for this user
               const existingTimer = this.disconnectTimers.get(userId);

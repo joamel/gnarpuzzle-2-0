@@ -499,7 +499,7 @@ const GameInterface: React.FC = () => {
           
           {gameTimer && (
             <span className={`timer ${gameTimer.isWarning ? 'warning' : ''}`}>
-              {gameTimer.remainingSeconds}s
+              {gameTimer.remainingSeconds} s
             </span>
           )}
         </div>

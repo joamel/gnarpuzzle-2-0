@@ -100,7 +100,6 @@ describe('HomePage Component', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Tillgängliga rum (0)')).toBeInTheDocument();
-        expect(screen.getByText(/Inloggad som:/)).toBeInTheDocument();
         expect(screen.getByText(/testuser/)).toBeInTheDocument();
       });
 

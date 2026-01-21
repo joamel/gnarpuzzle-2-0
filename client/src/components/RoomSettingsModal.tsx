@@ -114,7 +114,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
 
           <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px'}}>
             <div className="form-group">
-              <label className="form-label">Tid för val: {letterTimer}s</label>
+              <label className="form-label">Tid för val: {letterTimer} s</label>
               <input
                 type="range"
                 value={letterTimer}
@@ -128,7 +128,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
             </div>
             
             <div className="form-group">
-              <label className="form-label">Tid för placering: {placementTimer}s</label>
+              <label className="form-label">Tid för placering: {placementTimer} s</label>
               <input
                 type="range"
                 value={placementTimer}

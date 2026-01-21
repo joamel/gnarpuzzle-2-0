@@ -63,11 +63,11 @@ const RoomSettings: React.FC<RoomSettingsProps> = ({
         </div>
         <div className="setting-item">
           <span className="setting-label">Tid för val:</span>
-          <span className="setting-value">{letterTimer}s</span>
+          <span className="setting-value">{letterTimer} s</span>
         </div>
         <div className="setting-item">
           <span className="setting-label">Tid för placering:</span>
-          <span className="setting-value">{placementTimer}s</span>
+          <span className="setting-value">{placementTimer} s</span>
         </div>
       </div>
     </div>

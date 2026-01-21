@@ -333,6 +333,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
       <div className="lobby-content-scrollable">
         <div className="lobby-header">
           <div className="lobby-title-row">
+            <div className="lobby-title-spacer" aria-hidden="true" />
             <h2>{currentRoom.name}</h2>
             <button
               type="button"
