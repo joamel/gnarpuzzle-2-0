@@ -811,7 +811,7 @@
 
 **Startdatum**: 25 December 2025  
 **Nuvarande fas**: Fas 8.0 - Deployment & Production ✅ COMPLETE  
-**Senaste commit**: chore: move debug UI off main (bdc122f)  
+**Senaste commit**: release: v2.1.0 (1f4b801)  
 **Nästa milestone**: Phase 9 - Advanced Mobile Features & PWA Enhancement (optional)  
 
 **Senast slutfört (v2.1.0 Release)**:
