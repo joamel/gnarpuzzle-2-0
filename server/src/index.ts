@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import { DatabaseManager } from './config/database';
 import { SocketService } from './services/SocketService';
 import { RoomCleanupService } from './services/RoomCleanupService';
+import { GuestCleanupService } from './services/GuestCleanupService';
 import { logger } from './utils/logger';
 
 // Load environment variables
@@ -112,6 +113,7 @@ app.use('*', (req, res) => {
 // Socket.IO connection handling - now delegated to SocketService
 let socketService: SocketService;
 let roomCleanupService: RoomCleanupService | undefined;
+let guestCleanupService: GuestCleanupService | undefined;
 
 io.on('connection', (socket) => {
   logger.info(`Client connected: ${socket.id}`);
@@ -166,6 +168,11 @@ async function startServer() {
     roomCleanupService.start();
     logger.info('Room cleanup service started with empty room deletion enabled');
 
+    // Cleanup temporary guest/legacy users after inactivity
+    guestCleanupService = new GuestCleanupService();
+    guestCleanupService.start();
+    logger.info('Guest cleanup service started');
+
     // Start server
     server.listen(PORT, () => {
       logger.info(`🚀 GnarPuzzle server running on port ${PORT}`);
@@ -192,6 +199,11 @@ process.on('SIGTERM', async () => {
         logger.info('Room cleanup service stopped');
       }
 
+      if (guestCleanupService && guestCleanupService.stop) {
+        guestCleanupService.stop();
+        logger.info('Guest cleanup service stopped');
+      }
+
       const dbManager = await DatabaseManager.getInstance();
       await dbManager.close();
       logger.info('Database connection closed');
@@ -212,6 +224,11 @@ process.on('SIGINT', async () => {
       if (roomCleanupService && roomCleanupService.stop) {
         roomCleanupService.stop();
         logger.info('Room cleanup service stopped');
+      }
+
+      if (guestCleanupService && guestCleanupService.stop) {
+        guestCleanupService.stop();
+        logger.info('Guest cleanup service stopped');
       }
 
       const dbManager = await DatabaseManager.getInstance();
