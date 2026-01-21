@@ -7,11 +7,12 @@ import { socketService } from '../services/socketService';
 import { Room } from '../types/game';
 import Logo from '../assets/Logo';
 import OnlineStats from '../components/OnlineStats';
+import UserMenu from '../components/UserMenu';
 import '../styles/home.css';
 
 const HomePage: React.FC = () => {
-  const { logout, user } = useAuth();
-  const { joinRoom, leaveRoom, currentRoom } = useGame();
+  const { user } = useAuth();
+  const { joinRoom, currentRoom } = useGame();
   const navigate = useNavigate();
   const shouldNavigate = useRef(false);
   
@@ -157,25 +158,10 @@ const HomePage: React.FC = () => {
       <div className="home-page">
         {/* Mobile Header */}
         <header className="page-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Logo size="small" showText={true} />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <button 
-              onClick={async () => {
-                try {
-                  if (currentRoom?.code) {
-                    await leaveRoom(true);
-                  }
-                } finally {
-                  await logout();
-                }
-              }}
-              className="logout-button"
-              aria-label="Logga ut"
-            >
-              Logga ut
-            </button>
+          <Logo size="small" showText={true} />
+          <div className="page-header-actions">
+            <UserMenu />
+            <OnlineStats className="header-online-stats" />
           </div>
         </header>
 
@@ -201,7 +187,6 @@ const HomePage: React.FC = () => {
                   <div className="rooms-user-line">
                     Inloggad som: <strong>{user.username}</strong>
                   </div>
-                  <OnlineStats className="online-stats-under" />
                 </div>
               )}
             </div>

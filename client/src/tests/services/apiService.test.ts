@@ -74,13 +74,13 @@ describe('ApiService', () => {
       };
       mockFetch.mockResolvedValue(mockResponse);
 
-      await apiService.login('testuser');
+      await apiService.login('testuser', 'password123');
 
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:3001/api/auth/login',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ username: 'testuser' }),
+          body: JSON.stringify({ username: 'testuser', password: 'password123' }),
           headers: expect.objectContaining({
             'Content-Type': 'application/json'
           })
@@ -97,13 +97,13 @@ describe('ApiService', () => {
       };
       mockFetch.mockResolvedValue(mockResponse);
 
-      await expect(apiService.login('invaliduser')).rejects.toThrow('Invalid request');
+      await expect(apiService.login('invaliduser', 'password123')).rejects.toThrow('Invalid request');
     });
 
     it('should handle network errors', async () => {
       mockFetch.mockRejectedValue(new Error('Network error'));
 
-      await expect(apiService.login('testuser')).rejects.toThrow('Network error');
+      await expect(apiService.login('testuser', 'password123')).rejects.toThrow('Network error');
     });
   });
 
@@ -118,12 +118,37 @@ describe('ApiService', () => {
       };
       mockFetch.mockResolvedValue(mockResponse);
 
-      const result = await apiService.login('testuser');
+      const result = await apiService.login('testuser', 'password123');
 
       expect(result).toEqual({
         token: 'auth-token',
         user: { id: 1, username: 'testuser' }
       });
+    });
+
+    it('should register user and return token', async () => {
+      const mockResponse = {
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          token: 'reg-token',
+          user: { id: 2, username: 'newuser' }
+        })
+      };
+      mockFetch.mockResolvedValue(mockResponse);
+
+      const result = await apiService.register('newuser', 'password123');
+
+      expect(result).toEqual({ token: 'reg-token', user: { id: 2, username: 'newuser' } });
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:3001/api/auth/register',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ username: 'newuser', password: 'password123' }),
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json'
+          })
+        })
+      );
     });
 
     it('should logout user', async () => {
@@ -143,6 +168,30 @@ describe('ApiService', () => {
         })
       );
       expect(localStorageMock.removeItem).toHaveBeenCalledWith('auth_token');
+    });
+
+    it('should rename username', async () => {
+      const mockResponse = {
+        ok: true,
+        json: vi.fn().mockResolvedValue({ token: 'new-token', user: { id: 1, username: 'newname' } })
+      };
+      mockFetch.mockResolvedValue(mockResponse);
+
+      apiService.setToken('test-token');
+      const result = await apiService.renameUsername('newname');
+
+      expect(result).toEqual({ token: 'new-token', user: { id: 1, username: 'newname' } });
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:3001/api/auth/username',
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ username: 'newname' }),
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer test-token'
+          })
+        })
+      );
     });
   });
 

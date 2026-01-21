@@ -25,6 +25,14 @@
   flex-shrink: 0;
 }
 
+.lobby-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .lobby-header h2 {
   margin: 0 0 2px 0;
   color: #C994DD;

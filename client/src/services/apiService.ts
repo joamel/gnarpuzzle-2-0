@@ -1,4 +1,5 @@
 import { Game } from '../../../shared/types.js';
+import type { MyStatsResponse } from '../types/stats';
 
 const API_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
 
@@ -57,67 +58,100 @@ class ApiService {
       });
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({} as any));
+        const errorMessage = errorData?.error || errorData?.message || `HTTP ${response.status}: ${response.statusText}`;
+
         // Handle authentication errors with intelligent retry
         if (response.status === 403 || response.status === 401) {
           // Don't retry for login/refresh endpoints to avoid infinite loops
-          if (endpoint === '/api/auth/login' || endpoint === '/api/auth/refresh' || endpoint === '/api/auth/me') {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+          // Also don't retry for endpoints that can legitimately return 401 for non-token reasons.
+          if (
+            endpoint === '/api/auth/login' ||
+            endpoint === '/api/auth/register' ||
+            endpoint === '/api/auth/refresh' ||
+            endpoint === '/api/auth/me' ||
+            endpoint === '/api/auth/password'
+          ) {
+            throw new Error(errorMessage);
           }
           
           console.warn(`Authentication failed (${response.status}) - attempting token refresh`);
           
+          // Try to refresh the token. Only clear token/redirect if refresh fails.
+          let refreshResponse: { token: string; user: any };
           try {
-            // Try to refresh the token
-            const refreshResponse = await this.refreshToken();
-            this.setToken(refreshResponse.token);
-            
-            // Log if user was recreated
-            if ((refreshResponse as any).recreated) {
-              console.log('ℹ️ User was recreated during token refresh - continuing with new token');
-            } else {
-              console.log('✅ Token refreshed successfully, retrying original request');
-            }
-            
-            // Retry the original request with new token
-            const retryHeaders = {
-              ...headers,
-              Authorization: `Bearer ${refreshResponse.token}`
-            };
-            
-            const retryResponse = await fetch(url, {
-              ...options,
-              headers: retryHeaders,
-            });
-            
-            if (!retryResponse.ok) {
-              const errorData = await retryResponse.json().catch(() => ({}));
-              throw new Error(errorData.error || `HTTP ${retryResponse.status}: ${retryResponse.statusText}`);
-            }
-            
-            return await retryResponse.json();
+            refreshResponse = await this.refreshToken();
           } catch (refreshError) {
             console.warn('❌ Token refresh failed, redirecting to login:', refreshError);
             this.clearToken();
             window.location.href = '/';
             return Promise.reject(new Error('Session expired - please log in again'));
           }
+
+          this.setToken(refreshResponse.token);
+
+          // Log if user was recreated
+          if ((refreshResponse as any).recreated) {
+            console.log('ℹ️ User was recreated during token refresh - continuing with new token');
+          } else {
+            console.log('✅ Token refreshed successfully, retrying original request');
+          }
+
+          // Retry the original request with new token
+          const retryHeaders = {
+            ...headers,
+            Authorization: `Bearer ${refreshResponse.token}`
+          };
+
+          const retryResponse = await fetch(url, {
+            ...options,
+            headers: retryHeaders,
+          });
+
+          if (!retryResponse.ok) {
+            const retryErrorData = await retryResponse.json().catch(() => ({} as any));
+            const retryErrorMessage = retryErrorData?.error || retryErrorData?.message || `HTTP ${retryResponse.status}: ${retryResponse.statusText}`;
+            throw new Error(retryErrorMessage);
+          }
+
+          return await retryResponse.json();
         }
         
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(errorMessage);
       }
 
       return await response.json();
     } catch (error) {
-      console.error(`API Error (${endpoint}):`, error);
+      const message = (error as any)?.message ? String((error as any).message) : '';
+      const lower = message.toLowerCase();
+      const isExpectedAuthFailure =
+        (endpoint === '/api/auth/login' && lower.includes('invalid credentials')) ||
+        (endpoint === '/api/auth/password' && (lower.includes('current password is incorrect') || lower.includes('invalid credentials')));
+
+      if (!isExpectedAuthFailure) {
+        console.error(`API Error (${endpoint}):`, error);
+      }
       throw error;
     }
   }
 
   // Auth endpoints
-  async login(username: string): Promise<{ token: string; user: any }> {
+  async login(username: string, password: string): Promise<{ token: string; user: any }> {
     return this.request<{ token: string; user: any }>('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    });
+  }
+
+  async register(username: string, password: string): Promise<{ token: string; user: any }> {
+    return this.request<{ token: string; user: any }>('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    });
+  }
+
+  async guestLogin(username: string): Promise<{ token: string; user: any }> {
+    return this.request<{ token: string; user: any }>('/api/auth/guest', {
       method: 'POST',
       body: JSON.stringify({ username }),
     });
@@ -132,6 +166,20 @@ class ApiService {
     const response = await this.request<{ success: boolean; user: any }>('/api/auth/me');
     // Backend returns { success: true, user: { id, username } }
     return response.user || response;
+  }
+
+  async renameUsername(username: string): Promise<{ token: string; user: any }> {
+    return this.request<{ token: string; user: any }>('/api/auth/username', {
+      method: 'PUT',
+      body: JSON.stringify({ username }),
+    });
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ success: boolean; message?: string }>{
+    return this.request<{ success: boolean; message?: string }>('/api/auth/password', {
+      method: 'PUT',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
   }
 
   // Room endpoints
@@ -246,6 +294,10 @@ class ApiService {
   // Stats endpoints
   async getOnlineStats(): Promise<{ online: { total: number; authenticated: number; anonymous: number } }> {
     return this.request<{ online: { total: number; authenticated: number; anonymous: number } }>('/api/stats/online');
+  }
+
+  async getMyStats(): Promise<MyStatsResponse> {
+    return this.request<MyStatsResponse>('/api/stats/me');
   }
 }
 

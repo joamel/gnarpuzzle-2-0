@@ -12,6 +12,8 @@ import m003 from './migrations/003_create_games_table';
 import m004 from './migrations/004_create_players_table';
 import m005 from './migrations/005_create_room_members_table';
 import m006 from './migrations/006_enhance_game_logic_schema';
+import m007 from './migrations/007_add_password_hash_to_users';
+import m008 from './migrations/008_case_insensitive_usernames';
 
 // For now, we'll use a simple in-memory mock for development
 interface MockDatabase extends DatabaseInterface {
@@ -40,9 +42,11 @@ class SimpleDatabaseMock implements MockDatabase {
     if (query.toLowerCase().includes('insert into users')) {
       const id = this.nextId++;
       const username = params[0];
+      const password_hash = params.length > 1 ? params[1] : null;
       const user = {
         id: id,
         username: username,
+        password_hash,
         created_at: new Date().toISOString(),
         last_active: new Date().toISOString()
       };
@@ -106,8 +110,10 @@ class SimpleDatabaseMock implements MockDatabase {
     // Handle user queries by username  
     if (query.toLowerCase().includes('select * from users where username')) {
       const username = params[0];
+      const wanted = typeof username === 'string' ? username.toLowerCase() : String(username ?? '').toLowerCase();
       for (const user of this.users.values()) {
-        if (user.username === username) {
+        const existing = typeof user.username === 'string' ? user.username.toLowerCase() : String(user.username ?? '').toLowerCase();
+        if (existing === wanted) {
           return user;
         }
       }
@@ -225,7 +231,10 @@ export class DatabaseManager {
   }
 
   private async init(): Promise<void> {
-    const dbPath = process.env.DATABASE_PATH || path.join(process.cwd(), 'data', 'gnarpuzzle.db');
+    const dbPath =
+      process.env.DATABASE_PATH ||
+      process.env.DB_PATH ||
+      path.join(process.cwd(), 'data', 'gnarpuzzle.db');
     
     // Ensure data directory exists
     const dbDir = path.dirname(dbPath);
@@ -260,6 +269,8 @@ export class DatabaseManager {
       migrationRunner.registerMigration(m004);
       migrationRunner.registerMigration(m005);
       migrationRunner.registerMigration(m006);
+      migrationRunner.registerMigration(m007);
+      migrationRunner.registerMigration(m008);
       
       // Run all pending migrations
       await migrationRunner.runPendingMigrations();

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
+import { act, render, waitFor } from '@testing-library/react';
 import { GameProvider, useGame } from '../../contexts/GameContext';
 import { socketService } from '../../services/socketService';
 
@@ -82,7 +82,9 @@ describe('GameContext Error Handling', () => {
 
     // Should not throw
     expect(() => {
-      gameEndedHandler!(malformedData);
+      act(() => {
+        gameEndedHandler!(malformedData);
+      });
     }).not.toThrow();
 
     // Should still update phase to finished
@@ -109,7 +111,9 @@ describe('GameContext Error Handling', () => {
 
     // Should not throw
     expect(() => {
-      letterPlacedHandler!(incompleteData);
+      act(() => {
+        letterPlacedHandler!(incompleteData);
+      });
     }).not.toThrow();
   });
 
@@ -125,12 +129,16 @@ describe('GameContext Error Handling', () => {
 
     // Trigger with null room
     expect(() => {
-      roomUpdatedHandler!({ room: null });
+      act(() => {
+        roomUpdatedHandler!({ room: null });
+      });
     }).not.toThrow();
 
     // Trigger with undefined data
     expect(() => {
-      roomUpdatedHandler!(undefined);
+      act(() => {
+        roomUpdatedHandler!(undefined);
+      });
     }).not.toThrow();
   });
 
@@ -146,15 +154,21 @@ describe('GameContext Error Handling', () => {
 
     // Trigger with various invalid data
     expect(() => {
-      turnSkippedHandler!({});
+      act(() => {
+        turnSkippedHandler!({});
+      });
     }).not.toThrow();
 
     expect(() => {
-      turnSkippedHandler!(null);
+      act(() => {
+        turnSkippedHandler!(null);
+      });
     }).not.toThrow();
 
     expect(() => {
-      turnSkippedHandler!({ nextPlayerId: 'invalid' });
+      act(() => {
+        turnSkippedHandler!({ nextPlayerId: 'invalid' });
+      });
     }).not.toThrow();
   });
 
@@ -173,11 +187,15 @@ describe('GameContext Error Handling', () => {
     (apiService.getGame as any).mockRejectedValue(new Error('Network error'));
 
     // Trigger game:started - should use fallback
-    gameStartedHandler!({
-      gameId: 1,
-      roomId: 1,
-      phase: 'letter_selection',
-      currentTurn: 1
+    await act(async () => {
+      gameStartedHandler!({
+        gameId: 1,
+        roomId: 1,
+        phase: 'letter_selection',
+        currentTurn: 1
+      });
+      // Allow any queued microtasks from async handlers to run.
+      await Promise.resolve();
     });
 
     // Should still update phase using fallback

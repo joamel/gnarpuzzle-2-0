@@ -63,7 +63,7 @@ vi.mock('../../services/socketService', () => ({
 
 const renderHomePage = () => {
   return render(
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true } as any}>
       <HomePage />
     </BrowserRouter>
   );
@@ -84,11 +84,15 @@ describe('HomePage Component', () => {
   });
 
   describe('Header and layout', () => {
-    it('renders welcome copy and logout', () => {
+    it('renders welcome copy and user menu', async () => {
       renderHomePage();
 
       expect(screen.getByText('Välkommen till GnarPuzzle')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /logga ut/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /användarmeny/i })).toBeInTheDocument();
+
+      // Let async effects (room list + online stats) settle to avoid act warnings.
+      await waitFor(() => expect(mockGetRooms).toHaveBeenCalled());
+      await waitFor(() => expect(mockGetOnlineStats).toHaveBeenCalled());
     });
 
     it('shows available rooms count and user info', async () => {
@@ -99,6 +103,8 @@ describe('HomePage Component', () => {
         expect(screen.getByText(/Inloggad som:/)).toBeInTheDocument();
         expect(screen.getByText(/testuser/)).toBeInTheDocument();
       });
+
+      await waitFor(() => expect(mockGetOnlineStats).toHaveBeenCalled());
     });
   });
 
@@ -110,6 +116,8 @@ describe('HomePage Component', () => {
         expect(screen.getByText('Inga rum tillgängliga')).toBeInTheDocument();
         expect(screen.getByText('Skapa det första rummet')).toBeInTheDocument();
       });
+
+      await waitFor(() => expect(mockGetOnlineStats).toHaveBeenCalled());
     });
 
     it('renders available rooms with details', async () => {
@@ -133,6 +141,8 @@ describe('HomePage Component', () => {
         expect(screen.getByText(/20\s*s/)).toBeInTheDocument();
         expect(screen.getByText(/4\s*×\s*4/)).toBeInTheDocument();
       });
+
+      await waitFor(() => expect(mockGetOnlineStats).toHaveBeenCalled());
     });
 
     it('joins a room when clicking a non-full room card', async () => {
@@ -156,6 +166,8 @@ describe('HomePage Component', () => {
       await waitFor(() => {
         expect(mockJoinRoom).toHaveBeenCalledWith('OPEN01', undefined);
       });
+
+      await waitFor(() => expect(mockGetOnlineStats).toHaveBeenCalled());
     });
 
     it('prompts for password when room is locked and joins with provided code', async () => {
@@ -195,6 +207,8 @@ describe('HomePage Component', () => {
       await waitFor(() => {
         expect(mockJoinRoom).toHaveBeenCalledWith('LOCK01', 'SECRET');
       });
+
+      await waitFor(() => expect(mockGetOnlineStats).toHaveBeenCalled());
     });
   });
 
@@ -207,6 +221,8 @@ describe('HomePage Component', () => {
 
       expect(await screen.findByText('Skapa nytt rum')).toBeInTheDocument();
       expect(screen.getByPlaceholderText('Mitt coola rum')).toBeInTheDocument();
+
+      await waitFor(() => expect(mockGetOnlineStats).toHaveBeenCalled());
     });
 
     it('disables submit when room name is empty', async () => {
@@ -217,6 +233,8 @@ describe('HomePage Component', () => {
 
       const submitButton = await screen.findByText('Skapa rum');
       expect(submitButton).toBeDisabled();
+
+      await waitFor(() => expect(mockGetOnlineStats).toHaveBeenCalled());
     });
 
     it('submits room creation with defaults and joins room', async () => {
@@ -246,6 +264,8 @@ describe('HomePage Component', () => {
       await waitFor(() => {
         expect(mockJoinRoom).toHaveBeenCalledWith('NEW123');
       });
+
+      await waitFor(() => expect(mockGetOnlineStats).toHaveBeenCalled());
     });
   });
 });

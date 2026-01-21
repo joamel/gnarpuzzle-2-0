@@ -4,7 +4,9 @@ import { apiService } from '../services/apiService';
 import { socketService } from '../services/socketService';
 
 interface AuthContextType extends AuthState {
-  login: (username: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
+  loginAsGuest: (username: string) => Promise<void>;
+  renameUsername: (username: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -54,7 +56,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
-  const login = useCallback(async (username: string) => {
+  const login = useCallback(async (username: string, password: string) => {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true }));
 
@@ -74,7 +76,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Disconnect old socket before logging in with new user
       socketService.disconnect();
       
-      const response = await apiService.login(username);
+      const response = await apiService.login(username, password);
       
       apiService.setToken(response.token);
       
@@ -89,11 +91,81 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await socketService.connect(response.token);
       
     } catch (error) {
-      console.error('Login error:', error);
+      const message = (error as any)?.message ? String((error as any).message) : '';
+      if (!message.toLowerCase().includes('invalid credentials')) {
+        console.error('Login error:', error);
+      }
       setAuthState(prev => ({ ...prev, isLoading: false }));
       throw error;
     }
   }, [authState.isAuthenticated, authState.user?.username, leaveAnyJoinedRooms]);
+
+  const loginAsGuest = useCallback(async (username: string) => {
+    try {
+      setAuthState(prev => ({ ...prev, isLoading: true }));
+
+      // If we're already logged in and switching accounts, leave room(s) and reset.
+      if (authState.isAuthenticated && authState.user?.username && authState.user.username !== username) {
+        await leaveAnyJoinedRooms();
+        try {
+          await apiService.logout();
+        } catch {
+          // ignore
+        }
+        apiService.clearToken();
+        localStorage.removeItem('auth_token');
+      }
+
+      socketService.disconnect();
+
+      const response = await apiService.guestLogin(username);
+      apiService.setToken(response.token);
+
+      setAuthState({
+        user: response.user,
+        token: response.token,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+
+      await socketService.connect(response.token);
+    } catch (error) {
+      const message = (error as any)?.message ? String((error as any).message) : '';
+      if (!message.toLowerCase().includes('password required')) {
+        console.error('Guest login error:', error);
+      }
+      setAuthState(prev => ({ ...prev, isLoading: false }));
+      throw error;
+    }
+  }, [authState.isAuthenticated, authState.user?.username, leaveAnyJoinedRooms]);
+
+  const renameUsername = useCallback(async (username: string) => {
+    if (!authState.isAuthenticated || !authState.user) {
+      throw new Error('Not authenticated');
+    }
+
+    try {
+      setAuthState(prev => ({ ...prev, isLoading: true }));
+
+      const response = await apiService.renameUsername(username);
+      apiService.setToken(response.token);
+
+      setAuthState(prev => ({
+        ...prev,
+        user: response.user,
+        token: response.token,
+        isAuthenticated: true,
+        isLoading: false,
+      }));
+
+      // Refresh the Socket.IO auth token while keeping room intent.
+      await socketService.reconnectWithToken(response.token);
+    } catch (error) {
+      console.error('Rename username error:', error);
+      setAuthState(prev => ({ ...prev, isLoading: false }));
+      throw error;
+    }
+  }, [authState.isAuthenticated, authState.user]);
 
   const logout = useCallback(async () => {
     try {
@@ -175,9 +247,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuth();
   }, []);
 
+  // Best-effort cleanup on tab close / browser close.
+  // This is especially useful for temporary guest accounts. Not guaranteed to run.
+  useEffect(() => {
+    const token = authState.token;
+    if (!token) return;
+
+    const baseUrl = (import.meta as any).env?.VITE_SERVER_URL || 'http://localhost:3001';
+    const url = `${baseUrl}/api/auth/logout`;
+
+    const sendLogout = () => {
+      try {
+        // Use fetch keepalive so the browser can attempt to complete the request during unload.
+        fetch(url, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+          keepalive: true,
+        } as any);
+      } catch {
+        // ignore
+      }
+    };
+
+    window.addEventListener('pagehide', sendLogout);
+    return () => {
+      window.removeEventListener('pagehide', sendLogout);
+    };
+  }, [authState.token]);
+
   const value: AuthContextType = {
     ...authState,
     login,
+    loginAsGuest,
+    renameUsername,
     logout,
     refreshUser,
   };

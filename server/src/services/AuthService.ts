@@ -1,7 +1,9 @@
 import * as jwt from 'jsonwebtoken';
 import { SignOptions } from 'jsonwebtoken';
 import { Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
 import { UserModel } from '../models';
+import { DatabaseManager } from '../config/database';
 import { logger } from '../utils/logger';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-this';
@@ -83,6 +85,15 @@ export class AuthService {
         user = await UserModel.create(username);
         logger.info(`New user registered: ${username}`);
       } else {
+        // Prevent insecure guest/legacy login from bypassing password-protected accounts.
+        if ((user as any).password_hash) {
+          res.status(403).json({
+            error: 'Password required',
+            message: 'This username is protected. Please log in with a password.'
+          });
+          return;
+        }
+
         // Update last active
         await UserModel.updateLastActive(user.id);
         logger.info(`User login: ${username}`);
@@ -106,6 +117,313 @@ export class AuthService {
       res.status(500).json({
         error: 'Authentication failed',
         message: 'Unable to authenticate user'
+      });
+    }
+  }
+
+  static async registerWithPassword(req: Request, res: Response): Promise<void> {
+    try {
+      const { username, password } = req.body || {};
+
+      if (!username || typeof username !== 'string' || username.length < 2 || username.length > 20) {
+        res.status(400).json({
+          error: 'Invalid username',
+          message: 'Username must be between 2 and 20 characters'
+        });
+        return;
+      }
+
+      const usernameRegex = /^[a-zA-Z0-9_åäöÅÄÖ]+$/;
+      if (!usernameRegex.test(username)) {
+        res.status(400).json({
+          error: 'Invalid username',
+          message: 'Username can only contain letters, numbers, underscore and Swedish characters'
+        });
+        return;
+      }
+
+      if (!password || typeof password !== 'string' || password.length < 8 || password.length > 128) {
+        res.status(400).json({
+          error: 'Invalid password',
+          message: 'Password must be between 8 and 128 characters'
+        });
+        return;
+      }
+
+      const existing = await UserModel.findByUsername(username);
+      if (existing) {
+        res.status(409).json({
+          error: 'Username already taken',
+          message: 'That username is already in use'
+        });
+        return;
+      }
+
+      const passwordHash = await bcrypt.hash(password, 10);
+      const user = await UserModel.createWithPassword(username, passwordHash);
+
+      const token = AuthService.generateToken(user);
+      res.status(200).json({
+        success: true,
+        user: {
+          id: user.id,
+          username: user.username,
+          created_at: user.created_at
+        },
+        token,
+        expiresIn: JWT_EXPIRES_IN
+      });
+    } catch (error) {
+      logger.error('Register error:', error);
+      res.status(500).json({
+        error: 'Authentication failed',
+        message: 'Unable to register user'
+      });
+    }
+  }
+
+  static async loginWithPassword(req: Request, res: Response): Promise<void> {
+    try {
+      const { username, password } = req.body || {};
+
+      if (!username || typeof username !== 'string' || username.length < 2 || username.length > 20) {
+        res.status(400).json({
+          error: 'Invalid username',
+          message: 'Username must be between 2 and 20 characters'
+        });
+        return;
+      }
+
+      if (!password || typeof password !== 'string' || password.length < 8 || password.length > 128) {
+        res.status(400).json({
+          error: 'Invalid password',
+          message: 'Password must be between 8 and 128 characters'
+        });
+        return;
+      }
+
+      const user = await UserModel.findByUsername(username);
+      // Avoid leaking whether a username exists.
+      if (!user || !user.password_hash) {
+        res.status(401).json({
+          error: 'Invalid credentials',
+          message: 'Invalid username or password'
+        });
+        return;
+      }
+
+      const ok = await bcrypt.compare(password, user.password_hash);
+      if (!ok) {
+        res.status(401).json({
+          error: 'Invalid credentials',
+          message: 'Invalid username or password'
+        });
+        return;
+      }
+
+      await UserModel.updateLastActive(user.id);
+      const token = AuthService.generateToken(user);
+
+      res.status(200).json({
+        success: true,
+        user: {
+          id: user.id,
+          username: user.username,
+          created_at: user.created_at
+        },
+        token,
+        expiresIn: JWT_EXPIRES_IN
+      });
+    } catch (error) {
+      logger.error('Login error:', error);
+      res.status(500).json({
+        error: 'Authentication failed',
+        message: 'Unable to authenticate user'
+      });
+    }
+  }
+
+  // Change password for current user (requires current password)
+  static async changePassword(req: Request, res: Response): Promise<void> {
+    try {
+      const authReq = req as AuthenticatedRequest;
+      const currentUser = authReq.user;
+      if (!currentUser) {
+        res.status(401).json({
+          error: 'Access denied',
+          message: 'Authorization token required'
+        });
+        return;
+      }
+
+      const { currentPassword, newPassword } = (req.body || {}) as any;
+
+      if (!currentPassword || typeof currentPassword !== 'string' || currentPassword.length < 8 || currentPassword.length > 128) {
+        res.status(400).json({
+          error: 'Invalid password',
+          message: 'Current password is required'
+        });
+        return;
+      }
+
+      if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8 || newPassword.length > 128) {
+        res.status(400).json({
+          error: 'Invalid password',
+          message: 'Password must be between 8 and 128 characters'
+        });
+        return;
+      }
+
+      if (currentPassword === newPassword) {
+        res.status(400).json({
+          error: 'Invalid password',
+          message: 'New password must be different'
+        });
+        return;
+      }
+
+      const user = await UserModel.findById(currentUser.id);
+      if (!user) {
+        res.status(404).json({
+          error: 'User not found',
+          message: 'User no longer exists'
+        });
+        return;
+      }
+
+      if (!user.password_hash) {
+        res.status(400).json({
+          error: 'Password not set',
+          message: 'This account does not have a password'
+        });
+        return;
+      }
+
+      const ok = await bcrypt.compare(currentPassword, user.password_hash);
+      if (!ok) {
+        res.status(401).json({
+          error: 'Invalid credentials',
+          message: 'Current password is incorrect'
+        });
+        return;
+      }
+
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+      const updated = await UserModel.setPasswordHash(user.id, passwordHash);
+      if (!updated) {
+        res.status(404).json({
+          error: 'User not found',
+          message: 'User no longer exists'
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Password updated'
+      });
+    } catch (error) {
+      logger.error('Change password error:', error);
+      res.status(500).json({
+        error: 'Password change failed',
+        message: 'Unable to change password'
+      });
+    }
+  }
+
+  // Rename username (preserves userId)
+  static async renameUsername(req: Request, res: Response): Promise<void> {
+    try {
+      const authReq = req as AuthenticatedRequest;
+      const currentUser = authReq.user;
+      if (!currentUser) {
+        res.status(401).json({
+          error: 'Access denied',
+          message: 'Authorization token required'
+        });
+        return;
+      }
+
+      const raw = req.body?.username;
+      const username = typeof raw === 'string' ? raw.trim() : '';
+
+      if (!username || username.length < 2 || username.length > 20) {
+        res.status(400).json({
+          error: 'Invalid username',
+          message: 'Username must be between 2 and 20 characters'
+        });
+        return;
+      }
+
+      // Validate username characters (alphanumeric + Swedish characters + underscore)
+      const usernameRegex = /^[a-zA-Z0-9_åäöÅÄÖ]+$/;
+      if (!usernameRegex.test(username)) {
+        res.status(400).json({
+          error: 'Invalid username',
+          message: 'Username can only contain letters, numbers, underscore and Swedish characters'
+        });
+        return;
+      }
+
+      // No-op rename
+      if (username === currentUser.username) {
+        const user = await UserModel.findById(currentUser.id);
+        if (!user) {
+          res.status(404).json({
+            error: 'User not found',
+            message: 'User no longer exists'
+          });
+          return;
+        }
+
+        const token = AuthService.generateToken(user);
+        res.status(200).json({
+          success: true,
+          user: {
+            id: user.id,
+            username: user.username,
+            created_at: user.created_at
+          },
+          token,
+          expiresIn: JWT_EXPIRES_IN
+        });
+        return;
+      }
+
+      const existing = await UserModel.findByUsername(username);
+      if (existing && existing.id !== currentUser.id) {
+        res.status(409).json({
+          error: 'Username already taken',
+          message: 'That username is already in use'
+        });
+        return;
+      }
+
+      const updated = await UserModel.updateUsername(currentUser.id, username);
+      if (!updated) {
+        res.status(404).json({
+          error: 'User not found',
+          message: 'User no longer exists'
+        });
+        return;
+      }
+
+      const token = AuthService.generateToken(updated);
+      res.status(200).json({
+        success: true,
+        user: {
+          id: updated.id,
+          username: updated.username,
+          created_at: updated.created_at
+        },
+        token,
+        expiresIn: JWT_EXPIRES_IN
+      });
+    } catch (error) {
+      logger.error('Rename username error:', error);
+      res.status(500).json({
+        error: 'Rename failed',
+        message: 'Unable to rename username'
       });
     }
   }
@@ -136,37 +454,11 @@ export class AuthService {
       // Get fresh user data
       const user = await UserModel.findById(decoded.userId);
       if (!user) {
-        console.log(`⚠️ User ${decoded.userId} (${decoded.username}) not found during refresh - recreating user`);
-        logger.warn(`User ${decoded.userId} (${decoded.username}) not found during token refresh - recreating`);
-        
-        // Try to recreate the user since they existed when the token was created
-        try {
-          const recreatedUser = await UserModel.create(decoded.username);
-          console.log(`✅ Recreated user: ${recreatedUser.id} (${recreatedUser.username})`);
-          
-          // Generate new token for recreated user
-          const newToken = AuthService.generateToken(recreatedUser);
-          
-          res.status(200).json({
-            success: true,
-            user: {
-              id: recreatedUser.id,
-              username: recreatedUser.username,
-              created_at: recreatedUser.created_at
-            },
-            token: newToken,
-            expiresIn: JWT_EXPIRES_IN,
-            recreated: true
-          });
-          return;
-        } catch (createError) {
-          console.error(`❌ Failed to recreate user ${decoded.username}:`, createError);
-          res.status(401).json({
-            error: 'User not found',
-            message: 'User associated with token no longer exists and could not be recreated'
-          });
-          return;
-        }
+        res.status(401).json({
+          error: 'User not found',
+          message: 'User associated with token no longer exists. Please log in again.'
+        });
+        return;
       }
 
       // Update last active and generate new token
@@ -201,6 +493,56 @@ export class AuthService {
       const authReq = req as AuthenticatedRequest;
       if (authReq.user) {
         await UserModel.updateLastActive(authReq.user.id);
+
+        // If this is a guest/legacy account (no password hash), we try to clean it up.
+        // IMPORTANT: users can own rooms. If a guest owns a room that still has members,
+        // transfer ownership to the longest-tenured remaining member.
+        const fullUser = await UserModel.findById(authReq.user.id);
+        if (fullUser && !fullUser.password_hash) {
+          const dbManager = await DatabaseManager.getInstance();
+          const db = dbManager.getDatabase();
+
+          const ownedRooms = await db.all<{ id: number }[]>(
+            'SELECT id FROM rooms WHERE created_by = ?',
+            authReq.user.id
+          );
+
+          for (const room of ownedRooms) {
+            const nextOwner = await db.get<{ user_id: number }>(
+              `
+              SELECT user_id
+              FROM room_members
+              WHERE room_id = ? AND user_id != ?
+              ORDER BY joined_at ASC
+              LIMIT 1
+              `,
+              room.id,
+              authReq.user.id
+            );
+
+            if (nextOwner?.user_id) {
+              await db.run(
+                'UPDATE rooms SET created_by = ? WHERE id = ?',
+                nextOwner.user_id,
+                room.id
+              );
+            } else {
+              // No remaining members -> remove the room.
+              await db.run('DELETE FROM rooms WHERE id = ?', room.id);
+            }
+          }
+
+          await UserModel.delete(authReq.user.id);
+          logger.info(`Guest user deleted on logout: ${authReq.user.username}`);
+
+          res.status(200).json({
+            success: true,
+            message: 'Logged out successfully',
+            deletedGuest: true
+          });
+          return;
+        }
+
         logger.info(`User logout: ${authReq.user.username}`);
       }
 
@@ -260,6 +602,9 @@ export class AuthService {
       });
       return;
     }
+
+    // Keep last_active updated so inactivity-based cleanup works reliably.
+    await UserModel.updateLastActive(user.id);
 
     // Add user info to request
     (req as AuthenticatedRequest).user = {

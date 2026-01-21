@@ -3,6 +3,7 @@ import { useGame } from '../contexts/GameContext';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/apiService';
 import { socketService } from '../services/socketService';
+import { useNavigate } from 'react-router-dom';
 import RoomSettings from './RoomSettings';
 import PlayersList from './PlayersList';
 import TipsModal from './TipsModal';
@@ -21,7 +22,8 @@ interface LobbyMember {
 
 const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   const { user: authUser } = useAuth();
-  const { currentRoom, startGame, isLoading, error } = useGame();
+  const { currentRoom, startGame, isLoading, error, leaveRoom } = useGame();
+  const navigate = useNavigate();
   
   // Initialize player list
   const [playerList, setPlayerList] = useState<LobbyMember[]>([]);
@@ -211,7 +213,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
     if (!currentRoom || !canActuallyStartGame) {
       return;
     }
-    
+
     try {
       setIsStarting(true);
       await startGame(currentRoom.id);
@@ -226,6 +228,19 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
       }
     } finally {
       setIsStarting(false);
+    }
+  };
+
+  const handleLeaveRoom = async () => {
+    if (!currentRoom?.code) {
+      navigate('/');
+      return;
+    }
+
+    try {
+      await leaveRoom(true);
+    } finally {
+      navigate('/');
     }
   };
 
@@ -317,7 +332,17 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
     <div className="room-lobby">
       <div className="lobby-content-scrollable">
         <div className="lobby-header">
-          <h2>{currentRoom.name}</h2>
+          <div className="lobby-title-row">
+            <h2>{currentRoom.name}</h2>
+            <button
+              type="button"
+              onClick={handleLeaveRoom}
+              className="leave-room-button"
+              aria-label="Lämna rummet"
+            >
+              🚪 Lämna
+            </button>
+          </div>
           <div className="room-code-section">
             <div className="room-code">
               <span>Kod: <strong>{currentRoom.code}</strong></span>

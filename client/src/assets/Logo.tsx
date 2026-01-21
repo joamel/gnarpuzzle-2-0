@@ -4,9 +4,10 @@ import './Logo.css';
 interface LogoProps {
   size?: 'small' | 'medium' | 'large';
   showText?: boolean;
+  showTagline?: boolean;
 }
 
-const Logo: React.FC<LogoProps> = ({ size = 'medium', showText = true }) => {
+const Logo: React.FC<LogoProps> = ({ size = 'medium', showText = true, showTagline = false }) => {
   const sizeClasses = {
     small: 'logo-small',
     medium: 'logo-medium',
@@ -14,7 +15,7 @@ const Logo: React.FC<LogoProps> = ({ size = 'medium', showText = true }) => {
   };
 
   return (
-    <div className={`gnarp-logo ${sizeClasses[size]}`}>
+    <div className={`gnarp-logo ${sizeClasses[size]}${showText ? '' : ' logo-icon-only'}`}>
       <div className="logo-container">
         {/* Puzzle piece SVG */}
         <svg 
@@ -74,7 +75,7 @@ const Logo: React.FC<LogoProps> = ({ size = 'medium', showText = true }) => {
               <span className="gnarp">GnarP</span>
               <span className="puzzle">uzzle</span>
             </span>
-            <span className="tagline">Ordjakten börjar här</span>
+            {showTagline && <span className="tagline">Ordjakten börjar här</span>}
           </div>
         )}
       </div>

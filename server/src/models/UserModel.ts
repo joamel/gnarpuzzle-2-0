@@ -20,6 +20,28 @@ export class UserModel {
     };
   }
 
+  static async createWithPassword(username: string, passwordHash: string): Promise<User> {
+    const dbManager = await DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+
+    const result = await db.run(
+      `
+      INSERT INTO users (username, password_hash)
+      VALUES (?, ?)
+    `,
+      username,
+      passwordHash
+    );
+
+    return {
+      id: result.lastInsertRowid as number,
+      username,
+      password_hash: passwordHash,
+      created_at: new Date().toISOString(),
+      last_active: new Date().toISOString()
+    };
+  }
+
   static async findById(id: number): Promise<User | null> {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
@@ -34,7 +56,7 @@ export class UserModel {
     const db = dbManager.getDatabase();
     
     return await db.get(`
-      SELECT * FROM users WHERE username = ?
+      SELECT * FROM users WHERE username COLLATE NOCASE = ?
     `, username) as User | null;
   }
 
@@ -47,6 +69,42 @@ export class UserModel {
       SET last_active = CURRENT_TIMESTAMP 
       WHERE id = ?
     `, id);
+  }
+
+  static async updateUsername(id: number, username: string): Promise<User | null> {
+    const dbManager = await DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+
+    const result = await db.run(
+      `
+      UPDATE users
+      SET username = ?, last_active = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `,
+      username,
+      id
+    );
+
+    if (!result.changes) return null;
+    return await UserModel.findById(id);
+  }
+
+  static async setPasswordHash(id: number, passwordHash: string): Promise<User | null> {
+    const dbManager = await DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+
+    const result = await db.run(
+      `
+      UPDATE users
+      SET password_hash = ?, last_active = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `,
+      passwordHash,
+      id
+    );
+
+    if (!result.changes) return null;
+    return await UserModel.findById(id);
   }
 
   static async getAll(limit = 100, offset = 0): Promise<User[]> {
@@ -76,7 +134,7 @@ export class UserModel {
     const db = dbManager.getDatabase();
     
     const result = await db.get(`
-      SELECT 1 FROM users WHERE username = ? LIMIT 1
+      SELECT 1 FROM users WHERE username COLLATE NOCASE = ? LIMIT 1
     `, username);
     
     return !!result;

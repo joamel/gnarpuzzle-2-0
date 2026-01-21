@@ -93,6 +93,31 @@ class SocketService {
     });
   }
 
+  // Reconnect socket with a new auth token without clearing
+  // event listeners or active room membership intent.
+  async reconnectWithToken(token: string): Promise<Socket> {
+    // Cancel any pending reconnect attempts; we're taking control.
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
+    if (this.socket) {
+      try {
+        // Avoid leaking listeners on the old socket instance. We keep
+        // our own listener registry and will re-register on connect().
+        this.socket.removeAllListeners();
+        this.socket.disconnect();
+      } finally {
+        this.socket = null;
+        this.isConnecting = false;
+        this.reconnectAttempts = 0;
+      }
+    }
+
+    return this.connect(token);
+  }
+
   disconnect(): void {
     // Clear reconnect timer
     if (this.reconnectTimer) {

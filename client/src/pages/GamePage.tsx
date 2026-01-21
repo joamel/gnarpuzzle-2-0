@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import RoomLobby from '../components/RoomLobby';
 import GameResultBoard from '../components/GameResultBoard';
 import OnlineStats from '../components/OnlineStats';
+import UserMenu from '../components/UserMenu';
 import Logo from '@/assets/Logo';
 import { socketService } from '../services/socketService';
 
@@ -15,7 +16,7 @@ const GameInterface = React.lazy(() => import('../components/GameInterface').the
 
 const GamePage: React.FC = () => {
   const { user } = useAuth();
-  const { currentRoom, currentGame, gamePhase, leaderboard, leaveRoom, gameEndReason, boardSize, joinRoom } = useGame();
+  const { currentRoom, currentGame, gamePhase, leaderboard, gameEndReason, boardSize, joinRoom } = useGame();
   const navigate = useNavigate();
   const location = useLocation();
   const [gameStarted, setGameStarted] = useState(false);
@@ -124,30 +125,6 @@ const GamePage: React.FC = () => {
     }
   };
 
-  // Leave room and go back to home
-  const handleLeaveRoom = async () => {
-    // If no current room, just navigate home (game may have ended already)
-    if (!currentRoom) {
-      console.log('🎮 [GamePage] No current room to leave, navigating to home');
-      navigate('/');
-      return;
-    }
-    
-    // Confirm before leaving if game is in progress
-    if (gamePhase && gamePhase !== 'finished') {
-      const confirmed = window.confirm('Är du säker på att du vill lämna spelet? Du kommer att försvinna från rummet.');
-      if (!confirmed) return;
-    }
-    
-    try {
-      await leaveRoom(true); // intentional = true when clicking button
-      navigate('/');
-    } catch (error) {
-      console.error('Failed to leave room:', error);
-      navigate('/');
-    }
-  };
-
   if (!currentRoom) {
     console.log('🎮 [GamePage] Rendering "not in room" screen');
     return (
@@ -231,17 +208,11 @@ const GamePage: React.FC = () => {
     return (
       <div className="game-page">
         <header className="page-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Logo size="small" showText={true} />
-            <OnlineStats />
+          <Logo size="small" showText={true} />
+          <div className="page-header-actions">
+            <UserMenu />
+            <OnlineStats className="header-online-stats" />
           </div>
-          <button 
-            onClick={handleLeaveRoom}
-            className="header-btn"
-            aria-label="Lämna rummet"
-          >
-            🚪 Lämna rummet
-          </button>
         </header>
         
         <Suspense fallback={
@@ -260,17 +231,11 @@ const GamePage: React.FC = () => {
   return (
     <div className="game-page">
       <header className="page-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Logo size="small" showText={true} />
-          <OnlineStats />
+        <Logo size="small" showText={true} />
+        <div className="page-header-actions">
+          <UserMenu />
+          <OnlineStats className="header-online-stats" />
         </div>
-        <button 
-          onClick={handleLeaveRoom}
-          className="header-btn"
-          aria-label="Lämna rummet"
-        >
-          🚪 Lämna rummet
-        </button>
       </header>
       
       <RoomLobby onStartGame={handleStartGame} />

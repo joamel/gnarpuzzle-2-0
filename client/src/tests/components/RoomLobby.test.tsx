@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import RoomLobby from '../../components/RoomLobby';
 import { apiService } from '../../services/apiService';
@@ -74,7 +74,7 @@ vi.mock('../../services/socketService');
 
 const renderRoomLobby = () => {
   return render(
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true } as any}>
       <RoomLobby onStartGame={() => {}} />
     </BrowserRouter>
   );
@@ -95,18 +95,23 @@ describe('RoomLobby Component', () => {
     });
   });
 
-  it('should render room information correctly', () => {
+  it('should render room information correctly', async () => {
     renderRoomLobby();
+
+    await waitFor(() => expect(apiService.getRoomByCode).toHaveBeenCalled());
     
     expect(screen.getByText('Test Room')).toBeDefined();
     expect(screen.getByText('TEST01')).toBeDefined();
   });
 
-  it('should show current user when members list is empty', () => {
+  it('should show current user when members list is empty', async () => {
     // Mock room with empty players array
     mockGameContext.currentRoom = { ...mockRoom, players: [] };
     
     renderRoomLobby();
+
+    // Wait for the async refresh effect to complete to avoid act warnings.
+    await waitFor(() => expect(apiService.getRoomByCode).toHaveBeenCalled());
     
     expect(screen.getByText('testuser')).toBeDefined();
     // Note: Owner badge (👑) only appears when role is explicitly 'owner' in player data
@@ -114,7 +119,7 @@ describe('RoomLobby Component', () => {
     expect(screen.getByText('Du')).toBeDefined(); // Self badge
   });
 
-  it('should display members from API response', () => {
+  it('should display members from API response', async () => {
     // Real API returns { room: { members: [...] } }
     const roomWithMembers = {
       ...mockRoom,
@@ -132,6 +137,8 @@ describe('RoomLobby Component', () => {
     mockGameContext.currentRoom = mockRoom;
     
     renderRoomLobby();
+
+    await waitFor(() => expect(apiService.getRoomByCode).toHaveBeenCalled());
     
     expect(screen.getByText('testuser')).toBeDefined();
     // Note: player2 is not shown because component uses internal playerList state, not room.players directly
@@ -139,10 +146,12 @@ describe('RoomLobby Component', () => {
     // Owner badge only shows when member.role === 'owner'
   });
 
-  it('should show empty slots for remaining players', () => {
+  it('should show empty slots for remaining players', async () => {
     mockGameContext.currentRoom = { ...mockRoom, players: [] };
     
     renderRoomLobby();
+
+    await waitFor(() => expect(apiService.getRoomByCode).toHaveBeenCalled());
     
     // Should show 3 empty slots (4 max - 1 current user)
     const emptySlots = screen.getAllByText('Väntar på spelare...');
@@ -166,6 +175,8 @@ describe('RoomLobby Component', () => {
     (apiService.getRoomByCode as any).mockResolvedValueOnce(freshRoomData);
 
     renderRoomLobby();
+
+    await waitFor(() => expect(apiService.getRoomByCode).toHaveBeenCalled());
     
     // Component auto-refreshes - just verify room renders
     expect(screen.getByText('Test Room')).toBeDefined();
@@ -175,26 +186,32 @@ describe('RoomLobby Component', () => {
     (apiService.getRoomByCode as any).mockRejectedValueOnce(new Error('Network error'));
 
     renderRoomLobby();
+
+    await waitFor(() => expect(apiService.getRoomByCode).toHaveBeenCalled());
     
     // Component doesn't have manual refresh button - just verify error handling
     expect(screen.getByText('Test Room')).toBeDefined();
   });
 
-  it('should show start game button for room owner with enough players', () => {
+  it('should show start game button for room owner with enough players', async () => {
     // Make user the owner so we see owner-specific UI
     mockGameContext.currentRoom = { ...mockRoom, createdBy: '123' };
     
     renderRoomLobby();
+
+    await waitFor(() => expect(apiService.getRoomByCode).toHaveBeenCalled());
     
     // Since we only have 1 player, we should see the waiting message
     expect(screen.getByText(/Väntar på fler spelare för att starta \(minst 2 behövs\)/)).toBeDefined();
   });
 
-  it('should disable start game button with insufficient players', () => {
+  it('should disable start game button with insufficient players', async () => {
     // Make user the owner so we see owner-specific UI  
     mockGameContext.currentRoom = { ...mockRoom, createdBy: '123' };
     
     renderRoomLobby();
+
+    await waitFor(() => expect(apiService.getRoomByCode).toHaveBeenCalled());
     
     // Test passes if we can see the waiting message with requirement
     expect(screen.getByText(/Väntar på fler spelare för att starta \(minst 2 behövs\)/)).toBeDefined();
@@ -205,7 +222,7 @@ describe('RoomLobby Component', () => {
     expect(true).toBe(true); // Placeholder
   });
 
-  it('should render unique keys for all player items', () => {
+  it('should render unique keys for all player items', async () => {
     // Real API structure with members array
     const roomWithMembers = {
       ...mockRoom,
@@ -223,6 +240,8 @@ describe('RoomLobby Component', () => {
     mockGameContext.currentRoom = mockRoom;
 
     const { container } = renderRoomLobby();
+
+    await waitFor(() => expect(apiService.getRoomByCode).toHaveBeenCalled());
     
     // Check that all player items exist (no React warnings for missing keys)
     const playerItems = container.querySelectorAll('.player-item');

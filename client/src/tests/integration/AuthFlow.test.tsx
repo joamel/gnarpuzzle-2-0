@@ -13,6 +13,8 @@ vi.mock('../../services/apiService', () => {
   return {
     apiService: {
       login: vi.fn(),
+      guestLogin: vi.fn(),
+      register: vi.fn(),
       logout: vi.fn().mockResolvedValue(undefined),
       getRooms: vi.fn(),
       createRoom: vi.fn(),
@@ -49,7 +51,7 @@ vi.mock('../../services/socketService', () => ({
 
 const renderWithAuth = (component: React.ReactElement) => {
   return render(
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true } as any}>
       <AuthProvider>
         <GameProvider>
           {component}
@@ -77,13 +79,54 @@ describe('Authentication Flow', () => {
     renderWithAuth(<LoginPage />);
 
     const usernameInput = screen.getByPlaceholderText(/namn|användarnamn/i);
-    const loginButton = screen.getByRole('button', { name: /börja spela|logga in/i });
+    const passwordInput = screen.getByLabelText('Lösenord');
+    const loginButton = screen.getByRole('button', { name: /^(börja spela|logga in)$/i });
 
     fireEvent.change(usernameInput, { target: { value: 'testuser' } });
+    fireEvent.change(passwordInput, { target: { value: 'password123' } });
     fireEvent.click(loginButton);
 
     await waitFor(() => {
-      expect(apiService.login).toHaveBeenCalledWith('testuser');
+      expect(apiService.login).toHaveBeenCalledWith('testuser', 'password123');
+    });
+  });
+
+  it('should allow user to login as guest with provided username', async () => {
+    const { apiService } = await import('../../services/apiService');
+
+    (apiService.guestLogin as any).mockResolvedValue({
+      token: 'mock-guest-token',
+      user: { id: 1, username: 'gast_test' }
+    });
+
+    renderWithAuth(<LoginPage />);
+
+    const usernameInput = screen.getByPlaceholderText(/namn|användarnamn/i);
+    fireEvent.change(usernameInput, { target: { value: 'gast_test' } });
+
+    const guestButton = screen.getByRole('button', { name: /^logga in som gäst$/i });
+    fireEvent.click(guestButton);
+
+    await waitFor(() => {
+      expect(apiService.guestLogin).toHaveBeenCalledWith('gast_test');
+    });
+  });
+
+  it('should generate a guest username when none is provided', async () => {
+    const { apiService } = await import('../../services/apiService');
+
+    (apiService.guestLogin as any).mockResolvedValue({
+      token: 'mock-guest-token',
+      user: { id: 1, username: 'gast_ABCD' }
+    });
+
+    renderWithAuth(<LoginPage />);
+
+    const guestButton = screen.getByRole('button', { name: /^logga in som gäst$/i });
+    fireEvent.click(guestButton);
+
+    await waitFor(() => {
+      expect(apiService.guestLogin).toHaveBeenCalledWith(expect.stringMatching(/^gast_[A-Z0-9]{4}$/));
     });
   });
 
@@ -91,7 +134,7 @@ describe('Authentication Flow', () => {
     renderWithAuth(<LoginPage />);
 
     const usernameInput = screen.getByPlaceholderText(/namn|användarnamn/i);
-    const loginButton = screen.getByRole('button', { name: /börja spela|logga in/i });
+    const loginButton = screen.getByRole('button', { name: /^(börja spela|logga in)$/i });
 
     // Test too short username
     fireEvent.change(usernameInput, { target: { value: 'a' } });
@@ -111,7 +154,7 @@ describe('Authentication Flow', () => {
     renderWithAuth(<LoginPage />);
 
     const usernameInput = screen.getByPlaceholderText(/namn|användarnamn/i);
-    const loginButton = screen.getByRole('button', { name: /börja spela|logga in/i });
+    const loginButton = screen.getByRole('button', { name: /^(börja spela|logga in)$/i });
 
     fireEvent.change(usernameInput, { target: { value: 'testuser' } });
     fireEvent.click(loginButton);

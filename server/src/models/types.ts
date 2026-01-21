@@ -3,6 +3,7 @@ export interface User {
   username: string;
   created_at: string;
   last_active: string;
+  password_hash?: string | null;
 }
 
 export interface Room {

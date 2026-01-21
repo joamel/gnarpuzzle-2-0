@@ -5,10 +5,21 @@ const router = express.Router();
 
 /**
  * POST /api/auth/login
- * Fast user registration/login endpoint
- * Mobile-optimized - just username required
+ * Password-based login endpoint
  */
-router.post('/login', AuthService.loginOrRegister);
+router.post('/login', AuthService.loginWithPassword);
+
+/**
+ * POST /api/auth/register
+ * Password-based registration endpoint
+ */
+router.post('/register', AuthService.registerWithPassword);
+
+/**
+ * POST /api/auth/guest
+ * Legacy username-only login (insecure)
+ */
+router.post('/guest', AuthService.loginOrRegister);
 
 /**
  * POST /api/auth/refresh  
@@ -16,6 +27,20 @@ router.post('/login', AuthService.loginOrRegister);
  * Requires Authorization: Bearer <token> header
  */
 router.post('/refresh', AuthService.refreshToken);
+
+/**
+ * PUT /api/auth/username
+ * Rename current user (preserves userId)
+ * Requires Authorization: Bearer <token> header
+ */
+router.put('/username', AuthService.authenticateToken, AuthService.renameUsername);
+
+/**
+ * PUT /api/auth/password
+ * Change password for current user
+ * Requires Authorization: Bearer <token> header
+ */
+router.put('/password', AuthService.authenticateToken, AuthService.changePassword);
 
 /**
  * DELETE /api/auth/logout

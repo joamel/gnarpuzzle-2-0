@@ -2,20 +2,26 @@
 .login-page {
   min-height: 100vh;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
+  padding: 0;
+}
+
+.login-header-bar {
+  justify-content: center;
 }
 
 .login-container {
   width: 100%;
-  max-width: 400px;
+  max-width: 340px;
   background: white;
   border-radius: 20px;
-  padding: 40px 30px;
+  padding: 34px 26px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
   text-align: center;
+  margin: 20px auto;
 }
 
 .login-header h1 {
@@ -100,7 +106,7 @@
 /* Mobile optimizations */
 @media (max-width: 480px) {
   .login-page {
-    padding: 16px;
+    padding: 0;
   }
   
   .login-container {
