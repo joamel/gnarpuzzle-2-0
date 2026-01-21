@@ -17,7 +17,7 @@
 - **Room Passwords**: ✅ COMPLETE - Rumskod kan användas som lösenord
 - **Live Deployment**: ✅ COMPLETE - Application successfully deployed to Render
 - **TypeScript Build**: ✅ COMPLETE - All compilation errors resolved for production build
-- **Test Suite**: ✅ COMPLETE - **141 tests passing | 22 skipped** (Client: 67 | Server: 74 passed, 22 skipped)
+- **Test Suite**: ✅ COMPLETE - **157 tests passing | 22 skipped** (Client: 71 | Server: 86 passed, 22 skipped)
 
 **🎯 Phase 8 & Phase 9 Recent Fixes**:
 - ✅ Uppdaterad WordValidationService för att ladda ordlista från flera möjliga platser
@@ -38,6 +38,7 @@
 - ✅ **Fixed auto-placement race conditions** - Batch updates prevent partial state
 - ✅ **Added mobile disconnect grace period** - 90 seconds before removing from game
 - ✅ **Comprehensive race condition test suite** - 8/8 tests verify robustness
+- ✅ Online-statistik räknar både inloggade och gäster (total + uppdelning)
 
 **✅ Ordlista-lösning för produktion:**
 - ✅ Swedish.json (122k ord) inkluderad i repo - INTE i .gitignore
@@ -71,9 +72,9 @@
 - **10 tests skipped** - but all tested functionality works in other test suites
 
 ### ✅ All Critical Functionality Tested
-- **Total test results**: 141 tests passing | 22 tests skipped (expected)
-  - Client: 67 passed
-  - Server: 74 passed | 22 skipped (migrations/isolation)
+- **Total test results**: 157 tests passing | 22 tests skipped (expected)
+  - Client: 71 passed
+  - Server: 86 passed | 22 skipped (migrations/isolation)
 
 ---
 
@@ -94,10 +95,11 @@
 - **Status**: ✅ Permanent fix - 'abandoned' är giltig status enligt migration 002
 
 ### 🔍 Extra Debug Logging Tillagt
-- **Platser**: GameContext.tsx, apiService.ts (startGame methods)
-- **Syfte**: Debug för "Starta spel" knapp som inte fungerade  
-- **Status**: ✅ Kan behållas - hjälpsam för utveckling
-- **Överväg**: Ta bort console.logs innan produktion för prestanda
+- **Syfte**: Felsökning utan att spamma produktion
+- **Status**: ✅ FIXED - konsol-spam ersatt med strukturerad logging med nivåer
+- **Beteende**:
+  - Frontend är tyst som standard (WARN) i dev, opt-in via `localStorage.gnarpuzzle_log_level`
+  - Backend styrs via `LOG_LEVEL` (production default `info`, använd `debug` vid felsökning)
 
 ### ✅ DATABASE MIGRATION FIX (IF NOT EXISTS)
 - **Problem**: Migreringar kraschade med "table already exists" vid serveromstart
@@ -818,7 +820,7 @@
 - ✅ **Fas 1-3**: Complete full-stack implementation med React + Socket.IO + SQLite
 - ✅ **Fas 4.0-4.4**: Mobile-First Game Experience - All UI components COMPLETE
 - ✅ **Fas 5.1-5.3**: Performance optimization & mobile features COMPLETE
-- ✅ **Fas 7.1**: Automated Testing Infrastructure - 141 tests passing | 22 skipped (expected)
+- ✅ **Fas 7.1**: Automated Testing Infrastructure - 157 tests passing | 22 skipped (expected)
 - ✅ **Fas 8**: Render deployment LIVE i produktion
 - ✅ **Game Scoring**: WordValidationService med 122,201 svenska ord FIXED
 - ✅ **Word Validation**: Endast giltiga ord från ordlistan får poäng FIXED
@@ -849,7 +851,7 @@
 - 🟢 **Production Deployment**: Live på Render med komplett funktionalitet
 - 🟢 **Frontend Build**: Optimerad för produktion med code splitting  
 - 🟢 **Backend API**: Express + Socket.IO + SQLite live deployment
-- 🟢 **Test Suite**: Senast verifierat lokalt: 141 tests passing | 22 skipped (expected)
+- 🟢 **Test Suite**: Senast verifierat lokalt: 157 tests passing | 22 skipped (expected)
 - 🟢 **Game Features**: Timer config, ready status, results screen, public rooms all functional
 - 🟢 **Mobile Optimization**: Purple theme, compact UI, responsive design complete
 

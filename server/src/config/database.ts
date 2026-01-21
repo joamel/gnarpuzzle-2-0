@@ -4,6 +4,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { DatabaseInterface, SQLiteDatabase } from './sqlite';
+import { dbLogger } from '../utils/logger';
 
 // Import all migrations
 import m001 from './migrations/001_create_users_table';
@@ -32,11 +33,11 @@ class SimpleDatabaseMock implements MockDatabase {
   private roomMembers: Map<string, { room_id: number; user_id: number; joined_at: string }> = new Map();
 
   async exec(query: string): Promise<void> {
-    console.log(`🔍 EXEC: ${query.substring(0, 50)}...`);
+    dbLogger.debug('Mock DB exec', { queryPreview: `${query.substring(0, 50)}...` });
   }
 
   async run(query: string, ...params: any[]): Promise<{ lastInsertRowid: number; changes: number }> {
-    console.log(`🔍 RUN: ${query.substring(0, 50)}... with params:`, params);
+    dbLogger.debug('Mock DB run', { queryPreview: `${query.substring(0, 50)}...`, params });
     
     // Handle user insertions
     if (query.toLowerCase().includes('insert into users')) {
@@ -85,8 +86,8 @@ class SimpleDatabaseMock implements MockDatabase {
         joined_at: new Date().toISOString()
       };
       this.roomMembers.set(memberKey, memberData);
-      console.log(`💾 Mock DB: Stored room member ${user_id} in room ${room_id}`);
-      console.log(`💾 Mock DB: Current room members:`, Array.from(this.roomMembers.entries()));
+      dbLogger.debug('Mock DB stored room member', { roomId: room_id, userId: user_id });
+      dbLogger.debug('Mock DB current room members', { roomMembers: Array.from(this.roomMembers.entries()) });
       return { lastInsertRowid: this.nextId++, changes: 1 };
     }
 
@@ -99,7 +100,7 @@ class SimpleDatabaseMock implements MockDatabase {
   }
 
   async get(query: string, ...params: any[]): Promise<any | null> {
-    console.log(`🔍 GET: ${query.substring(0, 50)}... with params:`, params);
+    dbLogger.debug('Mock DB get', { queryPreview: `${query.substring(0, 50)}...`, params });
     
     // Handle user queries by ID
     if (query.toLowerCase().includes('select * from users where id')) {
@@ -138,7 +139,7 @@ class SimpleDatabaseMock implements MockDatabase {
       const roomId = params[0];
       const memberCount = Array.from(this.roomMembers.values())
         .filter(member => member.room_id === roomId).length;
-      console.log(`🔢 Mock DB: Room ${roomId} has ${memberCount} members`);
+      dbLogger.debug('Mock DB room member count', { roomId, memberCount });
       return { count: memberCount };
     }
 
@@ -148,7 +149,7 @@ class SimpleDatabaseMock implements MockDatabase {
       const userId = params[1];
       const memberKey = `${roomId}-${userId}`;
       const exists = this.roomMembers.has(memberKey);
-      console.log(`🔍 Mock DB: User ${userId} ${exists ? 'is' : 'is not'} member of room ${roomId}`);
+      dbLogger.debug('Mock DB membership check', { roomId, userId, exists });
       return exists ? { '1': 1 } : null;
     }
     
@@ -156,27 +157,33 @@ class SimpleDatabaseMock implements MockDatabase {
   }
 
   async all(query: string, ...params: any[]): Promise<any[]> {
-    console.log(`🔍 ALL: ${query.substring(0, 50)}... with params:`, params);
+    dbLogger.debug('Mock DB all', { queryPreview: `${query.substring(0, 50)}...`, params });
     
     // Handle room members JOIN query
     if (query.toLowerCase().includes('select u.*') && 
         query.toLowerCase().includes('from users u') &&
         query.toLowerCase().includes('join room_members rm')) {
       const roomId = params[0];
-      console.log(`👥 Mock DB: Getting members for room ${roomId}`);
-      console.log(`👥 Mock DB: All room members in system:`, Array.from(this.roomMembers.entries()));
-      console.log(`👥 Mock DB: All users in system:`, Array.from(this.users.entries()));
+      dbLogger.debug('Mock DB getting members for room', { roomId });
+      dbLogger.debug('Mock DB all room members in system', { roomMembers: Array.from(this.roomMembers.entries()) });
+      dbLogger.debug('Mock DB all users in system', { users: Array.from(this.users.entries()) });
       
       // Find all members for this room
       const memberUserIds = Array.from(this.roomMembers.values())
         .filter(member => {
           const matches = member.room_id === roomId || member.room_id === Number(roomId);
-          console.log(`👥 Mock DB: Comparing member.room_id ${member.room_id} (${typeof member.room_id}) with ${roomId} (${typeof roomId}): ${matches}`);
+          dbLogger.debug('Mock DB comparing member.room_id with roomId', {
+            memberRoomId: member.room_id,
+            memberRoomIdType: typeof member.room_id,
+            roomId,
+            roomIdType: typeof roomId,
+            matches
+          });
           return matches;
         })
         .map(member => member.user_id);
         
-      console.log(`👥 Mock DB: Found member IDs for room ${roomId}: [${memberUserIds.join(', ')}]`);
+      dbLogger.debug('Mock DB found member IDs for room', { roomId, memberUserIds });
       
       // Get user details for each member
       const members = memberUserIds.map(userId => {
@@ -185,11 +192,11 @@ class SimpleDatabaseMock implements MockDatabase {
         if (!user) {
           user = this.users.get(Number(userId));
         }
-        console.log(`👤 Mock DB: Looking up user ${userId}:`, user);
+        dbLogger.debug('Mock DB looking up user', { userId, userFound: Boolean(user) });
         return user;
       }).filter(user => user !== undefined);
         
-      console.log(`👥 Mock DB: Returning ${members.length} members:`, members);
+      dbLogger.debug('Mock DB returning members', { roomId, memberCount: members.length });
       return members;
     }
     
@@ -210,7 +217,7 @@ class SimpleDatabaseMock implements MockDatabase {
   }
 
   async close(): Promise<void> {
-    console.log('📁 Mock database connection closed');
+    dbLogger.debug('Mock database connection closed');
   }
 }
 
@@ -255,10 +262,10 @@ export class DatabaseManager {
 
     if (useSQLite) {
       this.db = new SQLiteDatabase(dbPath);
-      console.log(`✅ Using real SQLite database: ${dbPath}`);
+      dbLogger.info('Using real SQLite database', { dbPath });
       
       // Run migrations to create schema
-      console.log('🔄 Running database migrations...');
+      dbLogger.info('Running database migrations');
       const { MigrationRunner } = await import('./MigrationRunner');
       const migrationRunner = new MigrationRunner(this.db as SQLiteDatabase);
       
@@ -288,8 +295,8 @@ export class DatabaseManager {
     } else {
       // Fallback to mock database ONLY if better-sqlite3 is not installed
       this.db = new SimpleDatabaseMock();
-      console.log(`📁 Mock Database connected for development: ${dbPath}`);
-      console.log(`ℹ️  To use real SQLite, install: npm install better-sqlite3 @types/better-sqlite3`);
+      dbLogger.warn('Using mock database (better-sqlite3 not installed)', { dbPath });
+      dbLogger.info('To use real SQLite, install: npm install better-sqlite3 @types/better-sqlite3');
     }
   }
 
@@ -305,13 +312,15 @@ export class DatabaseManager {
 
   // Transaction helper
   public async transaction<T>(fn: (db: DatabaseInterface) => Promise<T>): Promise<T> {
-    console.log('🔄 Starting transaction');
+    dbLogger.debug('Starting transaction');
     try {
       const result = await fn(this.db);
-      console.log('✅ Transaction committed');
+      dbLogger.debug('Transaction committed');
       return result;
     } catch (error) {
-      console.log('❌ Transaction rolled back');
+      dbLogger.warn('Transaction rolled back', {
+        error: error instanceof Error ? error.message : String(error)
+      });
       throw error;
     }
   }

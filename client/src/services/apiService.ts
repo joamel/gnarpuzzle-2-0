@@ -1,5 +1,6 @@
 import { Game } from '../../../shared/types.js';
 import type { MyStatsResponse } from '../types/stats';
+import { logger } from '../utils/logger';
 
 const API_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
 
@@ -74,15 +75,18 @@ class ApiService {
           ) {
             throw new Error(errorMessage);
           }
-          
-          console.warn(`Authentication failed (${response.status}) - attempting token refresh`);
+
+          logger.auth.info('Authentication failed - attempting token refresh', {
+            status: response.status,
+            endpoint,
+          });
           
           // Try to refresh the token. Only clear token/redirect if refresh fails.
           let refreshResponse: { token: string; user: any };
           try {
             refreshResponse = await this.refreshToken();
           } catch (refreshError) {
-            console.warn('❌ Token refresh failed, redirecting to login:', refreshError);
+            logger.auth.warn('Token refresh failed, redirecting to login', { refreshError });
             this.clearToken();
             window.location.href = '/';
             return Promise.reject(new Error('Session expired - please log in again'));
@@ -92,9 +96,9 @@ class ApiService {
 
           // Log if user was recreated
           if ((refreshResponse as any).recreated) {
-            console.log('ℹ️ User was recreated during token refresh - continuing with new token');
+            logger.auth.info('User was recreated during token refresh - continuing with new token');
           } else {
-            console.log('✅ Token refreshed successfully, retrying original request');
+            logger.auth.info('Token refreshed successfully, retrying original request');
           }
 
           // Retry the original request with new token
@@ -129,7 +133,7 @@ class ApiService {
         (endpoint === '/api/auth/password' && (lower.includes('current password is incorrect') || lower.includes('invalid credentials')));
 
       if (!isExpectedAuthFailure) {
-        console.error(`API Error (${endpoint}):`, error);
+        logger.api.error('API Error', { endpoint, error });
       }
       throw error;
     }
@@ -235,15 +239,15 @@ class ApiService {
 
   // Game endpoints
   async startGame(roomId: number): Promise<Game> {
-    console.log('🌐 ApiService.startGame called with roomId:', roomId);
+    logger.api.debug('startGame called', { roomId });
     const endpoint = `/api/rooms/${roomId}/start`;
-    console.log('📍 Making POST request to:', endpoint);
+    logger.api.debug('Making POST request', { endpoint });
     
     try {
       const result = await this.request<Game>(endpoint, { method: 'POST' });
       return result;
     } catch (error) {
-      console.error('❌ ApiService.startGame failed:', error);
+      logger.api.error('startGame failed', { error, roomId });
       throw error;
     }
   }

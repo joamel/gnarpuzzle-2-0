@@ -2,6 +2,7 @@ import React, { useEffect, Suspense, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { GameProvider } from './contexts/GameContext';
+import { logger } from './utils/logger';
 import './styles/global.css';
 import './styles/mobile.css';
 // Removed PWA styles to avoid conflicts
@@ -40,7 +41,7 @@ function App() {
     if ('serviceWorker' in navigator && import.meta.env.DEV) {
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
         for(let registration of registrations) {
-          console.log('Unregistering Service Worker:', registration.scope);
+          logger.pwa.debug('Unregistering Service Worker', { scope: registration.scope });
           registration.unregister();
         }
       });

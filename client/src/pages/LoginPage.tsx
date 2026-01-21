@@ -99,7 +99,7 @@ const LoginPage: React.FC = () => {
   return (
     <div className="login-page">
       <header className="page-header login-header-bar">
-        <Logo size="small" showText={true} />
+        <Logo size="small" showText={true} showTagline={true} />
       </header>
       <div className="login-container">
         <form onSubmit={handleSubmit} className="login-form">

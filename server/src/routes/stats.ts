@@ -2,6 +2,9 @@ import express from 'express';
 import { getSocketService } from '../index';
 import { AuthService, AuthenticatedRequest } from '../services/AuthService';
 import { DatabaseManager } from '../config/database';
+import { createCategoryLogger } from '../utils/logger';
+
+const statsLogger = createCategoryLogger('STATS');
 
 const router = express.Router();
 
@@ -61,7 +64,9 @@ router.get('/online', (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error getting online stats:', error);
+    statsLogger.error('Error getting online stats', {
+      error: error instanceof Error ? error.message : String(error)
+    });
     res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to get online statistics'
@@ -111,7 +116,9 @@ router.get('/summary', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error getting game stats:', error);
+    statsLogger.error('Error getting game stats', {
+      error: error instanceof Error ? error.message : String(error)
+    });
     res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to get game statistics'
@@ -212,7 +219,9 @@ router.get('/me', AuthService.authenticateToken, async (req, res) => {
       stats
     });
   } catch (error) {
-    console.error('Error getting personal stats:', error);
+    statsLogger.error('Error getting personal stats', {
+      error: error instanceof Error ? error.message : String(error)
+    });
     res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to get personal statistics'

@@ -8,6 +8,7 @@ import OnlineStats from '../components/OnlineStats';
 import UserMenu from '../components/UserMenu';
 import Logo from '@/assets/Logo';
 import { socketService } from '../services/socketService';
+import { logger } from '../utils/logger';
 
 // Lazy load GameInterface for better performance
 const GameInterface = React.lazy(() => import('../components/GameInterface').then(module => ({ 
@@ -30,13 +31,13 @@ const GamePage: React.FC = () => {
     
     if (roomCode && !currentRoom) {
       // Auto-join room from shared link
-      console.log('🔗 Auto-joining room from shared link:', roomCode);
+      logger.room.info('Auto-joining room from shared link', { roomCode });
       joinRoom(roomCode, password || undefined).then(() => {
-        console.log('✅ Successfully joined room from shared link');
+        logger.room.info('Successfully joined room from shared link', { roomCode });
         // Clear URL parameters after joining
         navigate('/game', { replace: true });
       }).catch((error) => {
-        console.error('❌ Failed to join room from shared link:', error);
+        logger.room.error('Failed to join room from shared link', { roomCode, error });
         alert(`Kunde inte gå med i rummet: ${error.message || 'Okänt fel'}`);
         navigate('/', { replace: true });
       });
@@ -44,7 +45,11 @@ const GamePage: React.FC = () => {
   }, [location.search, currentRoom, joinRoom, navigate]);
 
   useEffect(() => {
-    console.log('🎮 [GamePage] useEffect - currentRoom:', currentRoom?.code || 'NULL', 'currentGame:', !!currentGame, 'gamePhase:', gamePhase);
+    logger.game.debug('GamePage state', {
+      currentRoom: currentRoom?.code ?? null,
+      hasCurrentGame: !!currentGame,
+      gamePhase,
+    });
     
     if (currentGame && (gamePhase === 'letter_selection' || gamePhase === 'letter_placement')) {
       setGameStarted(true);
@@ -75,7 +80,7 @@ const GamePage: React.FC = () => {
         wakeLock = await nav.wakeLock.request('screen');
       } catch (e) {
         // Wake Lock is best-effort (requires secure context and user gesture in some browsers)
-        console.debug('WakeLock request failed:', (e as Error).message);
+        logger.game.debug('WakeLock request failed', { message: (e as Error).message });
       }
     };
 
@@ -126,7 +131,7 @@ const GamePage: React.FC = () => {
   };
 
   if (!currentRoom) {
-    console.log('🎮 [GamePage] Rendering "not in room" screen');
+    logger.room.debug('Rendering "not in room" screen');
     return (
       <div className="no-room">
         <p>Du är inte i något rum just nu.</p>

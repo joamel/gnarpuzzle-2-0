@@ -1,5 +1,5 @@
 import { Server as SocketServer, Socket } from 'socket.io';
-import { logger } from '../utils/logger';
+import { authLogger, gameLogger, logger, socketLogger } from '../utils/logger';
 import { GameStateService } from './GameStateService';
 import { AuthService } from './AuthService';
 
@@ -164,7 +164,7 @@ export class SocketService {
         return;
       }
 
-      console.log('JWT decoded payload:', decoded);
+      authLogger.debug('JWT decoded payload', { userId: decoded.userId, username: decoded.username });
 
       const userData = {
         userId: decoded.userId,
@@ -282,7 +282,11 @@ export class SocketService {
     const { roomCode } = data;
     const userData = this.connectedUsers.get(socket.id);
 
-    console.log(`🚪 handleRoomJoin called: roomCode=${roomCode}, userId=${userData?.userId}, username=${userData?.username}`);
+    socketLogger.debug('handleRoomJoin called', {
+      roomCode,
+      userId: userData?.userId,
+      username: userData?.username,
+    });
 
     if (!userData?.userId) {
       socket.emit('error', { message: 'Not authenticated' });
@@ -342,11 +346,11 @@ export class SocketService {
         roomCode,
         readyPlayers: Array.from(this.roomPlayerReadyStatus.get(roomCode) || []).map(String)
       });
-      
-      console.log('📢 Broadcasting room:member_joined to other players:', {
+
+      socketLogger.debug('Broadcasting room:member_joined to other players', {
         newJoiner: userData.username,
         roomCode,
-        readyPlayers: Array.from(this.roomPlayerReadyStatus.get(roomCode) || []).map(String)
+        readyPlayers: Array.from(this.roomPlayerReadyStatus.get(roomCode) || []).map(String),
       });
 
       // Send room data to joining user
@@ -365,11 +369,11 @@ export class SocketService {
         },
         readyPlayers: Array.from(this.roomPlayerReadyStatus.get(roomCode) || []).map(String)
       });
-      
-      console.log('✅ Emitting room:joined event with readyPlayers:', {
+
+      socketLogger.debug('Emitting room:joined event with readyPlayers', {
         roomCode,
         userId: userData.userId,
-        readyPlayers: Array.from(this.roomPlayerReadyStatus.get(roomCode) || []).map(String)
+        readyPlayers: Array.from(this.roomPlayerReadyStatus.get(roomCode) || []).map(String),
       });
 
       // If room has an active game, sync game state to the reconnecting player
@@ -378,7 +382,12 @@ export class SocketService {
         const activeGame = await GameModel.findByRoomId(room.id);
         
         if (activeGame && activeGame.state !== 'finished') {
-          console.log(`🎮 Room ${roomCode} has active game ${activeGame.id} - syncing state to reconnecting player`);
+          gameLogger.debug('Room has active game; syncing state to reconnecting player', {
+            roomCode,
+            gameId: activeGame.id,
+            userId: userData.userId,
+            username: userData.username,
+          });
           
           // Get all players in the game
           const { PlayerModel } = await import('../models');
@@ -441,8 +450,13 @@ export class SocketService {
               timer_end: activeGame.phase_timer_end,
               players: mappedPlayers
             });
-            
-            console.log(`✅ Synced game state with ${mappedPlayers.length} players to reconnecting player ${userData.username}`);
+
+            gameLogger.debug('Synced game state to reconnecting player', {
+              userId: userData.userId,
+              username: userData.username,
+              gameId: activeGame.id,
+              players: mappedPlayers.length,
+            });
           }
         }
       } catch (gameSyncError) {
@@ -544,12 +558,12 @@ export class SocketService {
         readySet.delete(userData.userId);
       }
       
-      console.log('🔵 Player ready status updated:', {
+      socketLogger.debug('Player ready status updated', {
         roomCode,
         userId: userData.userId,
         username: userData.username,
         isReady,
-        totalReady: Array.from(readySet)
+        totalReady: Array.from(readySet),
       });
 
       // Broadcast ready status to all players in the room (including sender)
@@ -1062,13 +1076,12 @@ export class SocketService {
     const roomName = `room:${roomCode}`;
     const room = this.io.sockets.adapter.rooms.get(roomName);
     const socketCount = room ? room.size : 0;
-    
-    logger.info(`📡 emitToRoom: Sending ${event} to ${roomName} (${socketCount} sockets in room)`, {
-      service: 'gnarpuzzle-server',
+
+    socketLogger.debug('emitToRoom', {
       roomCode,
       event,
       socketCount,
-      socketIds: room ? Array.from(room) : []
+      socketIds: room ? Array.from(room) : [],
     });
     
     this.io.to(roomName).emit(event, data);
@@ -1079,9 +1092,9 @@ export class SocketService {
   }
 
   public broadcastToRoom(room: string, event: string, data: any): void {
-    console.log(`📡 SocketService.broadcastToRoom: room=${room}, event=${event}, data=`, data);
+    socketLogger.debug('broadcastToRoom', { room, event });
     this.io.to(room).emit(event, data);
-    console.log(`✅ Socket event broadcasted to room ${room}`);
+    socketLogger.debug('Socket event broadcasted', { room, event });
   }
 
   public emitToUser(socketId: string, event: string, data: any): void {

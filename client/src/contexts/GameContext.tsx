@@ -58,7 +58,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   // DEBUG: Track provider renders and auth changes
   const renderCountRef = useRef(0);
   renderCountRef.current++;
-  console.log(`🏗️ [GameProvider] Render #${renderCountRef.current}, user:`, user?.username, 'user id:', user?.id);
+  logger.game.debug(`Render #${renderCountRef.current}`, { username: user?.username, userId: user?.id });
   
   const [currentGame, setCurrentGame] = useState<GameState | null>(null);
   
@@ -106,29 +106,27 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
 
   // DEBUG: Track provider lifecycle
   useEffect(() => {
-    console.log(`🏗️ [GameProvider] MOUNTED`);
-    // Test if debug logger catches this
-    setTimeout(() => {
-      console.log('🧪 [TEST] Debug logger should catch this delayed log');
-    }, 2000);
+    logger.game.debug('GameProvider mounted');
     return () => {
-      console.log(`🏗️ [GameProvider] UNMOUNTING`);
+      logger.game.debug('GameProvider unmounting');
     };
   }, []);
 
   // Debug: Log currentRoom changes with detailed stack trace
   useEffect(() => {
     if (currentRoom) {
-      console.log('🔍 [GameContext] currentRoom changed:', `${currentRoom.code} (${currentRoom.status})`);
+      logger.room.debug('currentRoom changed', { code: currentRoom.code, status: currentRoom.status });
     } else {
       const stack = new Error().stack || '';
       const stackLines = stack.split('\n');
       const caller1 = stackLines[3]?.trim() || 'unknown';
       const caller2 = stackLines[4]?.trim() || '';
-      console.log('🔍 [GameContext] currentRoom changed: NULL');
-      console.log('   └─ Called from:', caller1);
-      if (caller2) console.log('   └─ Called from:', caller2);
-      console.log('   └─ App is hidden:', appIsHiddenRef.current, 'reconnect in progress:', reconnectInProgressRef.current);
+      logger.room.debug('currentRoom changed: NULL', {
+        caller1,
+        caller2: caller2 || undefined,
+        appIsHidden: appIsHiddenRef.current,
+        reconnectInProgress: reconnectInProgressRef.current
+      });
     }
   }, [currentRoom]);
 
@@ -169,13 +167,13 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     // DEBUG: Log ALL socket events to catch unexpected ones
     const debugLogAllEvents = (eventName: string, ...args: any[]) => {
       if (eventName !== 'connect' && eventName !== 'disconnect' && eventName !== 'connect_error') {
-        console.log(`🔌 [SOCKET EVENT] ${eventName}:`, args);
+        logger.socket.debug(`Socket event: ${eventName}`, { args });
       }
     };
     
     // Register debug listener if socket exists
     const socket = socketService.getSocket();
-    console.log('🔌 Registering debug listener, socket exists:', !!socket);
+    logger.socket.debug('Registering debug listener', { socketExists: !!socket });
     if (socket) {
       socket.onAny(debugLogAllEvents);
     }
@@ -192,11 +190,11 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       // Set selected letter when entering placement phase (robustness for missed letter:selected events)
       if (data.phase === 'letter_placement') {
         if (data.current_letter) {
-          console.log('✅ Phase change included current_letter:', data.current_letter);
+          logger.game.debug('Phase change included current_letter', { current_letter: data.current_letter });
           setSelectedLetter(data.current_letter);
         } else if (data.gameId && user) {
           // Fallback: Fetch from API if letter not included in event
-          console.warn('⚠️ Phase change missing current_letter, fetching from API');
+          logger.game.debug('Phase change missing current_letter; fetching from API');
           try {
             const gameData = await apiService.getGame(data.gameId);
             const currentPlayer = gameData?.game?.players?.find((p: any) => p.user_id === user.id);
@@ -247,11 +245,10 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     };
 
     const handleLetterSelected = (data: any) => {
-      console.log('🔤 Letter selected event received:', {
+      logger.game.debug('Letter selected event received', {
         letter: data.letter,
         playerId: data.playerId,
         turn: data.turn,
-        timestamp: new Date().toLocaleTimeString()
       });
       
       // All players should get the selected letter to place on their own grids
@@ -289,7 +286,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
 
     const handleGameEnded = (data: any) => {
       try {
-        console.log('🎮 [game:ended] Event received, data:', data);
+        logger.game.debug('game:ended event received', { data });
         // Parse grid and words data if they are JSON strings
         const parsedLeaderboard = (data.leaderboard || []).map((player: any) => {
           try {
@@ -299,7 +296,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
               words: typeof player.words === 'string' ? JSON.parse(player.words) : player.words
             };
           } catch (parseError) {
-            console.error('❌ Error parsing player leaderboard data:', parseError, player);
+            logger.game.error('Error parsing player leaderboard data', { parseError, player });
             return {
               ...player,
               grid: player.grid,
@@ -328,11 +325,11 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
 
         // Update room status back to waiting
         if (currentRoom && currentRoom.code) {
-          console.log('🎮 game:ended event handler - updating room status');
+          logger.room.debug('game:ended handler updating room status to waiting', { roomCode: currentRoom.code });
           // Only update if we have a valid room with a code
           setCurrentRoom(prev => prev && prev.code ? { ...prev, status: 'waiting' } : prev);
         } else if (currentRoom) {
-          console.warn('⚠️ Cannot update room status - room missing code property:', currentRoom);
+          logger.room.warn('Cannot update room status - room missing code property', { currentRoom });
         }
       } catch (error) {
         logger.game.error('Error handling game ended event', { error, data });
@@ -364,7 +361,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       
       // If players are included in the event (reconnection), set them immediately
       if (data.players && Array.isArray(data.players) && data.players.length > 0) {
-        console.log('🎮 Setting players from game:started event:', data.players.length);
+        logger.game.debug('Setting players from game:started event', { count: data.players.length });
         setPlayers(data.players);
       }
       
@@ -394,7 +391,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
             const game = gameData.game;
 
 
-            console.log('🔍 API game keys:', Object.keys(game));
+            logger.api.debug('Fetched game keys', { keys: Object.keys(game) });
 
             // Only update gamePhase if API has valid phase, otherwise keep socket phase
             if (game.current_phase) {
@@ -416,15 +413,19 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
               try {
 
                 const mappedPlayers = game.players.map((p: any, index: number) => {
-                  console.log(`🎯 Processing player ${index + 1}:`, {
+                  logger.game.debug('Processing player from game state', {
+                    index: index + 1,
                     id: p.id,
                     user_id: p.user_id,
                     position: p.position,
                     username: p.username,
                     grid_state_type: typeof p.grid_state,
-                    grid_state_sample: typeof p.grid_state === 'string' 
-                      ? p.grid_state.substring(0, 100) + '...' 
-                      : p.grid_state ? 'parsed object' : 'null'
+                    grid_state_sample:
+                      typeof p.grid_state === 'string'
+                        ? `${p.grid_state.substring(0, 100)}...`
+                        : p.grid_state
+                          ? 'parsed object'
+                          : 'null',
                   });
                   
                   let parsedGrid;
@@ -438,8 +439,11 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
                       throw new Error('Invalid grid_state format');
                     }
                   } catch (parseError) {
-                    console.warn(`⚠️ Failed to parse grid_state for player ${p.user_id}:`, (parseError as Error).message);
-                    console.warn(`Grid state content:`, p.grid_state);
+                    logger.game.warn('Failed to parse grid_state for player; using default grid', {
+                      userId: p.user_id,
+                      message: (parseError as Error).message,
+                      grid_state: p.grid_state,
+                    });
                     // Create default grid based on room settings
                     const gridSize = currentRoom?.board_size || 5;
                     parsedGrid = Array(gridSize).fill(null).map((_, y) => 
@@ -466,15 +470,15 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
                 });
 
                 setPlayers(mappedPlayers);
-                
-                console.log('👥 Setting players with position data:', 
-                  mappedPlayers.map((p: Player) => ({ 
-                    userId: p.userId, 
-                    username: p.username, 
-                    position: p.position, 
-                    positionType: typeof p.position 
-                  }))
-                );
+
+                logger.game.debug('Setting players with position data', {
+                  players: mappedPlayers.map((p: Player) => ({
+                    userId: p.userId,
+                    username: p.username,
+                    position: p.position,
+                    positionType: typeof p.position,
+                  })),
+                });
                 
                 // Set selectedLetter for current user if they have a current letter
                 if (user) {
@@ -485,7 +489,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
                   }
                 }
               } catch (mappingError) {
-                console.error('❌ Error during player mapping:', mappingError);
+                logger.game.error('Error during player mapping', { mappingError });
 
                 // Fallback: Set basic game phase from socket data
                 if (data.phase) {
@@ -502,7 +506,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
             }
           }
         }).catch(err => {
-          console.error('❌ Failed to fetch game state:', err);
+          logger.api.error('Failed to fetch game state', { err });
 
           // Fallback: Set basic game phase from socket data
           if (data.phase) {
@@ -545,7 +549,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     const handleRoomMemberLeft = (data: any) => {
       // Don't process if WE are the one who left (screen lock, disconnect, etc)
       if (user && data.user && Number(data.user.id) === Number(user.id)) {
-        console.log('🚪 Ignoring room:member_left for self (likely screen lock/disconnect)');
+        logger.room.debug('Ignoring room:member_left for self (likely screen lock/disconnect)');
         return;
       }
 
@@ -593,7 +597,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
           } : prev); // NEVER return null - keep room
         }
       } catch (error) {
-        console.error('❌ Error handling ownership transferred event:', error, data);
+        logger.room.error('Error handling ownership transferred event', { error, data });
       }
     };
 
@@ -603,10 +607,10 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         if (currentRoom && data.room && data.room.code === currentRoom.code) {
           setCurrentRoom(data.room);
         } else if (currentRoom && !data.room) {
-          console.warn('⚠️ room:updated event received with null/invalid room data, ignoring');
+          logger.room.debug('room:updated event received with null/invalid room data, ignoring');
         }
       } catch (error) {
-        console.error('❌ Error handling room updated event:', error, data);
+        logger.room.error('Error handling room updated event', { error, data });
       }
     };
 
@@ -684,7 +688,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
             // Ignore errors during page unload
           });
         } catch (error) {
-          console.warn('Failed to leave room on page unload:', error);
+          logger.room.debug('Failed to leave room on page unload', { error });
         }
       }
     };
@@ -710,11 +714,11 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
 
       const game = await apiService.startGame(roomId);
 
-      console.log('🎮 Game object structure:', {
+      logger.game.debug('Game object structure', {
         game,
         gameKeys: game ? Object.keys(game) : 'no game',
-        gameState: game?.state,
-        gameId: game?.id
+        gameState: (game as any)?.state,
+        gameId: (game as any)?.id,
       });
       
       // Convert Game to GameState format for our context
@@ -833,25 +837,26 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     
     if (!currentGame || !currentPlayer || !letterToUse) {
       const error = `Cannot place letter: game=${!!currentGame}, player=${!!currentPlayer}, letter=${letterToUse}`;
-      console.error('❌', error);
+      logger.game.error('Cannot place letter', { error });
       throw new Error(error);
     }
 
-    console.log('📍 placeLetter called:', {
+    logger.game.debug('placeLetter called', {
       gameId: currentGame.id,
       playerId: currentPlayer.userId,
-      position: `(${x}, ${y})`,
+      x,
+      y,
       selectedLetter,
       letterOverride,
       letterToUse,
-      gamePhase
+      gamePhase,
     });
 
     try {
       await apiService.placeLetter(currentGame.id, currentPlayer.userId, x, y);
-      console.log('✅ placeLetter API call successful');
+      logger.game.debug('placeLetter API call successful');
     } catch (err) {
-      console.error('❌ placeLetter API call failed:', err);
+      logger.game.error('placeLetter API call failed', { err });
       const message = err instanceof Error ? err.message : 'Failed to place letter';
       setError(message);
       throw err;
@@ -860,15 +865,15 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
 
   const setPlacementIntent = useCallback(async () => {
     if (!currentGame) {
-      console.error('❌ setPlacementIntent: No current game');
+      logger.game.error('setPlacementIntent: No current game');
       throw new Error('No active game');
     }
 
     try {
       await apiService.setPlacementIntent(currentGame.id);
-      console.log('✅ Placement intent set successfully');
+      logger.game.debug('Placement intent set successfully');
     } catch (err) {
-      console.error('❌ setPlacementIntent failed:', err);
+      logger.game.error('setPlacementIntent failed', { err });
       const message = err instanceof Error ? err.message : 'Failed to set placement intent';
       setError(message);
       throw err;
@@ -920,21 +925,23 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         // ignore storage errors (private mode, etc)
       }
 
-      console.log('🏠 Room object keys:', Object.keys(room));
-      console.log('📝 Room object:', JSON.stringify({
-        code: room.code,
-        id: room.id,
-        status: room.status,
-        name: room.name,
-        members: room.members ? room.members.length : 0
-      }));
-      console.log('📝 Setting currentRoom state to:', room.code);
+      logger.room.debug('Joined room', {
+        keys: Object.keys(room),
+        room: {
+          code: room.code,
+          id: room.id,
+          status: room.status,
+          name: room.name,
+          members: room.members ? room.members.length : 0,
+        },
+      });
+      logger.room.debug('Setting currentRoom state', { roomCode: room.code });
       setCurrentRoom(room);
-      console.log('📝 setCurrentRoom() called (async update scheduled)');
+      logger.room.debug('setCurrentRoom() called (async update scheduled)');
       
       // Initialize players based on room members (for UI display)
       if (room.members && room.members.length > 0) {
-        console.log('👥 Setting players based on room members:', room.members.length);
+        logger.room.debug('Setting players based on room members', { count: room.members.length });
         const roomPlayers: Player[] = room.members.map((member: any, index: number) => {
           const gridSize = room.board_size || 5;
           return {
@@ -959,7 +966,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       // If room is playing, fetch the active game
       if (room.status === 'playing') {
         try {
-          console.log('🎮 Room is playing, fetching active game...');
+          logger.game.debug('Room is playing, fetching active game');
           const gameResponse = await apiService.getGameByRoomId(room.id);
           if (gameResponse && gameResponse.game) {
             const game = gameResponse.game;
@@ -972,10 +979,10 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
             };
             setCurrentGame(gameState);
             setGamePhase('letter_selection'); // Will be updated by socket
-            console.log('🎮 Restored game state:', gameState);
+            logger.game.debug('Restored game state', { gameState });
           }
         } catch (gameErr) {
-          console.error('Failed to fetch active game:', gameErr);
+          logger.api.error('Failed to fetch active game', { gameErr });
           // Don't fail the join if we can't fetch game - socket will sync
         }
       }
@@ -995,15 +1002,15 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
 
   const leaveRoom = useCallback(async (intentional: boolean = false) => {
     if (!currentRoom || !currentRoom.code) {
-      console.log('🚪 leaveRoom() skipped - no room or invalid room code:', { 
-        hasRoom: !!currentRoom, 
-        roomCode: currentRoom?.code 
+      logger.room.debug('leaveRoom() skipped - no room or invalid room code', {
+        hasRoom: !!currentRoom,
+        roomCode: currentRoom?.code,
       });
       return;
     }
     
     try {
-      console.log('🚪 leaveRoom() called - intentional:', intentional, 'room:', currentRoom.code);
+      logger.room.debug('leaveRoom() called', { intentional, roomCode: currentRoom.code });
       
       // Set flag to prevent reconnect attempts
       if (intentional) {
@@ -1018,7 +1025,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       if (intentional) {
         sessionStorage.removeItem(`room_joined_${currentRoom.code}`);
       }
-      console.log('🚪 [leaveRoom] Clearing currentRoom and game state, room:', currentRoom.code, 'intentional:', intentional);
+      logger.room.debug('[leaveRoom] Clearing currentRoom and game state', { roomCode: currentRoom.code, intentional });
       
       // Always clear state when leaving room - the safety check was too restrictive
       // This ensures UI state stays in sync regardless of how leaveRoom was called
@@ -1047,7 +1054,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         appIsHiddenRef.current = true;
         reconnectInProgressRef.current = false; // Reset if screen locks while reconnecting
         if (currentRoom) {
-          console.log('📱 App went to background, user is in room:', currentRoom.code);
+          logger.room.debug('App went to background, user is in room', { roomCode: currentRoom.code });
         }
       } else {
         // App came back to foreground
@@ -1055,20 +1062,20 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         
         // Prevent duplicate reconnect attempts
         if (reconnectInProgressRef.current) {
-          console.log('⏳ Reconnect already in progress, skipping...');
+          logger.room.debug('Reconnect already in progress, skipping');
           return;
         }
         
         // Don't reconnect if user intentionally left
         if (isIntentionallyLeavingRef.current) {
-          console.log('🚪 User intentionally left, not reconnecting');
+          logger.room.debug('User intentionally left, not reconnecting');
           isIntentionallyLeavingRef.current = false;
           return;
         }
         
         // Don't reconnect if already in a room (state update may be pending, check refs)
         if (currentRoom) {
-          console.log('✅ Already in room:', currentRoom.code);
+          logger.room.debug('Already in room', { roomCode: currentRoom.code });
           return;
         }
         
@@ -1076,7 +1083,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         const sessionKeys = Object.keys(sessionStorage).filter(key => key.startsWith('room_joined_'));
         
         if (sessionKeys.length === 0) {
-          console.log('⚠️ No session records found, no reconnection needed');
+          logger.room.debug('No session records found, no reconnection needed');
           return;
         }
         
@@ -1086,17 +1093,17 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         
         try {
           reconnectInProgressRef.current = true;
-          console.log('🔄 Found session record for room:', roomCode, '- attempting reconnect');
+          logger.room.info('Found session record - attempting reconnect', { roomCode });
           
           // Wait a bit for socket to reconnect after visibility change
           await new Promise(resolve => setTimeout(resolve, 500));
-          console.log('⏳ Waiting for socket connection...');
+          logger.socket.debug('Waiting for socket connection');
           
           // Use the full joinRoom flow (updates state, joins socket, etc)
           await joinRoom(roomCode);
-          console.log('✅ Successfully reconnected to room:', roomCode);
+          logger.room.info('Successfully reconnected to room', { roomCode });
         } catch (error) {
-          console.warn('⚠️ Failed to reconnect to room on visibility change:', error);
+          logger.room.warn('Failed to reconnect to room on visibility change', { error, roomCode });
           // Clear the session storage if reconnect fails
           sessionStorage.removeItem(sessionKey);
         } finally {

@@ -29,8 +29,35 @@ class ClientLogger {
 
   constructor() {
     this.isDevelopment = import.meta.env.DEV;
-    // Production: WARN only, Development: DEBUG
-    this.level = this.isDevelopment ? LogLevel.DEBUG : LogLevel.WARN;
+
+    // Default behavior:
+    // - Production: WARN (keep console mostly clean)
+    // - Development: WARN by default, opt-in to verbose via localStorage
+    //   localStorage.setItem('gnarpuzzle_log_level', 'debug' | 'info' | 'warn' | 'error')
+    const stored = this.isDevelopment ? this.getStoredLevel() : null;
+    this.level = stored ?? LogLevel.WARN;
+  }
+
+  private getStoredLevel(): LogLevel | null {
+    try {
+      const raw = localStorage.getItem('gnarpuzzle_log_level');
+      if (!raw) return null;
+
+      switch (raw.toLowerCase()) {
+        case 'error':
+          return LogLevel.ERROR;
+        case 'warn':
+          return LogLevel.WARN;
+        case 'info':
+          return LogLevel.INFO;
+        case 'debug':
+          return LogLevel.DEBUG;
+        default:
+          return null;
+      }
+    } catch {
+      return null;
+    }
   }
 
   private shouldLog(level: LogLevel): boolean {
@@ -115,6 +142,13 @@ class ClientLogger {
     warn: (msg: string, data?: any) => this.warn('API', msg, data),
     info: (msg: string, data?: any) => this.info('API', msg, data),
     debug: (msg: string, data?: any) => this.debug('API', msg, data),
+  };
+
+  pwa = {
+    error: (msg: string, data?: any) => this.error('PWA', msg, data),
+    warn: (msg: string, data?: any) => this.warn('PWA', msg, data),
+    info: (msg: string, data?: any) => this.info('PWA', msg, data),
+    debug: (msg: string, data?: any) => this.debug('PWA', msg, data),
   };
 
   auth = {

@@ -52,6 +52,14 @@ npm run dev
 - ✅ 15-sekunders timers för val och placering
 - ✅ Smart poängsystem
 
+### Online & Konton
+- ✅ Inloggade spelare + gäster (anonyma) stöds
+- ✅ Online-statistik räknar både inloggade och gäster (returnerar total + uppdelning)
+
+### Logging (endast i dev)
+- ✅ Frontend: tyst som standard (WARN) i dev, opt-in via `localStorage.gnarpuzzle_log_level = debug|info|warn|error`
+- ✅ Backend: strukturerad logging med nivåer; använd `LOG_LEVEL=debug` vid felsökning (production default är `info`)
+
 ### Mobile Experience
 - 📱 Touch-optimerade kontroller
 - 📳 Haptic feedback (vibrationer)
@@ -60,9 +68,9 @@ npm run dev
 - 📦 PWA installation
 
 ### Technical Stack
-- **Frontend**: React 18, TypeScript, Tailwind CSS, Vite
-- **Backend**: Node.js, Express, Socket.IO, PostgreSQL
-- **Testing**: Jest, Playwright, React Testing Library
+- **Frontend**: React 18, TypeScript, Vite
+- **Backend**: Node.js, Express, Socket.IO, SQLite (better-sqlite3)
+- **Testing**: Vitest, React Testing Library
 - **Deployment**: Docker, Railway/Vercel
 
 ## 🗂️ Development Phases

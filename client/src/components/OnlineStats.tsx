@@ -42,8 +42,11 @@ const OnlineStats: React.FC<OnlineStatsProps> = ({ className = '' }) => {
 
   return (
     <div className={`online-stats ${className}`}>
-      <span className="online-indicator">
-        🟢 {stats.authenticated} online
+      <span
+        className="online-indicator"
+        title={`Konton: ${stats.authenticated}, Gäster/okända: ${stats.anonymous}`}
+      >
+        🟢 {stats.total} spelare online
       </span>
     </div>
   );

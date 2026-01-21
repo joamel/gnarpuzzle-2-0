@@ -1,6 +1,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { GridCell } from '../models/types';
+import { createCategoryLogger } from '../utils/logger';
+
+const wordLogger = createCategoryLogger('WORDS');
 
 export interface WordScore {
   word: string;
@@ -55,7 +58,7 @@ export class WordValidationService {
         try {
           await fs.promises.access(p);
           dictPath = p;
-          console.log(`✅ Found dictionary at: ${dictPath}`);
+          wordLogger.info('Found dictionary', { dictPath });
           break;
         } catch {
           // Try next path
@@ -77,15 +80,20 @@ export class WordValidationService {
           }
         });
 
-        console.log(`✅ Swedish dictionary loaded: ${this.swedishWords.size} words`);
+        wordLogger.info('Swedish dictionary loaded', { wordCount: this.swedishWords.size });
       } catch (fileError: any) {
-        console.error('❌ Failed to read dictionary file:', fileError);
+        wordLogger.error('Failed to read dictionary file', {
+          dictPath,
+          error: fileError instanceof Error ? fileError.message : String(fileError)
+        });
         throw fileError;
       }
       
       this.isLoaded = true;
     } catch (error) {
-      console.error('❌ Failed to load Swedish dictionary:', error);
+      wordLogger.error('Failed to load Swedish dictionary', {
+        error: error instanceof Error ? error.message : String(error)
+      });
       // Don't use fallback mode - require dictionary to be available
       throw new Error('Could not load word dictionary. Dictionary file must be present at data/swedish.json');
     }
@@ -242,7 +250,7 @@ export class WordValidationService {
           
           // Double-check that word is valid (safety check)
           if (!this.isValidWord(word)) {
-            console.warn(`⚠️ Invalid word in partition: "${word}" - skipping`);
+            wordLogger.warn('Invalid word in partition - skipping', { word });
             continue;
           }
           

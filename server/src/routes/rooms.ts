@@ -2,7 +2,7 @@ import express from 'express';
 import { RoomModel, GameModel } from '../models';
 import { AuthService, AuthenticatedRequest } from '../services/AuthService';
 import { getSocketService } from '../index';
-import { logger } from '../utils/logger';
+import { logger, roomLogger } from '../utils/logger';
 import { DatabaseManager } from '../config/database';
 
 const router = express.Router();
@@ -55,8 +55,10 @@ router.post('/', AuthService.authenticateToken, async (req, res) => {
     const authReq = req as AuthenticatedRequest;
     const { name, max_players, board_size, turn_duration, letter_timer, placement_timer, require_password } = req.body;
 
-    console.log(`📥 Creating room request:`);
-    console.log(`   - require_password from request: ${require_password} (type: ${typeof require_password})`);
+    roomLogger.debug('Create room request', {
+      requirePassword: require_password,
+      requirePasswordType: typeof require_password
+    });
 
     // Validation
     if (!name || name.length < 2 || name.length > 30) {
@@ -120,10 +122,14 @@ router.post('/', AuthService.authenticateToken, async (req, res) => {
       }
     });
 
-    console.log(`📝 Room created for code ${room.code}:`);
-    console.log(`   - require_password sent: ${require_password} (${typeof require_password})`);
-    console.log(`   - require_password stored: ${room.settings?.require_password} (${typeof room.settings?.require_password})`);
-    console.log(`   - full settings: ${JSON.stringify(room.settings)}`);
+    roomLogger.debug('Room created settings', {
+      roomCode: room.code,
+      requirePasswordSent: require_password,
+      requirePasswordSentType: typeof require_password,
+      requirePasswordStored: room.settings?.require_password,
+      requirePasswordStoredType: typeof room.settings?.require_password,
+      settings: room.settings
+    });
     logger.info(`Room created: ${room.code} by ${authReq.user!.username}`);
 
     // Get room members for response (creator is already added by RoomModel.create)
@@ -272,21 +278,33 @@ router.post('/:code/join', AuthService.authenticateToken, async (req, res) => {
     }
 
     // Debug logging for password check
-    console.log(`🔐 Join room ${code}:`);
-    console.log(`   - room.settings:`, JSON.stringify(room.settings));
-    console.log(`   - require_password value: "${room.settings?.require_password}"`);
-    console.log(`   - require_password type: ${typeof room.settings?.require_password}`);
-    console.log(`   - require_password === true? ${room.settings?.require_password === true}`);
-    console.log(`   - password provided? ${!!password}`);
+    roomLogger.debug('Join room password check', {
+      roomCode: code,
+      settings: room.settings,
+      requirePasswordValue: room.settings?.require_password,
+      requirePasswordType: typeof room.settings?.require_password,
+      requirePasswordStrictTrue: room.settings?.require_password === true,
+      passwordProvided: Boolean(password)
+    });
 
     // Check if user is already in THIS room (before password check)
     // Existing members should always be able to rejoin without password
     const isAlreadyMember = await RoomModel.isUserInRoom(room.id, authReq.user!.id);
-    console.log(`🔐 Join room ${code}: isUserInRoom(${room.id}, ${authReq.user!.id}) returned: ${isAlreadyMember}`);
+    roomLogger.debug('Join room membership check', {
+      roomCode: code,
+      roomId: room.id,
+      userId: authReq.user!.id,
+      isAlreadyMember
+    });
     
     if (isAlreadyMember) {
       // User is already in room - return success with room data
-      console.log(`✅ User ${authReq.user!.username} already member of room ${room.code}`);
+      roomLogger.info('User already member of room', {
+        roomCode: room.code,
+        roomId: room.id,
+        userId: authReq.user!.id,
+        username: authReq.user!.username
+      });
       
       // Get current member list
       const members = await RoomModel.getRoomMembers(room.id);

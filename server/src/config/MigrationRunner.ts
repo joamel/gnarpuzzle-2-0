@@ -1,4 +1,5 @@
 import { SQLiteDatabase } from './sqlite';
+import { dbLogger } from '../utils/logger';
 
 export interface SimpleMigration {
   version: number;
@@ -42,7 +43,7 @@ export class MigrationRunner {
         const migrationId = String(migration.version).padStart(3, '0');
         
         if (!appliedMigrations.includes(migrationId)) {
-          console.log(`🔄 Running migration ${migrationId} (${migration.name})...`);
+          dbLogger.info('Running migration', { migrationId, name: migration.name });
           try {
             // Execute the up migration SQL
             // Split by semicolon and execute each statement separately
@@ -55,26 +56,34 @@ export class MigrationRunner {
                 // Ignore "table already exists", "index already exists", "duplicate column" errors
                 const errorMsg = stmtError.message || '';
                 if (errorMsg.includes('already exists') || errorMsg.includes('duplicate column')) {
-                  console.log(`⚠️  Skipping (already exists): ${statement.substring(0, 50)}...`);
+                  dbLogger.debug('Skipping statement (already exists/duplicate column)', {
+                    migrationId,
+                    statementPreview: `${statement.substring(0, 50)}...`
+                  });
                 } else {
                   throw stmtError;
                 }
               }
             }
             await this.recordMigration(migrationId);
-            console.log(`✅ Migration ${migrationId} completed`);
+            dbLogger.info('Migration completed', { migrationId });
           } catch (error) {
-            console.error(`❌ Migration ${migrationId} failed:`, error);
+            dbLogger.error('Migration failed', {
+              migrationId,
+              error: error instanceof Error ? error.message : String(error)
+            });
             throw error;
           }
         } else {
-          console.log(`⏭️  Migration ${migrationId} already applied`);
+          dbLogger.debug('Migration already applied', { migrationId });
         }
       }
 
-      console.log('✅ All migrations completed successfully');
+      dbLogger.info('All migrations completed successfully');
     } catch (error) {
-      console.error('❌ Migration process failed:', error);
+      dbLogger.error('Migration process failed', {
+        error: error instanceof Error ? error.message : String(error)
+      });
       throw error;
     }
   }
@@ -92,7 +101,9 @@ export class MigrationRunner {
         )
       `);
     } catch (error) {
-      console.error('Failed to create migrations table:', error);
+      dbLogger.error('Failed to create migrations table', {
+        error: error instanceof Error ? error.message : String(error)
+      });
       throw error;
     }
   }
@@ -107,7 +118,9 @@ export class MigrationRunner {
       );
       return result.map((row: any) => row.migration_name);
     } catch (error) {
-      console.error('Failed to get applied migrations:', error);
+      dbLogger.error('Failed to get applied migrations', {
+        error: error instanceof Error ? error.message : String(error)
+      });
       return [];
     }
   }
@@ -122,7 +135,10 @@ export class MigrationRunner {
         migrationName
       );
     } catch (error) {
-      console.error(`Failed to record migration ${migrationName}:`, error);
+      dbLogger.error('Failed to record migration', {
+        migrationName,
+        error: error instanceof Error ? error.message : String(error)
+      });
       throw error;
     }
   }

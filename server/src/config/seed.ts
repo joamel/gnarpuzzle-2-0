@@ -39,23 +39,24 @@ export async function seedDatabase(): Promise<void> {
         try {
           // Check if room already exists by name
           const existingRoom = await db.get(
-            `SELECT id FROM rooms WHERE name = ?`,
+            `SELECT id, status, settings FROM rooms WHERE name = ? LIMIT 1`,
             [roomData.name]
-          );
-          
+          ) as { id: number; status: string; settings: unknown } | undefined;
+
+          const desiredSettings = JSON.stringify({
+            grid_size: roomData.board_size,
+            max_players: roomData.max_players,
+            letter_timer: roomData.letter_timer,
+            placement_timer: roomData.placement_timer,
+            is_private: false,
+            require_password: false
+          });
+
           if (!existingRoom) {
             // Generate unique room code
             const code = await RoomModel.generateRoomCode();
             
             // Insert room directly WITHOUT auto-joining creator
-            const settings = JSON.stringify({
-              grid_size: roomData.board_size,
-              max_players: roomData.max_players,
-              letter_timer: roomData.letter_timer,
-              placement_timer: roomData.placement_timer,
-              is_private: false
-            });
-
             await db.run(`
               INSERT INTO rooms (code, name, created_by, max_players, board_size, turn_duration, settings, status)
               VALUES (?, ?, ?, ?, ?, ?, ?, 'waiting')
@@ -66,11 +67,47 @@ export async function seedDatabase(): Promise<void> {
               roomData.max_players,
               roomData.board_size,
               roomData.placement_timer,
-              settings
+              desiredSettings
             );
 
             console.log(`✅ Created standard public room: ${roomData.name}`);
           } else {
+            const isActive = ['waiting', 'playing'].includes(existingRoom.status);
+
+            // If a standard room was previously auto-cleaned and marked abandoned,
+            // revive it so it shows up again in the lobby.
+            if (!isActive) {
+              await db.run(
+                `UPDATE rooms
+                 SET status = 'waiting',
+                     created_by = ?,
+                     max_players = ?,
+                     board_size = ?,
+                     turn_duration = ?,
+                     settings = ?
+                 WHERE id = ?`,
+                adminUser.id,
+                roomData.max_players,
+                roomData.board_size,
+                roomData.placement_timer,
+                desiredSettings,
+                existingRoom.id
+              );
+
+              console.log(`♻️ Revived standard public room: ${roomData.name}`);
+              continue;
+            }
+
+            // Backfill settings if missing/invalid so cleanup treats it as permanent.
+            if (!existingRoom.settings) {
+              await db.run(
+                `UPDATE rooms SET settings = ? WHERE id = ?`,
+                desiredSettings,
+                existingRoom.id
+              );
+              console.log(`🛠️ Backfilled settings for standard public room: ${roomData.name}`);
+            }
+
             console.log(`ℹ️  Standard public room already exists: ${roomData.name}`);
           }
         } catch (err) {

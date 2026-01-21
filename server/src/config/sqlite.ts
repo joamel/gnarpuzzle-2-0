@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { dbLogger } from '../utils/logger';
 
 export interface DatabaseInterface {
   run(query: string, ...params: any[]): Promise<{ lastInsertRowid: number; changes: number }> | { lastInsertRowid: number; changes: number };
@@ -17,7 +18,7 @@ export class SQLiteDatabase implements DatabaseInterface {
     // Enable foreign keys
     this.db.pragma('foreign_keys = ON');
     
-    console.log(`🗄️  SQLite Database connected: ${dbPath}`);
+    dbLogger.info('SQLite Database connected', { dbPath });
   }
 
   async run(query: string, ...params: any[]): Promise<{ lastInsertRowid: number; changes: number }> {
@@ -29,9 +30,11 @@ export class SQLiteDatabase implements DatabaseInterface {
         changes: result.changes
       };
     } catch (error) {
-      console.error(`❌ SQL Error in run():`, (error as Error).message);
-      console.error(`📝 Query:`, query);
-      console.error(`📋 Params:`, params);
+      dbLogger.error('SQL Error in run()', {
+        message: (error as Error).message,
+        query,
+        params
+      });
       throw error;
     }
   }
@@ -42,9 +45,11 @@ export class SQLiteDatabase implements DatabaseInterface {
       const result = stmt.get(...params);
       return result || null;
     } catch (error) {
-      console.error(`❌ SQL Error in get():`, (error as Error).message);
-      console.error(`📝 Query:`, query);
-      console.error(`📋 Params:`, params);
+      dbLogger.error('SQL Error in get()', {
+        message: (error as Error).message,
+        query,
+        params
+      });
       throw error;
     }
   }
@@ -55,9 +60,11 @@ export class SQLiteDatabase implements DatabaseInterface {
       const results = stmt.all(...params);
       return results;
     } catch (error) {
-      console.error(`❌ SQL Error in all():`, (error as Error).message);
-      console.error(`📝 Query:`, query);
-      console.error(`📋 Params:`, params);
+      dbLogger.error('SQL Error in all()', {
+        message: (error as Error).message,
+        query,
+        params
+      });
       throw error;
     }
   }
@@ -66,8 +73,10 @@ export class SQLiteDatabase implements DatabaseInterface {
     try {
       this.db.exec(query);
     } catch (error) {
-      console.error(`❌ SQL Error in exec():`, (error as Error).message);
-      console.error(`📝 Query:`, query);
+      dbLogger.error('SQL Error in exec()', {
+        message: (error as Error).message,
+        query
+      });
       throw error;
     }
   }
@@ -75,7 +84,7 @@ export class SQLiteDatabase implements DatabaseInterface {
   async close(): Promise<void> {
     if (this.db) {
       this.db.close();
-      console.log('🗄️  SQLite Database connection closed');
+      dbLogger.info('SQLite Database connection closed');
     }
   }
 
@@ -95,7 +104,7 @@ export class SQLiteDatabase implements DatabaseInterface {
   // Development helper: Clear all rooms and games
   async clearAllRoomsAndGames(): Promise<void> {
     try {
-      console.log('🧹 Development mode: Clearing all rooms and games...');
+      dbLogger.debug('Clearing all rooms and games (development)');
       
       // Clear in reverse dependency order
       this.db.exec('DELETE FROM players');
@@ -103,9 +112,11 @@ export class SQLiteDatabase implements DatabaseInterface {
       this.db.exec('DELETE FROM room_members');
       this.db.exec('DELETE FROM rooms');
       
-      console.log('✅ All rooms and games cleared for development');
+      dbLogger.info('All rooms and games cleared (development)');
     } catch (error) {
-      console.error('❌ Error clearing rooms and games:', error);
+      dbLogger.error('Error clearing rooms and games', {
+        error: error instanceof Error ? error.message : String(error)
+      });
       throw error;
     }
   }
@@ -113,7 +124,7 @@ export class SQLiteDatabase implements DatabaseInterface {
   // Development helper: Reset playing rooms to waiting
   async resetPlayingRooms(): Promise<void> {
     try {
-      console.log('🔄 Development mode: Resetting playing rooms to waiting...');
+      dbLogger.debug('Resetting playing rooms to waiting (development)');
       
       // Delete all games and players first  
       this.db.exec('DELETE FROM players');
@@ -122,9 +133,11 @@ export class SQLiteDatabase implements DatabaseInterface {
       // Reset all rooms to waiting status
       const result = this.db.prepare('UPDATE rooms SET status = ? WHERE status = ?').run('waiting', 'playing');
       
-      console.log(`✅ Reset ${result.changes} playing rooms to waiting status`);
+      dbLogger.info('Reset playing rooms to waiting', { changes: result.changes });
     } catch (error) {
-      console.error('❌ Error resetting playing rooms:', error);
+      dbLogger.error('Error resetting playing rooms', {
+        error: error instanceof Error ? error.message : String(error)
+      });
       throw error;
     }
   }

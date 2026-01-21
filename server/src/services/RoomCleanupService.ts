@@ -120,6 +120,13 @@ export class RoomCleanupService {
    */
   private async shouldCleanupRoom(room: any): Promise<boolean> {
     try {
+      // If the room predates the settings column (NULL settings), be conservative:
+      // don't auto-delete it. These include seeded standard rooms in some upgraded DBs.
+      if (!room.settings) {
+        logger.debug(`Room ${room.code} has no settings - skipping cleanup`);
+        return false;
+      }
+
       // NEVER cleanup public rooms (they are kept permanently)
       const settings = typeof room.settings === 'string' ? JSON.parse(room.settings) : room.settings;
       if (settings?.is_private === false) {

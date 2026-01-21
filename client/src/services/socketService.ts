@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import { SocketEvents } from '../../../shared/types';
+import { logger } from '../utils/logger';
 
 class SocketService {
   private socket: Socket | null = null;
@@ -71,7 +72,7 @@ class SocketService {
       });
 
       this.socket.on('connect_error', (error) => {
-        console.error('❌ Socket connection error:', error);
+        logger.socket.error('Socket connection error', { error });
         this.isConnecting = false;
         this.handleReconnection();
         reject(error);
@@ -150,7 +151,7 @@ class SocketService {
 
   emit(event: string, data?: any): void {
     if (!this.socket?.connected) {
-      console.warn('⚠️ Socket not connected, cannot emit:', event);
+      logger.socket.debug('Socket not connected, cannot emit', { event });
       return;
     }
     this.socket.emit(event, data);
@@ -160,47 +161,47 @@ class SocketService {
   joinRoom(roomCode: string): void {
     this.activeRoomCodes.add(roomCode);
     if (!this.socket?.connected) {
-      console.warn('⚠️ Socket not connected yet, queueing room join:', roomCode);
+      logger.socket.debug('Socket not connected yet, queueing room join', { roomCode });
       // Queue the join to be processed when socket connects
       if (!this.pendingRoomJoins.includes(roomCode)) {
         this.pendingRoomJoins.push(roomCode);
-        console.log(`📝 Room join queued. Pending joins:`, this.pendingRoomJoins);
+        logger.socket.debug('Room join queued', { pendingRoomJoins: this.pendingRoomJoins });
       }
       return;
     }
-    console.log(`🚪 Joining Socket.IO room: ${roomCode}`);
+    logger.socket.debug('Joining Socket.IO room', { roomCode });
     this.socket.emit('room:join', { roomCode });
-    console.log(`✅ room:join event emitted to socket`);
+    logger.socket.debug('room:join event emitted to socket', { roomCode });
   }
 
   // Leave a room
   leaveRoom(roomCode: string): void {
     this.activeRoomCodes.delete(roomCode);
     if (!this.socket?.connected) {
-      console.warn('⚠️ Socket not connected, cannot leave room:', roomCode);
+      logger.socket.debug('Socket not connected, cannot leave room', { roomCode });
       return;
     }
-    console.log(`🚪 Leaving Socket.IO room: ${roomCode}`);
+    logger.socket.debug('Leaving Socket.IO room', { roomCode });
     this.socket.emit('room:leave', { roomCode });
   }
 
   // Join a game for real-time updates
   joinGame(gameId: number): void {
     if (!this.socket?.connected) {
-      console.warn('⚠️ Socket not connected, cannot join game:', gameId);
+      logger.socket.debug('Socket not connected, cannot join game', { gameId });
       return;
     }
-    console.log(`🎮 Joining Socket.IO game: ${gameId}`);
+    logger.socket.debug('Joining Socket.IO game', { gameId });
     this.socket.emit('game:join', { gameId });
   }
 
   // Set player ready status
   setPlayerReady(roomCode: string, isReady: boolean): void {
     if (!this.socket?.connected) {
-      console.warn('⚠️ Socket not connected, cannot set ready status');
+      logger.socket.debug('Socket not connected, cannot set ready status', { roomCode, isReady });
       return;
     }
-    console.log(`✅ Setting ready status: ${isReady} for room: ${roomCode}`);
+    logger.socket.debug('Setting ready status', { roomCode, isReady });
     this.socket.emit('player:set_ready', { roomCode, isReady });
   }
 
@@ -242,7 +243,7 @@ class SocketService {
 
   private handleReconnection(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('❌ Max reconnection attempts reached');
+      logger.socket.error('Max reconnection attempts reached');
       return;
     }
 
@@ -253,12 +254,16 @@ class SocketService {
     this.reconnectAttempts++;
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts - 1), 30000); // Exponential backoff, max 30s
 
-    console.log(`🔄 Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+    logger.socket.info('Attempting to reconnect', {
+      delayMs: delay,
+      attempt: this.reconnectAttempts,
+      maxAttempts: this.maxReconnectAttempts,
+    });
     
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       if (!this.socket?.connected && this.reconnectAttempts < this.maxReconnectAttempts) {
-        console.log('🔄 Retrying connection...');
+        logger.socket.debug('Retrying connection');
         // Note: Would need to store token for auto-reconnection
       }
     }, delay);

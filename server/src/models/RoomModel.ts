@@ -1,5 +1,6 @@
 import { DatabaseManager } from '../config/database';
 import { Room, RoomWithMembers, User, RoomSettings } from './types';
+import { roomLogger } from '../utils/logger';
 
 export class RoomModel {
   static async create(data: {
@@ -39,13 +40,13 @@ export class RoomModel {
     const room = await this.findById(result.lastInsertRowid as number) as Room;
     
     // Auto-join creator to room
-    console.log(`🏠 RoomModel.create: Auto-joining user ${data.created_by} to room ${room.id}`);
+    roomLogger.debug('Auto-joining creator to room', { roomId: room.id, userId: data.created_by });
     const addMemberResult = await this.addMember(room.id, data.created_by);
-    console.log(`🏠 RoomModel.create: addMember result:`, addMemberResult);
+    roomLogger.debug('Auto-join addMember result', { roomId: room.id, userId: data.created_by, addMemberResult });
     
     // Verify member was added
     const memberCount = await this.getMemberCount(room.id);
-    console.log(`🏠 RoomModel.create: Member count after adding:`, memberCount);
+    roomLogger.debug('Member count after auto-join', { roomId: room.id, memberCount });
     
     return room;
   }
@@ -70,9 +71,13 @@ export class RoomModel {
     `, code) as Room | null;
     
     if (room) {
-      console.log(`🔍 RoomModel.findByCode(${code}): Raw settings from DB:`, room.settings);
+      roomLogger.debug('findByCode raw settings from DB', { code, settings: room.settings });
       const parsed = this.parseRoomSettings(room);
-      console.log(`🔍 RoomModel.findByCode(${code}): After parseRoomSettings - require_password:`, parsed.settings?.require_password, `(type: ${typeof parsed.settings?.require_password})`);
+      roomLogger.debug('findByCode parsed settings', {
+        code,
+        requirePassword: parsed.settings?.require_password,
+        requirePasswordType: typeof parsed.settings?.require_password
+      });
       return parsed;
     }
     return null;
@@ -120,9 +125,12 @@ export class RoomModel {
       
       return result.changes > 0;
     } catch (error: any) {
-      console.error(`❌ RoomModel.addMember: Error adding member:`, error);
-      console.error(`❌ RoomModel.addMember: Error message:`, error?.message);
-      console.error(`❌ RoomModel.addMember: Error code:`, error?.code);
+      roomLogger.warn('Error adding room member', {
+        roomId,
+        userId,
+        message: error?.message,
+        code: error?.code
+      });
       // Handle unique constraint violation (user already in room)
       return false;
     }
@@ -132,7 +140,12 @@ export class RoomModel {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
     
-    console.log(`🔍 isMember check: roomId=${roomId} (${typeof roomId}), userId=${userId} (${typeof userId})`);
+    roomLogger.debug('isMember check', {
+      roomId,
+      roomIdType: typeof roomId,
+      userId,
+      userIdType: typeof userId
+    });
     
     try {
       const member = await db.get(`
@@ -142,11 +155,15 @@ export class RoomModel {
       `, roomId, userId);
       
       const result = member !== null && member !== undefined;
-      console.log(`🔍 isMember result: ${result} for room ${roomId}, user ${userId}`);
+      roomLogger.debug('isMember result', { roomId, userId, isMember: result });
       
       return result;
     } catch (error) {
-      console.error(`❌ RoomModel.isMember: Error checking membership:`, error);
+      roomLogger.warn('Error checking membership', {
+        roomId,
+        userId,
+        error: error instanceof Error ? error.message : String(error)
+      });
       return false;
     }
   }
@@ -155,7 +172,7 @@ export class RoomModel {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
     
-    console.log(`🚪 RoomModel.removeMember: Removing user ${userId} from room ${roomId}`);
+    roomLogger.debug('Removing user from room', { roomId, userId });
     
     const result = await db.run(`
       DELETE FROM room_members 
@@ -163,32 +180,35 @@ export class RoomModel {
     `, roomId, userId);
     
     if (result.changes > 0) {
-      console.log(`✅ Successfully removed user ${userId} from room ${roomId}`);
+      roomLogger.debug('Successfully removed user from room', { roomId, userId });
       
       // Check if room is now empty and reset status to waiting if needed
       const memberCount = await this.getMemberCount(roomId);
-      console.log(`📊 Room ${roomId} now has ${memberCount} members`);
+      roomLogger.debug('Room member count after removal', { roomId, memberCount });
       
       if (memberCount === 0) {
-        console.log(`🔄 Room ${roomId} is now empty, cleaning up...`);
+        roomLogger.info('Room is now empty, cleaning up', { roomId });
         
         // Delete any ongoing games for this room
         try {
           await db.run('DELETE FROM players WHERE game_id IN (SELECT id FROM games WHERE room_id = ?)', roomId);
           const gameDeleteResult = await db.run('DELETE FROM games WHERE room_id = ?', roomId);
           if (gameDeleteResult.changes > 0) {
-            console.log(`🗑️ Cleaned up ${gameDeleteResult.changes} games for empty room ${roomId}`);
+            roomLogger.info('Cleaned up games for empty room', { roomId, deletedGames: gameDeleteResult.changes });
           }
         } catch (error) {
-          console.warn('⚠️ Failed to clean up games for empty room:', error);
+          roomLogger.warn('Failed to clean up games for empty room', {
+            roomId,
+            error: error instanceof Error ? error.message : String(error)
+          });
         }
         
         // Reset room status to waiting
         await db.run('UPDATE rooms SET status = ? WHERE id = ?', 'waiting', roomId);
-        console.log(`♻️ Reset room ${roomId} status to waiting`);
+        roomLogger.debug('Reset room status to waiting', { roomId });
       }
     } else {
-      console.warn(`⚠️ No changes when trying to remove user ${userId} from room ${roomId} - user may not have been member`);
+      roomLogger.debug('No changes removing user from room (may not have been a member)', { roomId, userId });
     }
     
     return result.changes > 0;
@@ -198,7 +218,7 @@ export class RoomModel {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
     
-    console.log(`🔍 RoomModel.getRoomMembers: Getting members for room ${roomId}`);
+    roomLogger.debug('Getting room members', { roomId });
     
     const members = await db.all(`
       SELECT u.* 
@@ -208,7 +228,7 @@ export class RoomModel {
       ORDER BY rm.joined_at ASC
     `, roomId) as User[];
     
-    console.log(`🔍 RoomModel.getRoomMembers: Found ${members.length} members:`, members);
+    roomLogger.debug('Found room members', { roomId, memberCount: members.length });
     
     return members;
   }
@@ -383,7 +403,7 @@ export class RoomModel {
     try {
       // Handle null/undefined settings
       if (!room.settings) {
-        console.warn(`⚠️ Room ${room.code} has no settings, using defaults`);
+        roomLogger.warn('Room has no settings, using defaults', { roomCode: room.code });
         return {
           ...room,
           settings: {
@@ -391,6 +411,7 @@ export class RoomModel {
             max_players: room.max_players || 6,
             letter_timer: room.settings?.letter_timer || 20,
             placement_timer: room.settings?.placement_timer || 30,
+            is_private: false,
             require_password: false
           }
         } as Room;
@@ -426,7 +447,10 @@ export class RoomModel {
         settings: completeSettings
       } as Room;
     } catch (error) {
-      console.error(`❌ Error parsing settings for room ${room.code}:`, error);
+      roomLogger.error('Error parsing room settings, using defaults', {
+        roomCode: room.code,
+        error: error instanceof Error ? error.message : String(error)
+      });
       // Fallback to default settings if parsing fails
       const defaultSettings: RoomSettings = {
         grid_size: room.board_size || 5,

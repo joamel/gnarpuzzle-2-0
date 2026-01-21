@@ -261,11 +261,15 @@ export class GameStateService {
    * Place letter on player's grid
    */
   async placeLetter(gameId: number, playerId: number, x: number, y: number): Promise<void> {
-    console.log(`🔍 placeLetter called: gameId=${gameId}, playerId=${playerId}, position=(${x},${y})`);
+    gameLogger.debug('placeLetter called', { gameId, playerId, x, y });
     
     const game = await this.getGameById(gameId);
     if (!game || game.current_phase !== 'letter_placement') {
-      console.log(`❌ placeLetter failed: phase=${game?.current_phase}, expected=letter_placement`);
+      gameLogger.warn('placeLetter failed: not in letter_placement phase', {
+        gameId,
+        playerId,
+        phase: game?.current_phase,
+      });
       throw new Error('Not in placement phase');
     }
 
@@ -277,13 +281,21 @@ export class GameStateService {
     `, gameId, playerId) as Player;
 
     if (!player || !player.current_letter) {
-      console.log(`❌ placeLetter failed: player=${!!player}, current_letter=${player?.current_letter}`);
+      gameLogger.warn('placeLetter failed: missing player or current_letter', {
+        gameId,
+        playerId,
+        hasPlayer: !!player,
+        currentLetter: player?.current_letter,
+      });
       throw new Error('No letter to place');
     }
 
-    console.log(`📝 Player data before placement:`);
-    console.log(`  - current_letter: "${player.current_letter}"`);
-    console.log(`  - placement_confirmed: ${player.placement_confirmed}`);
+    gameLogger.debug('Player data before placement', {
+      gameId,
+      playerId,
+      currentLetter: player.current_letter,
+      placementConfirmed: player.placement_confirmed,
+    });
 
     // Update player's grid
     let gridState: GridCell[][];
@@ -291,14 +303,19 @@ export class GameStateService {
       gridState = typeof player.grid_state === 'string' 
         ? JSON.parse(player.grid_state) 
         : player.grid_state;
-      console.log(`  - grid_state parsed, size: ${gridState.length}x${gridState[0]?.length}`);
+      gameLogger.debug('grid_state parsed', {
+        gameId,
+        playerId,
+        rows: gridState.length,
+        cols: gridState[0]?.length,
+      });
     } catch {
-      console.log(`❌ placeLetter failed: Invalid grid state`);
+      gameLogger.warn('placeLetter failed: invalid grid state', { gameId, playerId });
       throw new Error('Invalid grid state');
     }
     
     if (gridState[y] && gridState[y][x] && !gridState[y][x].letter) {
-      console.log(`✅ Cell (${x}, ${y}) is available - placing "${player.current_letter}"`);
+      gameLogger.debug('Cell is available; placing letter', { gameId, playerId, x, y, letter: player.current_letter });
       
       gridState[y][x] = {
         letter: player.current_letter,
@@ -306,15 +323,15 @@ export class GameStateService {
         y
       };
 
-      console.log(`💾 Saving updated grid_state to database...`);
+      gameLogger.debug('Saving updated grid_state to database', { gameId, playerId });
       await db.run(`
         UPDATE players 
         SET grid_state = ?
         WHERE game_id = ? AND user_id = ?
       `, JSON.stringify(gridState), gameId, playerId);
 
-      console.log(`✅ Grid state saved to database`);
-      console.log(`📍 Cell (${x}, ${y}) now contains: "${gridState[y][x].letter}"`);
+      gameLogger.debug('Grid state saved to database', { gameId, playerId });
+      gameLogger.debug('Cell now contains letter', { gameId, playerId, x, y, letter: gridState[y][x].letter });
 
       // Emit placement event
       this.socketService.broadcastToRoom(`game:${gameId}`, 'letter:placed', {
@@ -324,11 +341,11 @@ export class GameStateService {
         x,
         y
       });
-      
-      console.log(`📡 Broadcasted letter:placed event`);
+
+      gameLogger.debug('Broadcasted letter:placed event', { gameId, playerId, x, y, letter: player.current_letter });
     } else {
       const cellStatus = gridState[y]?.[x]?.letter ? 'occupied' : 'invalid';
-      console.log(`❌ placeLetter failed: Cell (${x}, ${y}) is ${cellStatus}`);
+      gameLogger.warn('placeLetter failed: cell not available', { gameId, playerId, x, y, cellStatus });
       throw new Error('Cell not available');
     }
   }
@@ -347,7 +364,7 @@ export class GameStateService {
       WHERE game_id = ? AND user_id = ? AND placement_confirmed = 0
     `, gameId, playerId);
 
-    console.log(`📍 Player ${playerId} set placement intent for game ${gameId}`);
+    gameLogger.debug('Player set placement intent', { gameId, playerId });
   }
 
   /**
@@ -363,13 +380,13 @@ export class GameStateService {
       WHERE game_id = ? AND user_id = ? AND placement_confirmed IN (0, 2)
     `, gameId, playerId);
 
-    console.log(`✅ Player ${playerId} confirmed placement for game ${gameId}`);
+    gameLogger.debug('Player confirmed placement', { gameId, playerId });
 
     // Calculate current score for this player
     try {
       await this.calculatePlayerScore(gameId, playerId);
     } catch (err) {
-      console.error(`❌ Error calculating score for player ${playerId}:`, err);
+      gameLogger.error('Error calculating score for player', { gameId, playerId, err });
       // Continue even if score calculation fails
     }
 
@@ -383,28 +400,38 @@ export class GameStateService {
       SELECT COUNT(*) as count FROM players WHERE game_id = ?
     `, gameId) as { count: number };
 
-    console.log(`📊 Placement confirmation status: ${confirmedCount.count}/${totalPlayers.count} players confirmed`);
+    gameLogger.debug('Placement confirmation status', {
+      gameId,
+      confirmed: confirmedCount.count,
+      total: totalPlayers.count,
+    });
 
     if (confirmedCount.count === totalPlayers.count) {
-      console.log('✅ All players confirmed - advancing game');
+      gameLogger.debug('All players confirmed - advancing game');
       this.clearGameTimer(gameId);
       
       // Validate we're still in placement phase before advancing
       const updatedGame = await this.getGameById(gameId);
       if (updatedGame?.current_phase !== 'letter_placement') {
-        console.log('⚠️ Game phase changed during confirmation - skipping advance');
+        gameLogger.warn('Game phase changed during confirmation - skipping advance', {
+          gameId,
+          phase: updatedGame?.current_phase,
+        });
         return;
       }
       
       // Check if this ends the game or advances turn
       const gameEnded = await this.checkGameEnd(gameId);
-      console.log('🎮 Game end check result:', gameEnded);
+      gameLogger.debug('Game end check result', { gameId, gameEnded });
       if (!gameEnded) {
-        console.log('🔄 Advancing to next turn');
+        gameLogger.debug('Advancing to next turn', { gameId });
         await this.advanceToNextTurn(gameId);
       }
     } else {
-      console.log(`⏳ Waiting for remaining ${totalPlayers.count - confirmedCount.count} players to confirm`);
+      gameLogger.debug('Waiting for remaining players to confirm', {
+        gameId,
+        remaining: totalPlayers.count - confirmedCount.count,
+      });
     }
   }
 
@@ -412,28 +439,32 @@ export class GameStateService {
    * Advance to next turn or check game end
    */
   async advanceToNextTurn(gameId: number): Promise<void> {
-    console.log(`🔄 advanceToNextTurn called for game ${gameId}`);
+    gameLogger.debug('advanceToNextTurn called', { gameId });
     
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
 
     const game = await this.getGameById(gameId);
     if (!game) {
-      console.log(`❌ Game ${gameId} not found in advanceToNextTurn`);
+      gameLogger.warn('Game not found in advanceToNextTurn', { gameId });
       return;
     }
 
-    console.log(`📊 Current game state: phase=${game.current_phase}, turn=${game.current_turn}`);
+    gameLogger.debug('Current game state', { gameId, phase: game.current_phase, turn: game.current_turn });
 
     // Prevent race conditions - only advance if in placement phase
     if (game.current_phase !== 'letter_placement') {
-      console.log(`⚠️ Cannot advance turn - game is in ${game.current_phase} phase, expected letter_placement`);
+      gameLogger.warn('Cannot advance turn - wrong phase', {
+        gameId,
+        phase: game.current_phase,
+        expected: 'letter_placement',
+      });
       return;
     }
 
     // Check if game is finished (grid full)
     if (await this.isGameFinished(gameId)) {
-      console.log('🏁 Game is finished - ending game');
+      gameLogger.info('Game is finished - ending game', { gameId });
       await this.finishGame(gameId);
       return;
     }
@@ -666,37 +697,42 @@ export class GameStateService {
     `, gameId, playerId) as Player;
 
     if (!player) {
-      console.log(`❌ autoPlaceLetter: Player ${playerId} not found`);
+      gameLogger.warn('autoPlaceLetter: player not found', { gameId, playerId });
       return;
     }
 
-    console.log(`🔍 autoPlaceLetter DEBUG: Processing player ${playerId}`);
-    console.log(`  - current_letter: "${player.current_letter}" (${typeof player.current_letter})`);
-    console.log(`  - placement_confirmed: ${player.placement_confirmed}`);
-    console.log(`  - target letter: "${letter}" (${typeof letter})`);
+    gameLogger.debug('autoPlaceLetter processing player', {
+      gameId,
+      playerId,
+      currentLetter: player.current_letter,
+      currentLetterType: typeof player.current_letter,
+      placementConfirmed: player.placement_confirmed,
+      targetLetter: letter,
+      targetLetterType: typeof letter,
+    });
     
     let gridState: GridCell[][];
     try {
       gridState = typeof player.grid_state === 'string' 
         ? JSON.parse(player.grid_state)
         : player.grid_state;
-      console.log(`  - grid_state parsed successfully, size: ${gridState.length}x${gridState[0]?.length}`);
+      gameLogger.debug('autoPlaceLetter grid_state parsed', {
+        gameId,
+        playerId,
+        rows: gridState.length,
+        cols: gridState[0]?.length,
+      });
     } catch (error) {
-      console.error(`❌ Failed to parse grid_state:`, error);
+      gameLogger.error('autoPlaceLetter failed to parse grid_state', { gameId, playerId, error });
       return;
     }
     
     // Since each player has their own individual grid, just place the letter randomly
-    console.log(`🤖 Auto-placing letter "${letter}" for player ${playerId} (each player has their own grid)`);
-    console.log(`📊 Current grid state for player ${playerId}:`);
-    for (let y = 0; y < gridState.length; y++) {
-      let row = '';
-      for (let x = 0; x < gridState[y].length; x++) {
-        const cell = gridState[y][x];
-        row += cell?.letter ? `"${cell.letter}"`.padEnd(4) : 'null'.padEnd(4);
-      }
-      console.log(`  Row ${y}: [${row}]`);
-    }
+    gameLogger.debug('Auto-placing letter for player (individual grid)', {
+      gameId,
+      playerId,
+      letter,
+    });
     
     // Letter not found in grid, place it in a random empty cell
     const emptyCells: {x: number, y: number}[] = [];
@@ -720,8 +756,15 @@ export class GameStateService {
         SET grid_state = ? 
         WHERE game_id = ? AND user_id = ?
       `, JSON.stringify(gridState), gameId, playerId);
-      
-      console.log(`🤖 Auto-placed "${letter}" at random position (${x}, ${y}) for player ${playerId} (${emptyCells.length} empty cells available)`);
+
+      gameLogger.debug('Auto-placed letter', {
+        gameId,
+        playerId,
+        letter,
+        x,
+        y,
+        emptyCells: emptyCells.length,
+      });
       
       // Emit the auto-placement to show other players
       this.socketService.broadcastToRoom(`game:${gameId}`, 'letter:placed', {
@@ -736,7 +779,7 @@ export class GameStateService {
       return;
     }
     
-    console.log(`❌ No empty cells found for player ${playerId} - grid is full!`);
+    gameLogger.warn('No empty cells found for player - grid is full', { gameId, playerId });
   }
 
   private async isGameFinished(gameId: number): Promise<boolean> {
@@ -747,7 +790,7 @@ export class GameStateService {
       SELECT user_id, grid_state FROM players WHERE game_id = ?
     `, gameId) as { user_id: number; grid_state: string }[];
 
-    console.log(`🔍 isGameFinished check: gameId=${gameId}, players=${players.length}`);
+    gameLogger.debug('isGameFinished check', { gameId, players: players.length });
 
     // Check if any player's grid is full
     for (const player of players) {
@@ -808,7 +851,12 @@ export class GameStateService {
       WHERE game_id = ? AND user_id = ?
     `, gridScore.totalPoints, JSON.stringify(gridScore.words), gameId, userId);
 
-    console.log(`🎯 Player ${userId} score: ${gridScore.totalPoints} (${gridScore.words.length} words)`);
+    gameLogger.debug('Player score calculated', {
+      gameId,
+      userId,
+      points: gridScore.totalPoints,
+      words: gridScore.words.length,
+    });
     
     return gridScore;
   }
@@ -870,7 +918,7 @@ export class GameStateService {
       await db.run(`
         UPDATE rooms SET status = 'waiting' WHERE id = ?
       `, game.room_id);
-      console.log(`📍 Room ${game.room_id} reset to waiting status`);
+      gameLogger.debug('Room reset to waiting status', { roomId: game.room_id, gameId });
     }
 
     // Ready state is a lobby-only concept; clear it when a game ends.
@@ -910,11 +958,14 @@ export class GameStateService {
       ORDER BY p.final_score DESC
     `, gameId);
 
-    console.log(`🏁 Players at game end:`, players.map(p => ({
-      username: p.username,
-      gridState: p.grid_state,
-      wordsFount: p.words_found
-    })));
+    gameLogger.debug('Players at game end', {
+      gameId,
+      players: players.map((p) => ({
+        username: p.username,
+        gridState: p.grid_state,
+        wordsFound: p.words_found
+      }))
+    });
 
     // Broadcast game end with scores and board size
     this.socketService.broadcastToRoom(`game:${gameId}`, 'game:ended', {
@@ -949,19 +1000,28 @@ export class GameStateService {
 
     const game = await this.getGameById(gameId);
     if (!game || game.state === 'finished') {
-      console.log(`🚪 Player ${leavingUserId} left but game ${gameId} already finished or not found`);
+      gameLogger.debug('Player left but game already finished or not found', {
+        gameId,
+        leavingUserId
+      });
       return;
     }
 
     // If intentional leave (clicked button), remove player immediately
     if (intentional) {
-      console.log(`🚪 Player ${leavingUserId} intentionally left game ${gameId} - removing immediately`);
+      gameLogger.info('Player intentionally left game - removing immediately', {
+        gameId,
+        leavingUserId
+      });
       
       // Remove player from the game
       await db.run(`DELETE FROM players WHERE game_id = ? AND user_id = ?`, gameId, leavingUserId);
-      console.log(`🚪 Removed player ${leavingUserId} from game ${gameId}`);
+      gameLogger.debug('Removed player from game', { gameId, leavingUserId });
     } else {
-      console.log(`🚪 Player ${leavingUserId} disconnected from game ${gameId} - will be removed if not reconnecting`);
+      gameLogger.debug('Player disconnected from game - awaiting grace period', {
+        gameId,
+        leavingUserId
+      });
       // For non-intentional disconnects, the SocketService handles the grace period
       // and will call this function again with proper removal after timeout
       return;
@@ -980,7 +1040,10 @@ export class GameStateService {
 
     // If only 1 or fewer players left, end the game
     if (remainingPlayers.length <= 1) {
-      console.log(`🏁 Only ${remainingPlayers.length} player(s) left - ending game ${gameId}`);
+      gameLogger.info('Ending game because only one player left', {
+        gameId,
+        remainingPlayers: remainingPlayers.length
+      });
       
       // Clear any active timers
       this.clearGameTimer(gameId);
@@ -1018,7 +1081,10 @@ export class GameStateService {
 
     // If the leaving player had the turn, switch to next player
     if (game.current_turn === leavingUserId) {
-      console.log(`🔄 Leaving player ${leavingUserId} had the turn - switching to next player`);
+      gameLogger.info('Leaving player had the turn - switching to next player', {
+        gameId,
+        leavingUserId
+      });
       
       // Find next player
       const nextPlayer = remainingPlayers[0]; // First remaining player gets the turn
@@ -1089,7 +1155,7 @@ export class GameStateService {
     if (timerId) {
       clearTimeout(timerId);
       this.activeTimers.delete(gameId);
-      console.log(`🕒 Cleared timer for game ${gameId}`);
+      gameLogger.debug('Cleared game timer', { gameId });
     }
   }
 }

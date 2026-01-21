@@ -8,6 +8,7 @@ import { Room } from '../types/game';
 import Logo from '../assets/Logo';
 import OnlineStats from '../components/OnlineStats';
 import UserMenu from '../components/UserMenu';
+import { logger } from '../utils/logger';
 import '../styles/home.css';
 
 const HomePage: React.FC = () => {
@@ -54,7 +55,7 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     if (currentRoom && shouldNavigate.current) {
       shouldNavigate.current = false;
-      console.log('🏠 Already in room, navigating to game:', currentRoom.code);
+      logger.room.debug('Already in room, navigating to game', { roomCode: currentRoom.code });
       // Use setTimeout to avoid navigation during render
       setTimeout(() => {
         navigate('/game');
@@ -116,7 +117,7 @@ const HomePage: React.FC = () => {
           // User previously joined this room, so they're just reconnecting
           // Try again without password prompt (backend will allow as existing member)
           try {
-            console.log(`🔄 Reconnecting to room ${code} without password (previously joined)`);
+            logger.room.info('Reconnecting to room without password (previously joined)', { roomCode: code });
             shouldNavigate.current = true;
             await joinRoom(code.trim()); // No password
             sessionStorage.setItem(`room_joined_${code.trim()}`, 'true');
@@ -380,7 +381,10 @@ const HomePage: React.FC = () => {
                     setError('');
                     
                     try {
-                      console.log(`📝 Creating room with requirePassword=${requirePassword} (type: ${typeof requirePassword})`);
+                      logger.room.debug('Creating room', {
+                        requirePassword,
+                        requirePasswordType: typeof requirePassword,
+                      });
                       const roomData = await apiService.createRoom(roomName.trim(), {
                         max_players: maxPlayers,
                         board_size: boardSize,

@@ -24,6 +24,15 @@ html, body {
   overflow: hidden;
 }
 
+:root {
+  --page-header-height: 76px;
+  --page-header-padding-x: 16px;
+  --page-header-padding-y: 10px;
+  --page-header-logo-size: 46px;
+  --page-header-title-size: 1.75rem;
+  --page-header-tagline-size: 0.65rem;
+}
+
 /* ======================
    UNIFIED HEADER STYLES
    ====================== */
@@ -33,12 +42,43 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: var(--page-header-padding-y) var(--page-header-padding-x);
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  min-height: 60px;
+  min-height: var(--page-header-height);
+  height: var(--page-header-height);
   position: relative;
   z-index: 10;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* Make the Logo fit consistently inside headers */
+.page-header .gnarp-logo {
+  justify-content: flex-start;
+}
+
+.page-header .gnarp-logo .logo-container {
+  padding: 0;
+  gap: 10px;
+}
+
+.page-header .gnarp-logo .puzzle-icon {
+  width: var(--page-header-logo-size);
+  height: var(--page-header-logo-size);
+}
+
+.page-header .gnarp-logo .brand-name {
+  font-size: var(--page-header-title-size);
+}
+
+.page-header .gnarp-logo .logo-text {
+  gap: 2px;
+}
+
+.page-header .gnarp-logo .tagline {
+  font-size: var(--page-header-tagline-size);
+  letter-spacing: 0.9px;
 }
 
 .page-header-actions {

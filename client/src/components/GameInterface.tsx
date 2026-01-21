@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { GridCell } from '../types/game';
 import { useGame } from '../contexts/GameContext';
+import { logger } from '../utils/logger';
 import Brick from './Brick';
 import DraggableBrick from './DraggableBrick';
 import '../styles/board.css';
@@ -226,7 +227,7 @@ const GameInterface: React.FC = () => {
   // Clear temporaryPlacement when game phase changes away from letter_placement
   useEffect(() => {
     if (gamePhase !== 'letter_placement' && temporaryPlacement) {
-      console.log('🧹 Clearing temporaryPlacement due to phase change:', gamePhase);
+      logger.game.debug('Clearing temporaryPlacement due to phase change', { gamePhase });
       setTemporaryPlacement(null);
     }
   }, [gamePhase, temporaryPlacement]);
@@ -236,7 +237,10 @@ const GameInterface: React.FC = () => {
   useEffect(() => {
     // Only trigger if we're leaving letter_placement phase (not entering it)
     if (previousGamePhaseRef.current === 'letter_placement' && gamePhase !== 'letter_placement' && temporaryPlacement) {
-      console.log('⏰ Phase changed away from letter_placement - emergency saving:', temporaryPlacement);
+      logger.game.warn('Phase changed away from letter_placement - emergency saving placement', {
+        gamePhase,
+        temporaryPlacement,
+      });
       submitPlacement();
     }
     previousGamePhaseRef.current = gamePhase;
@@ -245,7 +249,10 @@ const GameInterface: React.FC = () => {
   // Auto-submit when timeout is imminent
   useEffect(() => {
     if (gamePhase === 'letter_placement' && gameTimer && gameTimer.remainingSeconds <= 1 && temporaryPlacement) {
-      console.log('⏰ 1 second left - auto-submitting placement:', temporaryPlacement);
+      logger.game.warn('1 second left - auto-submitting placement', {
+        remainingSeconds: gameTimer.remainingSeconds,
+        temporaryPlacement,
+      });
       submitPlacement();
     }
   }, [gameTimer?.remainingSeconds, gamePhase, temporaryPlacement]);
@@ -263,37 +270,39 @@ const GameInterface: React.FC = () => {
   // Single function to submit current placement - used by both OK button and timeout
   const submitPlacement = async () => {
     if (!temporaryPlacement) {
-      console.log('❌ No temporary placement to submit');
+      logger.game.debug('No temporary placement to submit');
       return;
     }
     
     if (submitInProgress) {
-      console.log('⚠️ Submit already in progress, skipping...');
+      logger.game.debug('Submit already in progress, skipping');
       return;
     }
-    
-    console.log('📤 submitPlacement called with position:', temporaryPlacement);
-    console.log('📤 Current gamePhase:', gamePhase);
-    console.log('📤 Current gameTimer:', gameTimer?.remainingSeconds);
+
+    logger.game.debug('submitPlacement called', {
+      temporaryPlacement,
+      gamePhase,
+      remainingSeconds: gameTimer?.remainingSeconds,
+    });
     
     try {
       setSubmitInProgress(true);
-      console.log('📤 Calling placeLetter with coordinates:', temporaryPlacement.x, temporaryPlacement.y);
+      logger.game.debug('Calling placeLetter', { x: temporaryPlacement.x, y: temporaryPlacement.y });
       await placeLetter(temporaryPlacement.x, temporaryPlacement.y);
-      console.log('📤 Calling confirmPlacement...');
+      logger.game.debug('Calling confirmPlacement');
       await confirmPlacement();
-      console.log('✅ Placement submitted successfully at position:', temporaryPlacement);
+      logger.game.debug('Placement submitted successfully', { temporaryPlacement });
       setTemporaryPlacement(null);
     } catch (err) {
-      console.error('❌ Failed to submit placement:', err);
+      logger.game.error('Failed to submit placement', { err });
       
       // Show user-friendly error message
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       if (errorMessage.includes('Session expired') || errorMessage.includes('User not found') || errorMessage.includes('please log in again')) {
-        console.log('🔄 Authentication expired during game - user will be redirected to login');
+        logger.auth.warn('Authentication expired during game - user will be redirected to login');
         // The apiService.request already handles redirect, but we can add user notification
       } else {
-        console.log('⚠️ Game placement failed:', errorMessage);
+        logger.game.warn('Game placement failed', { errorMessage });
       }
     } finally {
       setSubmitInProgress(false);
@@ -303,7 +312,7 @@ const GameInterface: React.FC = () => {
   const handleLetterSelect = (letter: string) => {
     // Local confirm step: choose letter, then confirm explicitly
     if (!isMyTurn || gamePhase !== 'letter_selection') {
-      console.log('❌ Cannot select letter - not your turn or wrong phase:', { isMyTurn, gamePhase });
+      logger.game.debug('Cannot select letter - not your turn or wrong phase', { isMyTurn, gamePhase });
       return;
     }
     setPendingLetter(letter);
@@ -323,7 +332,7 @@ const GameInterface: React.FC = () => {
   // Letter browsing handlers
   const handleLetterHover = useCallback((letter: string) => {
     if (!isMyTurn || gamePhase !== 'letter_selection') return;
-    console.log(`🔤 Browsing letter: ${letter}`);
+    logger.game.debug('Browsing letter', { letter });
     setBrowsingLetter(letter);
   }, [isMyTurn, gamePhase]);
 
@@ -336,27 +345,35 @@ const GameInterface: React.FC = () => {
   // Move placement when cell is clicked  
   const handleCellClick = (x: number, y: number) => {
     if (!currentPlayer || !selectedLetter || gamePhase !== 'letter_placement') {
-      console.log('❌ Cannot click cell:', { selectedLetter, gamePhase, hasCurrentPlayer: !!currentPlayer });
+      logger.game.debug('Cannot click cell', {
+        selectedLetter,
+        gamePhase,
+        hasCurrentPlayer: !!currentPlayer,
+      });
       return;
     }
 
     // Validate coordinates
     if (!currentPlayer.grid || !currentPlayer.grid[y] || !currentPlayer.grid[y][x]) {
-      console.error('❌ Invalid cell coordinates:', { x, y, gridSize: currentPlayer.grid?.length });
+      logger.game.error('Invalid cell coordinates', { x, y, gridSize: currentPlayer.grid?.length });
       return;
     }
 
     const cell = currentPlayer.grid[y][x];
     if (cell.letter) {
-      console.log(`❌ Cell (${x}, ${y}) already occupied with letter: ${cell.letter}`);
+      logger.game.debug('Cell already occupied', { x, y, letter: cell.letter });
       return; // Cell already occupied with permanent letter
     }
     
     const prevPlacement = temporaryPlacement;
     // Move temporary placement to clicked cell
     setTemporaryPlacement({ x, y, letter: selectedLetter });
-    
-    console.log(`📍 User moved placement from (${prevPlacement?.x}, ${prevPlacement?.y}) to (${x}, ${y}) for letter ${selectedLetter}`);
+
+    logger.game.debug('User moved placement', {
+      from: prevPlacement ? { x: prevPlacement.x, y: prevPlacement.y } : null,
+      to: { x, y },
+      letter: selectedLetter,
+    });
   };
 
   // Drag and drop handlers
@@ -376,7 +393,7 @@ const GameInterface: React.FC = () => {
       }
     }
 
-    console.log(`🎯 Started dragging letter: ${letter}`);
+    logger.game.debug('Started dragging letter', { letter, startCell: startCell ?? null });
   }, [gamePhase, currentPlayer]);
 
   const handleDragMove = useCallback((x: number, y: number) => {
@@ -397,7 +414,7 @@ const GameInterface: React.FC = () => {
     const cell = currentPlayer.grid[y]?.[x];
     if (cell && !cell.letter) {
       // Valid placement
-      console.log(`🎯 Drag placement: ${draggedLetter} to (${x}, ${y})`);
+      logger.game.debug('Drag placement', { letter: draggedLetter, x, y });
       
       // Set the letter selection if not already selected
       if (selectedLetter !== draggedLetter) {
@@ -424,7 +441,7 @@ const GameInterface: React.FC = () => {
     setIsDragActive(false);
     setDragPreviewCell(null);
     setDraggedLetter(null);
-    console.log('🎯 Drag cancelled');
+    logger.game.debug('Drag cancelled');
   }, []);
 
   const handleConfirmPlacement = async () => {

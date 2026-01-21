@@ -1,7 +1,9 @@
+import { logger } from './logger';
+
 // PWA Service Worker Registration
 export function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) {
-    console.log('Service Worker not supported');
+    logger.pwa.debug('Service Worker not supported');
     return;
   }
 
@@ -9,7 +11,7 @@ export function registerServiceWorker() {
   navigator.serviceWorker
     .register('/sw.js')
     .then((registration) => {
-      console.log('SW registered successfully:', registration.scope);
+      logger.pwa.debug('SW registered successfully', { scope: registration.scope });
       
       // Check for updates
       registration.addEventListener('updatefound', () => {
@@ -25,7 +27,7 @@ export function registerServiceWorker() {
       });
     })
     .catch((error) => {
-      console.log('SW registration failed:', error);
+      logger.pwa.warn('SW registration failed', { error });
     });
 
   // Listen for SW messages
@@ -33,7 +35,7 @@ export function registerServiceWorker() {
     if (event.data && event.data.type) {
       switch (event.data.type) {
         case 'CACHE_UPDATED':
-          console.log('Cache updated:', event.data.payload);
+          logger.pwa.debug('Cache updated', { payload: event.data.payload });
           break;
         case 'OFFLINE_READY':
           showOfflineReadyNotification();
@@ -49,7 +51,7 @@ let deferredPrompt: any = null;
 export function initPWAInstallPrompt() {
   // Skip install prompt in development mode
   if (import.meta.env.DEV || window.location.hostname === 'localhost') {
-    console.log('🚀 Development mode: PWA install prompt disabled');
+    logger.pwa.debug('Development mode: PWA install prompt disabled');
     return;
   }
   
@@ -62,7 +64,7 @@ export function initPWAInstallPrompt() {
 
   // Listen for successful install
   window.addEventListener('appinstalled', () => {
-    console.log('PWA installed successfully');
+    logger.pwa.info('PWA installed successfully');
     hideInstallPrompt();
     deferredPrompt = null;
   });
@@ -70,16 +72,16 @@ export function initPWAInstallPrompt() {
 
 export function triggerPWAInstall() {
   if (!deferredPrompt) {
-    console.log('Install prompt not available');
+    logger.pwa.debug('Install prompt not available');
     return;
   }
 
   deferredPrompt.prompt();
   deferredPrompt.userChoice.then((choiceResult: any) => {
     if (choiceResult.outcome === 'accepted') {
-      console.log('User accepted PWA install');
+      logger.pwa.info('User accepted PWA install');
     } else {
-      console.log('User dismissed PWA install');
+      logger.pwa.debug('User dismissed PWA install');
     }
     deferredPrompt = null;
     hideInstallPrompt();
@@ -93,13 +95,13 @@ export function initNetworkStatus() {
 
   // Listen for network changes
   window.addEventListener('online', () => {
-    console.log('Network: Online');
+    logger.pwa.debug('Network: Online');
     updateNetworkStatus(true);
     showNetworkStatusNotification('Du är online igen!', 'success');
   });
 
   window.addEventListener('offline', () => {
-    console.log('Network: Offline');
+    logger.pwa.debug('Network: Offline');
     updateNetworkStatus(false);
     showNetworkStatusNotification('Du är offline. Vissa funktioner är begränsade.', 'warning');
   });
@@ -215,7 +217,7 @@ export function requestBackgroundSync(tag: string) {
       // Type assertion for Background Sync API which might not be in all TypeScript definitions
       return (registration as any).sync.register(tag);
     }).catch((error) => {
-      console.log('Background sync registration failed:', error);
+      logger.pwa.debug('Background sync registration failed', { error });
     });
   }
 }
@@ -227,11 +229,11 @@ export function initPerformanceMonitoring() {
     window.addEventListener('load', () => {
       // Use more reliable timing measurement
       const loadTime = performance.now();
-      console.log(`App loaded in ${Math.round(loadTime)}ms`);
+      logger.pwa.debug('App loaded', { ms: Math.round(loadTime) });
       
       // Report to analytics if available
       if (loadTime > 3000) {
-        console.warn('Slow app loading detected:', Math.round(loadTime));
+        logger.pwa.warn('Slow app loading detected', { ms: Math.round(loadTime) });
       }
     });
     
@@ -239,7 +241,7 @@ export function initPerformanceMonitoring() {
     if ('navigation' in performance) {
       const nav = performance.navigation;
       if (nav.type === nav.TYPE_RELOAD) {
-        console.log('App reloaded');
+        logger.pwa.debug('App reloaded');
       }
     }
   }
@@ -252,5 +254,5 @@ export function initPWA() {
   initNetworkStatus();
   initPerformanceMonitoring();
   
-  console.log('PWA initialized');
+  logger.pwa.debug('PWA initialized');
 }

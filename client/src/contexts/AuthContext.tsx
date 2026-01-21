@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { AuthState } from '../types/game';
 import { apiService } from '../services/apiService';
 import { socketService } from '../services/socketService';
+import { logger } from '../utils/logger';
 
 interface AuthContextType extends AuthState {
   login: (username: string, password: string) => Promise<void>;
@@ -46,7 +47,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           await apiService.leaveRoom(roomCode, true);
         } catch (err) {
           // Best-effort: if token is expired/invalid, server will reject; we still clear local markers.
-          console.warn('⚠️ Failed to leave room during logout/account switch:', roomCode, err);
+          logger.room.warn('Failed to leave room during logout/account switch', { roomCode, err });
         } finally {
           sessionStorage.removeItem(key);
         }
@@ -196,7 +197,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // Check if user ID changed (indicating user was recreated)
       if (authState.user && user.id !== authState.user.id) {
-        console.log('ℹ️ User ID changed during refresh - user was likely recreated. Maintaining session.');
+        logger.auth.info('User ID changed during refresh - user was likely recreated. Maintaining session.');
       }
       
       setAuthState(prev => ({ ...prev, user, isAuthenticated: true }));
@@ -232,7 +233,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         await socketService.connect(apiService.getToken() || token);
         
       } catch (error) {
-        console.warn('Authentication check failed - token may be invalid:', error);
+        logger.auth.warn('Authentication check failed - token may be invalid', { error });
         // apiService.getCurrentUser() already handles token refresh and cleanup
         // so we just need to update our state
         setAuthState({
