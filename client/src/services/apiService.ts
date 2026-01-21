@@ -62,18 +62,28 @@ class ApiService {
         const errorData = await response.json().catch(() => ({} as any));
         const errorMessage = errorData?.error || errorData?.message || `HTTP ${response.status}: ${response.statusText}`;
 
+        const err: any = new Error(errorMessage);
+        err.status = response.status;
+        err.endpoint = endpoint;
+
         // Handle authentication errors with intelligent retry
         if (response.status === 403 || response.status === 401) {
+          // Special case: /me is used as a passive auth-check on startup.
+          // If token is stale/invalid, treat it as logged-out (no refresh attempts here).
+          if (endpoint === '/api/auth/me') {
+            this.clearToken();
+            throw err;
+          }
+
           // Don't retry for login/refresh endpoints to avoid infinite loops
           // Also don't retry for endpoints that can legitimately return 401 for non-token reasons.
           if (
             endpoint === '/api/auth/login' ||
             endpoint === '/api/auth/register' ||
             endpoint === '/api/auth/refresh' ||
-            endpoint === '/api/auth/me' ||
             endpoint === '/api/auth/password'
           ) {
-            throw new Error(errorMessage);
+            throw err;
           }
 
           logger.auth.info('Authentication failed - attempting token refresh', {
@@ -115,22 +125,27 @@ class ApiService {
           if (!retryResponse.ok) {
             const retryErrorData = await retryResponse.json().catch(() => ({} as any));
             const retryErrorMessage = retryErrorData?.error || retryErrorData?.message || `HTTP ${retryResponse.status}: ${retryResponse.statusText}`;
-            throw new Error(retryErrorMessage);
+            const retryErr: any = new Error(retryErrorMessage);
+            retryErr.status = retryResponse.status;
+            retryErr.endpoint = endpoint;
+            throw retryErr;
           }
 
           return await retryResponse.json();
         }
-        
-        throw new Error(errorMessage);
+
+        throw err;
       }
 
       return await response.json();
     } catch (error) {
       const message = (error as any)?.message ? String((error as any).message) : '';
       const lower = message.toLowerCase();
+      const status = (error as any)?.status;
       const isExpectedAuthFailure =
         (endpoint === '/api/auth/login' && lower.includes('invalid credentials')) ||
-        (endpoint === '/api/auth/password' && (lower.includes('current password is incorrect') || lower.includes('invalid credentials')));
+        (endpoint === '/api/auth/password' && (lower.includes('current password is incorrect') || lower.includes('invalid credentials'))) ||
+        (endpoint === '/api/auth/me' && (status === 401 || status === 403));
 
       if (!isExpectedAuthFailure) {
         logger.api.error('API Error', { endpoint, error });

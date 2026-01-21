@@ -233,7 +233,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         await socketService.connect(apiService.getToken() || token);
         
       } catch (error) {
-        logger.auth.warn('Authentication check failed - token may be invalid', { error });
+        const status = (error as any)?.status;
+        // Stale token on startup is common; treat as logged-out without noisy logs.
+        if (status !== 401 && status !== 403) {
+          logger.auth.warn('Authentication check failed', { error });
+        }
         // apiService.getCurrentUser() already handles token refresh and cleanup
         // so we just need to update our state
         setAuthState({
