@@ -1,6 +1,6 @@
 # GnarPuzzle - Mobile-First Utvecklingschecklista
 
-## 🚀 Current Status: **Phase 8 Deployment & Production - COMPLETE** ✅ **v2.0.0 RELEASE**
+## 🚀 Current Status: **Phase 8 Deployment & Production - COMPLETE** ✅ **v2.1.0 RELEASE**
 
 **✅ Completed**: Core multiplayer gameplay, UI polish, timer system, player ready status, performance optimization, render deployment configuration, **LIVE DEPLOYMENT**, all tests passing  
 **🎯 Next Phase**: Phase 9 - Advanced mobile features and PWA enhancements (optional)  
@@ -17,7 +17,7 @@
 - **Room Passwords**: ✅ COMPLETE - Rumskod kan användas som lösenord
 - **Live Deployment**: ✅ COMPLETE - Application successfully deployed to Render
 - **TypeScript Build**: ✅ COMPLETE - All compilation errors resolved for production build
-- **Test Suite**: ✅ COMPLETE - **71 tests passing | 22 skipped** (100% success rate on active tests)
+- **Test Suite**: ✅ COMPLETE - **141 tests passing | 22 skipped** (Client: 67 | Server: 74 passed, 22 skipped)
 
 **🎯 Phase 8 & Phase 9 Recent Fixes**:
 - ✅ Uppdaterad WordValidationService för att ladda ordlista från flera möjliga platser
@@ -71,13 +71,9 @@
 - **10 tests skipped** - but all tested functionality works in other test suites
 
 ### ✅ All Critical Functionality Tested
-- **Total test results**: 71 tests passing | 22 tests skipped (expected)
-  - Server: 10 passed, 2 skipped (migrations)
-  - Race conditions: 8 passed
-  - WordValidation: 17 passed
-  - RoomModel: 14 passed
-  - SocketService: 4 passed
-  - Integration routes: 6 passed
+- **Total test results**: 141 tests passing | 22 tests skipped (expected)
+  - Client: 67 passed
+  - Server: 74 passed | 22 skipped (migrations/isolation)
 
 ---
 
@@ -815,14 +811,14 @@
 
 **Startdatum**: 25 December 2025  
 **Nuvarande fas**: Fas 8.0 - Deployment & Production ✅ COMPLETE  
-**Senaste commit**: fix: Update RoomModel tests to match settings changes (dd7ec41)  
+**Senaste commit**: chore: move debug UI off main (bdc122f)  
 **Nästa milestone**: Phase 9 - Advanced Mobile Features & PWA Enhancement (optional)  
 
-**Senast slutfört (v2.0.0 Release)**:
+**Senast slutfört (v2.1.0 Release)**:
 - ✅ **Fas 1-3**: Complete full-stack implementation med React + Socket.IO + SQLite
 - ✅ **Fas 4.0-4.4**: Mobile-First Game Experience - All UI components COMPLETE
 - ✅ **Fas 5.1-5.3**: Performance optimization & mobile features COMPLETE
-- ✅ **Fas 7.1**: Automated Testing Infrastructure - 71 tests passing | 22 skipped (100% active tests)
+- ✅ **Fas 7.1**: Automated Testing Infrastructure - 141 tests passing | 22 skipped (expected)
 - ✅ **Fas 8**: Render deployment LIVE i produktion
 - ✅ **Game Scoring**: WordValidationService med 122,201 svenska ord FIXED
 - ✅ **Word Validation**: Endast giltiga ord från ordlistan får poäng FIXED
@@ -853,7 +849,7 @@
 - 🟢 **Production Deployment**: Live på Render med komplett funktionalitet
 - 🟢 **Frontend Build**: Optimerad för produktion med code splitting  
 - 🟢 **Backend API**: Express + Socket.IO + SQLite live deployment
-- 🟢 **Test Suite**: 58/58 tests passing (100% success rate)
+- 🟢 **Test Suite**: Senast verifierat lokalt: 141 tests passing | 22 skipped (expected)
 - 🟢 **Game Features**: Timer config, ready status, results screen, public rooms all functional
 - 🟢 **Mobile Optimization**: Purple theme, compact UI, responsive design complete
 
