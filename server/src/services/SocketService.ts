@@ -571,7 +571,8 @@ export class SocketService {
         userId: String(userData.userId),
         username: userData.username,
         isReady,
-        roomCode
+        roomCode,
+        readyPlayers: Array.from(readySet).map(String)
       });
 
       logger.info(`Player ready status changed: ${userData.username} -> ${isReady}`, {

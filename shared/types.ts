@@ -132,6 +132,7 @@ export interface SocketEvents {
     username: string;
     isReady: boolean;
     roomCode: string;
+    readyPlayers?: string[];
   }) => void;
 
   // Game events

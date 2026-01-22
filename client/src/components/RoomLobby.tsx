@@ -77,6 +77,10 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
         if (data.readyPlayers && Array.isArray(data.readyPlayers)) {
           const ready = new Set<string>(data.readyPlayers.map(String));
           setReadyPlayers(ready);
+
+          if (authUser?.id != null) {
+            setIsReady(ready.has(String(authUser.id)));
+          }
         }
       };
       
@@ -86,17 +90,31 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
         username: string;
         isReady: boolean;
         roomCode: string;
+        readyPlayers?: string[];
       }) => {
         if (data.roomCode === currentRoom.code) {
+          if (data.readyPlayers && Array.isArray(data.readyPlayers)) {
+            const ready = new Set<string>(data.readyPlayers.map(String));
+            setReadyPlayers(ready);
+            if (authUser?.id != null) {
+              setIsReady(ready.has(String(authUser.id)));
+            }
+            return;
+          }
+
           setReadyPlayers(prev => {
             const newSet = new Set(prev);
             if (data.isReady) {
-              newSet.add(data.userId);
+              newSet.add(String(data.userId));
             } else {
-              newSet.delete(data.userId);
+              newSet.delete(String(data.userId));
             }
             return newSet;
           });
+
+          if (authUser?.id != null && String(data.userId) === String(authUser.id)) {
+            setIsReady(data.isReady);
+          }
         }
       };
       
@@ -109,7 +127,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
         socketService.off('player:ready_changed', handlePlayerReadyChanged);
       };
     }
-  }, [currentRoom?.code]);
+  }, [currentRoom?.code, authUser?.id]);
 
   useEffect(() => {
     // Since Room doesn't have players property, always add user if room exists
@@ -160,6 +178,10 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
         if (data.readyPlayers && Array.isArray(data.readyPlayers)) {
           const ready = new Set<string>(data.readyPlayers.map(String));
           setReadyPlayers(ready);
+
+          if (authUser?.id != null) {
+            setIsReady(ready.has(String(authUser.id)));
+          }
         }
         
          // Update playerList directly from socket event (instant)
@@ -207,7 +229,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
       socketService.off('room:member_joined', handleMemberJoined);
       socketService.off('room:member_left', handleMemberLeft);
     };
-  }, [currentRoom?.code]);
+  }, [currentRoom?.code, authUser?.id]);
 
   const handleStartGame = async () => {
     if (!currentRoom || !canActuallyStartGame) {

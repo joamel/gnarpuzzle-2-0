@@ -11,6 +11,7 @@ class SocketService {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private pendingRoomJoins: string[] = [];
   private activeRoomCodes: Set<string> = new Set();
+  private pendingReadyStatusByRoom: Map<string, boolean> = new Map();
 
   connect(token: string): Promise<Socket> {
     if (this.socket?.connected) {
@@ -66,6 +67,14 @@ class SocketService {
           pending.forEach(roomCode => {
             this.socket?.emit('room:join', { roomCode });
           });
+        }
+
+        // Flush any ready-status intents that were triggered while offline.
+        if (this.pendingReadyStatusByRoom.size > 0) {
+          for (const [roomCode, isReady] of Array.from(this.pendingReadyStatusByRoom.entries())) {
+            this.socket?.emit('player:set_ready', { roomCode, isReady });
+          }
+          this.pendingReadyStatusByRoom.clear();
         }
         
         resolve(this.socket!);
@@ -130,6 +139,7 @@ class SocketService {
     // doesn't accidentally rejoin old rooms.
     this.pendingRoomJoins = [];
     this.activeRoomCodes.clear();
+    this.pendingReadyStatusByRoom.clear();
 
     // Clear all event listeners to prevent memory leaks
     this.eventListeners.clear();
@@ -198,7 +208,8 @@ class SocketService {
   // Set player ready status
   setPlayerReady(roomCode: string, isReady: boolean): void {
     if (!this.socket?.connected) {
-      logger.socket.debug('Socket not connected, cannot set ready status', { roomCode, isReady });
+      logger.socket.debug('Socket not connected, queueing ready status', { roomCode, isReady });
+      this.pendingReadyStatusByRoom.set(roomCode, isReady);
       return;
     }
     logger.socket.debug('Setting ready status', { roomCode, isReady });
