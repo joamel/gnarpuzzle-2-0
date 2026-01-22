@@ -411,9 +411,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
             {error}
           </div>
         )}
-      </div>
-
-      <div className="lobby-actions">
+        <div className="lobby-actions">
         {isActualOwner && (
           <>
             <button
@@ -460,6 +458,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
             )}
           </div>
         )}
+      </div>
       </div>
       
       <TipsModal 
