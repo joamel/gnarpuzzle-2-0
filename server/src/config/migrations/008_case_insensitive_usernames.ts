@@ -6,11 +6,11 @@ export const migration: Migration = {
   up: `
     -- Enforce case-insensitive uniqueness for usernames.
     -- This prevents creating both 'Joakim' and 'joakim'.
-    CREATE UNIQUE INDEX IF NOT EXISTS uidx_users_username_nocase
-      ON users(username COLLATE NOCASE);
+    CREATE UNIQUE INDEX IF NOT EXISTS uidx_users_username_ci
+      ON users(lower(username));
   `,
   down: `
-    DROP INDEX IF EXISTS uidx_users_username_nocase;
+    DROP INDEX IF EXISTS uidx_users_username_ci;
   `
 };
 

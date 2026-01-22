@@ -127,9 +127,17 @@ async function startServer() {
     await DatabaseManager.getInstance();
     logger.info('Database connected successfully');
 
-    // Seed database with initial data
-    const { seedDatabase } = await import('./config/seed');
-    await seedDatabase();
+    // Seed database with initial data.
+    // In production, keep this opt-in (SEED_DATABASE_ON_STARTUP=true).
+    const shouldSeed =
+      process.env.NODE_ENV === 'production'
+        ? process.env.SEED_DATABASE_ON_STARTUP === 'true'
+        : process.env.SEED_DATABASE_ON_STARTUP !== 'false';
+
+    if (shouldSeed) {
+      const { seedDatabase } = await import('./config/seed');
+      await seedDatabase();
+    }
 
     // Initialize Socket.IO service
     socketService = new SocketService(io);

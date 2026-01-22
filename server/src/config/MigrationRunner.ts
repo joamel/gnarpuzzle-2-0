@@ -1,4 +1,4 @@
-import { SQLiteDatabase } from './sqlite';
+import { DatabaseInterface } from './sqlite';
 import { dbLogger } from '../utils/logger';
 
 export interface SimpleMigration {
@@ -13,10 +13,10 @@ export interface SimpleMigration {
  * Keeps track of which migrations have been applied
  */
 export class MigrationRunner {
-  private db: SQLiteDatabase;
+  private db: DatabaseInterface;
   private migrations: SimpleMigration[] = [];
 
-  constructor(db: SQLiteDatabase) {
+  constructor(db: DatabaseInterface) {
     this.db = db;
   }
 
@@ -41,8 +41,8 @@ export class MigrationRunner {
       // Run pending migrations
       for (const migration of this.migrations) {
         const migrationId = String(migration.version).padStart(3, '0');
-        
-        if (!appliedMigrations.includes(migrationId)) {
+
+        if (!appliedMigrations.includes(migration.version)) {
           dbLogger.info('Running migration', { migrationId, name: migration.name });
           try {
             // Execute the up migration SQL
@@ -65,7 +65,7 @@ export class MigrationRunner {
                 }
               }
             }
-            await this.recordMigration(migrationId);
+            await this.recordMigration(migration.version, migration.name);
             dbLogger.info('Migration completed', { migrationId });
           } catch (error) {
             dbLogger.error('Migration failed', {
@@ -93,11 +93,12 @@ export class MigrationRunner {
    */
   private async ensureMigrationsTable(): Promise<void> {
     try {
+      // Use schema_migrations for portability across SQLite/Postgres.
       await this.db.exec(`
-        CREATE TABLE IF NOT EXISTS migrations (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          migration_name TEXT UNIQUE NOT NULL,
-          applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+          version INTEGER PRIMARY KEY,
+          name TEXT NOT NULL,
+          executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `);
     } catch (error) {
@@ -111,32 +112,45 @@ export class MigrationRunner {
   /**
    * Get list of applied migrations
    */
-  private async getAppliedMigrations(): Promise<string[]> {
+  private async getAppliedMigrations(): Promise<number[]> {
     try {
       const result = await this.db.all(
-        'SELECT migration_name FROM migrations ORDER BY applied_at'
+        'SELECT version FROM schema_migrations ORDER BY version'
       );
-      return result.map((row: any) => row.migration_name);
+      return result.map((row: any) => Number(row.version)).filter((v: number) => Number.isFinite(v));
     } catch (error) {
-      dbLogger.error('Failed to get applied migrations', {
-        error: error instanceof Error ? error.message : String(error)
-      });
-      return [];
+      // Backward compatibility: older DBs may have used `migrations(migration_name, applied_at)`.
+      try {
+        const legacy = await this.db.all(
+          'SELECT migration_name FROM migrations ORDER BY applied_at'
+        );
+        return legacy
+          .map((row: any) => Number.parseInt(String(row.migration_name), 10))
+          .filter((v: number) => Number.isFinite(v));
+      } catch (legacyError) {
+        dbLogger.error('Failed to get applied migrations', {
+          error: error instanceof Error ? error.message : String(error),
+          legacyError: legacyError instanceof Error ? legacyError.message : String(legacyError)
+        });
+        return [];
+      }
     }
   }
 
   /**
    * Record a migration as applied
    */
-  private async recordMigration(migrationName: string): Promise<void> {
+  private async recordMigration(version: number, name: string): Promise<void> {
     try {
       await this.db.run(
-        'INSERT INTO migrations (migration_name) VALUES (?)',
-        migrationName
+        'INSERT INTO schema_migrations (version, name) VALUES (?, ?)',
+        version,
+        name
       );
     } catch (error) {
       dbLogger.error('Failed to record migration', {
-        migrationName,
+        version,
+        name,
         error: error instanceof Error ? error.message : String(error)
       });
       throw error;

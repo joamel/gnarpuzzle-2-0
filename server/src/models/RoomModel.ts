@@ -275,6 +275,11 @@ export class RoomModel {
   static async deleteEmptyRooms(): Promise<number> {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
+
+    const cutoff = new Date(Date.now() - 10 * 60_000)
+      .toISOString()
+      .slice(0, 19)
+      .replace('T', ' ');
     
     const result = await db.run(`
       DELETE FROM rooms 
@@ -283,9 +288,9 @@ export class RoomModel {
         FROM rooms r
         LEFT JOIN room_members rm ON r.id = rm.room_id
         WHERE rm.room_id IS NULL 
-        AND r.created_at < datetime('now', '-10 minutes')
+        AND r.created_at < ?
       )
-    `);
+    `, cutoff);
     
     return result.changes;
   }

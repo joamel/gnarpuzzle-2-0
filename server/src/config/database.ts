@@ -4,6 +4,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { DatabaseInterface, SQLiteDatabase } from './sqlite';
+import { PostgresDatabase } from './postgres';
 import { dbLogger } from '../utils/logger';
 
 // Import all migrations
@@ -238,6 +239,7 @@ export class DatabaseManager {
   }
 
   private async init(): Promise<void> {
+    const postgresUrl = process.env.DATABASE_URL;
     const dbPath =
       process.env.DATABASE_PATH ||
       process.env.DB_PATH ||
@@ -247,6 +249,42 @@ export class DatabaseManager {
     const dbDir = path.dirname(dbPath);
     if (!fs.existsSync(dbDir)) {
       fs.mkdirSync(dbDir, { recursive: true });
+    }
+
+    // Prefer Postgres when DATABASE_URL is provided (recommended for Render free tier).
+    if (postgresUrl) {
+      this.db = new PostgresDatabase(postgresUrl);
+      dbLogger.info('Using Postgres database (DATABASE_URL provided)');
+      
+      // Run migrations to create schema
+      dbLogger.info('Running database migrations');
+      const { MigrationRunner } = await import('./MigrationRunner');
+      const migrationRunner = new MigrationRunner(this.db);
+      
+      // Register all migrations in order
+      migrationRunner.registerMigration(m001);
+      migrationRunner.registerMigration(m002);
+      migrationRunner.registerMigration(m003);
+      migrationRunner.registerMigration(m004);
+      migrationRunner.registerMigration(m005);
+      migrationRunner.registerMigration(m006);
+      migrationRunner.registerMigration(m007);
+      migrationRunner.registerMigration(m008);
+      
+      // Run all pending migrations
+      await migrationRunner.runPendingMigrations();
+      
+      // Development mode: Clear/reset rooms on startup
+      if (process.env.NODE_ENV !== 'production') {
+        const clearMode = process.env.DB_CLEAR_MODE || 'reset'; // 'clear', 'reset', or 'none'
+        
+        if (clearMode === 'clear') {
+          await (this.db as any).clearAllRoomsAndGames();
+        } else if (clearMode === 'reset') {
+          await (this.db as any).resetPlayingRooms();
+        }
+      }
+      return;
     }
 
     // Try to use SQLite if available, otherwise fallback to mock
@@ -267,7 +305,7 @@ export class DatabaseManager {
       // Run migrations to create schema
       dbLogger.info('Running database migrations');
       const { MigrationRunner } = await import('./MigrationRunner');
-      const migrationRunner = new MigrationRunner(this.db as SQLiteDatabase);
+      const migrationRunner = new MigrationRunner(this.db);
       
       // Register all migrations in order
       migrationRunner.registerMigration(m001);
@@ -281,7 +319,7 @@ export class DatabaseManager {
       
       // Run all pending migrations
       await migrationRunner.runPendingMigrations();
-      
+
       // Development mode: Clear/reset rooms on startup
       if (process.env.NODE_ENV !== 'production') {
         const clearMode = process.env.DB_CLEAR_MODE || 'reset'; // 'clear', 'reset', or 'none'

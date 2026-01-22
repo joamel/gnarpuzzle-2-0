@@ -56,7 +56,7 @@ export class UserModel {
     const db = dbManager.getDatabase();
     
     return await db.get(`
-      SELECT * FROM users WHERE username COLLATE NOCASE = ?
+      SELECT * FROM users WHERE lower(username) = lower(?)
     `, username) as User | null;
   }
 
@@ -134,7 +134,7 @@ export class UserModel {
     const db = dbManager.getDatabase();
     
     const result = await db.get(`
-      SELECT 1 FROM users WHERE username COLLATE NOCASE = ? LIMIT 1
+      SELECT 1 FROM users WHERE lower(username) = lower(?) LIMIT 1
     `, username);
     
     return !!result;
@@ -143,11 +143,16 @@ export class UserModel {
   static async getActiveUsers(minutesAgo = 60): Promise<User[]> {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
+
+    const cutoff = new Date(Date.now() - minutesAgo * 60_000)
+      .toISOString()
+      .slice(0, 19)
+      .replace('T', ' ');
     
     return await db.all(`
       SELECT * FROM users 
-      WHERE last_active > datetime('now', '-' || ? || ' minutes')
+      WHERE last_active > ?
       ORDER BY last_active DESC
-    `, minutesAgo) as User[];
+    `, cutoff) as User[];
   }
 }
