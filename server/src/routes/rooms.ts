@@ -109,6 +109,20 @@ router.post('/', AuthService.authenticateToken, async (req, res) => {
       return;
     }
 
+    // Rate limit / guardrail: prevent users from creating multiple active rooms.
+    // The app expects a user to be in at most one room at a time.
+    const existingRooms = await RoomModel.getUserRooms(authReq.user!.id);
+    const activeRooms = existingRooms.filter(r => r.status === 'waiting' || r.status === 'playing');
+    if (activeRooms.length > 0) {
+      const room0 = activeRooms[0];
+      res.status(429).json({
+        error: 'Room creation limited',
+        message: `Du har redan ett aktivt rum (${room0.code}). Lämna rummet innan du skapar ett nytt.`,
+        activeRoom: { code: room0.code, name: room0.name, status: room0.status }
+      });
+      return;
+    }
+
     const room = await RoomModel.create({
       name,
       created_by: authReq.user!.id,
