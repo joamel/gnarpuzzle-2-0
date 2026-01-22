@@ -813,7 +813,7 @@ export class GameStateService {
 
     await db.run(`
       UPDATE games 
-      SET state = 'finished', current_phase = 'finished', finished_at = datetime('now')
+      SET state = 'finished', current_phase = 'finished', finished_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `, gameId);
 
@@ -1049,7 +1049,10 @@ export class GameStateService {
       this.clearGameTimer(gameId);
       
       // Update game state to finished
-      await db.run(`UPDATE games SET state = 'finished', current_phase = 'finished' WHERE id = ?`, gameId);
+      await db.run(
+        `UPDATE games SET state = 'finished', current_phase = 'finished', finished_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        gameId
+      );
       
       // Update room status back to waiting
       await db.run(`UPDATE rooms SET status = 'waiting' WHERE id = ?`, game.room_id);
@@ -1057,16 +1060,62 @@ export class GameStateService {
       // Get room code for socket broadcast
       const room = await db.get(`SELECT code FROM rooms WHERE id = ?`, game.room_id) as { code: string } | undefined;
       
+      let leaderboard: Array<{ userId: number; username: string; score: number; words: any[] }> = [];
+
+      if (remainingPlayers.length === 1) {
+        const winnerUserId = remainingPlayers[0].user_id;
+
+        // Calculate score from current grid if possible; then ensure at least 1 point for walkover.
+        try {
+          await this.calculatePlayerScore(gameId, winnerUserId);
+        } catch (scoreErr) {
+          gameLogger.warn('Failed to calculate winner score for walkover', {
+            gameId,
+            winnerUserId,
+            error: (scoreErr as Error)?.message
+          });
+        }
+
+        const winnerUser = await db.get(`SELECT username FROM users WHERE id = ?`, winnerUserId) as { username?: string } | undefined;
+        const winnerRow = await db.get(
+          `SELECT final_score as finalScore, words_found as wordsFound FROM players WHERE game_id = ? AND user_id = ?`,
+          gameId,
+          winnerUserId
+        ) as { finalScore?: number; wordsFound?: string } | undefined;
+
+        let winnerScore = Number(winnerRow?.finalScore || 0);
+        let winnerWords: any[] = [];
+        try {
+          winnerWords = JSON.parse(winnerRow?.wordsFound || '[]');
+          if (!Array.isArray(winnerWords)) winnerWords = [];
+        } catch {
+          winnerWords = [];
+        }
+
+        if (!Number.isFinite(winnerScore) || winnerScore < 1) {
+          winnerScore = 1;
+          await db.run(
+            `UPDATE players SET final_score = ?, words_found = ? WHERE game_id = ? AND user_id = ?`,
+            winnerScore,
+            JSON.stringify(winnerWords),
+            gameId,
+            winnerUserId
+          );
+        }
+
+        leaderboard = [{
+          userId: winnerUserId,
+          username: winnerUser?.username || 'Vinnare',
+          score: winnerScore,
+          words: winnerWords
+        }];
+      }
+
       const gameEndedData = {
         gameId,
         reason: 'player_left',
         message: 'Spelet avslutades eftersom en spelare lämnade',
-        leaderboard: remainingPlayers.length === 1 ? [{
-          userId: remainingPlayers[0].user_id,
-          username: 'Vinnare',
-          score: 0,
-          words: []
-        }] : [],
+        leaderboard,
         finalScores: {}
       };
       

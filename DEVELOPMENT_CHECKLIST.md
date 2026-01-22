@@ -56,6 +56,50 @@ Målet här är att lista *vad som finns* på hög nivå – detaljer finns i ko
 
 ## 🧭 Fas 9: Post-release förbättringar (NEXT, optional)
 
+### 9.0 P0/P1 – Buggar & måste-fixar
+
+#### P0 (högsta prioritet)
+- [ ] **BUG: Ready-status syncar inte stabilt i lobby**
+	- Symptom: När en spelare togglar “redo” uppdateras inte andra klienter (ibland krävs flera försök/refresh/rejoin innan start går).
+	- Impact: Blockerar start av spel → **måste fixas**.
+	- Repro (förslag):
+		- Skapa rum på en telefon + anslut 1–2 andra klienter
+		- Toggla redo/inte redo snabbt, byt nät (WiFi/4G), låt en klient gå i bakgrunden/återvänd
+		- Observera om “alla redo” och UI-indikatorer divergerar mellan klienter
+	- Acceptans:
+		- Alla clients ser samma ready-state inom < 250ms under normal latency
+		- Efter reconnect ska klienten alltid synka korrekt state utan manuell refresh
+		- Start-knappen ska aldrig låsas p.g.a. stale ready-state
+
+#### P1
+- [ ] **Svensk tid för “Senast spelat” (GMT+1 / Europe/Stockholm)**
+	- Beslut: Visa alltid tid i **Europe/Stockholm** (inte serverns timezone).
+	- Förslag på lösning: Server returnerar timestamp i ISO 8601 (UTC, t.ex. `2026-01-22T13:37:00Z`) och client formaterar med `Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Stockholm' })`.
+	- Acceptans: “Senast spelat” matchar svensk lokal tid även om server kör UTC.
+
+### 9.5 Rooms – Moderation & regler
+- [ ] **Kick-funktion (spelledare/room owner)**
+	- Endast room creator (eller admin) kan kicka.
+	- Kick ska funka både i lobby och under spel (definiera policy: auto-walkover/abandon?).
+	- Acceptans: Kickad spelare lämnar rummet direkt, får tydligt meddelande, kan ev. re-join om room inte är låst.
+
+- [ ] **Rate limit: skapa rum max 1 per användare per 5 min (eller max 1 aktivt rum)**
+	- En användare ska inte kunna skapa flera rum i snabb följd.
+	- Förslag: 
+		- Antingen: “max 1 aktivt rum” per user
+		- Eller: “cooldown 5 min” på create-room endpoint
+	- Acceptans: UI visar begripligt fel (och ev. nedräkning) om användaren försöker skapa för tidigt.
+
+- [ ] **Auto-städa tomma rum snabbt**
+	- Rum utan deltagare ska försvinna efter t.ex. 5 min.
+	- Definiera “tomt”: inga room_members (inkl creator om den lämnade).
+	- Acceptans: Tomma rum tas bort utan att störa aktiva rum; listan uppdateras i realtid.
+
+### 9.6 Lobby UX – mobil
+- [ ] **Start-knapp alltid synlig på mobil (ingen scroll för att starta)**
+	- Förslag: gör start-CTA + “redo-status sammanfattning” sticky/absolute nere till höger (eller sticky footer).
+	- Acceptans: På 360×640 (typisk mobil) syns start-knapp + redo-indikator alltid.
+
 ### 9.1 Logging & Observability
 - [ ] Sentry (client + server) eller motsvarande error tracking
 - [ ] Produktions-metadata i loggar (requestId, userId när möjligt)

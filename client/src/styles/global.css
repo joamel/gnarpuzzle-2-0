@@ -199,13 +199,18 @@ html, body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: white;
+  background: linear-gradient(180deg, #ffffff 0%, #fbf7ff 100%);
   border-radius: 16px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
   z-index: 1001;
   max-width: 420px;
   width: 92vw;
   overflow: hidden;
+  color: #241a38;
+}
+
+.user-stats-modal .modal-content {
+  color: #241a38;
 }
 
 .user-stats-grid {
@@ -219,9 +224,19 @@ html, body {
   align-items: center;
   justify-content: space-between;
   padding: 10px 12px;
-  background: rgba(102, 126, 234, 0.06);
-  border: 1px solid rgba(102, 126, 234, 0.12);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.10) 0%, rgba(118, 75, 162, 0.08) 100%);
+  border: 1px solid rgba(118, 75, 162, 0.18);
   border-radius: 10px;
+  box-shadow: 0 6px 14px rgba(118, 75, 162, 0.08);
+}
+
+.user-stats-row span {
+  color: rgba(36, 26, 56, 0.88);
+}
+
+.user-stats-row strong {
+  color: #241a38;
+  font-variant-numeric: tabular-nums;
 }
 
 .header-online-stats {

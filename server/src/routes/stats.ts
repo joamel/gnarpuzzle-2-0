@@ -11,6 +11,9 @@ const router = express.Router();
 type UserStats = {
   gamesPlayed: number;
   gamesFinished: number;
+  wins: number;
+  draws: number;
+  losses: number;
   totalScore: number;
   bestScore: number;
   averageScore: number;
@@ -175,6 +178,9 @@ router.get('/me', AuthService.authenticateToken, async (req, res) => {
 
     const gameIds = new Set<number>();
     let gamesFinished = 0;
+    let wins = 0;
+    let draws = 0;
+    let losses = 0;
     let totalScore = 0;
     let bestScore = 0;
     let scoredGames = 0;
@@ -200,9 +206,66 @@ router.get('/me', AuthService.authenticateToken, async (req, res) => {
       if (!lastPlayedAt) lastPlayedAt = playedAt;
     }
 
+    // Calculate W/D/L per game by comparing the user's score to all players in that game.
+    if (gameIds.size > 0) {
+      const ids = Array.from(gameIds);
+      const placeholders = ids.map(() => '?').join(',');
+
+      const allPlayers = await db.all(
+        `
+          SELECT game_id as gameId, user_id as userId, score as score, final_score as finalScore
+          FROM players
+          WHERE game_id IN (${placeholders})
+        `,
+        ...ids
+      ) as Array<{
+        gameId: number;
+        userId: number;
+        score: number;
+        finalScore: number;
+      }>;
+
+      const byGame = new Map<number, Array<{ userId: number; score: number; finalScore: number }>>();
+      for (const p of allPlayers) {
+        const list = byGame.get(p.gameId) || [];
+        list.push({
+          userId: p.userId,
+          score: p.score,
+          finalScore: p.finalScore
+        });
+        byGame.set(p.gameId, list);
+      }
+
+      for (const [gameId, players] of byGame.entries()) {
+        const normalized = players.map(p => {
+          const raw = Number.isFinite(p.finalScore) && p.finalScore > 0 ? p.finalScore : p.score;
+          return {
+            userId: p.userId,
+            score: Number.isFinite(raw) ? raw : 0
+          };
+        });
+
+        const me = normalized.find(p => p.userId === user.id);
+        if (!me) continue;
+
+        const maxScore = normalized.reduce((m, p) => Math.max(m, p.score), 0);
+        const maxCount = normalized.filter(p => p.score === maxScore).length;
+
+        if (me.score === maxScore) {
+          if (maxCount > 1) draws += 1;
+          else wins += 1;
+        } else {
+          losses += 1;
+        }
+      }
+    }
+
     const stats: UserStats = {
       gamesPlayed: gameIds.size,
       gamesFinished,
+      wins,
+      draws,
+      losses,
       totalScore,
       bestScore,
       averageScore: scoredGames > 0 ? Math.round((totalScore / scoredGames) * 10) / 10 : 0,

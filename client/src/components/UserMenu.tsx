@@ -269,13 +269,18 @@ const UserMenu: React.FC<UserMenuProps> = ({ className }) => {
                 <p style={{ color: '#b00020' }}>{statsError}</p>
               ) : stats ? (
                 <div className="user-stats-grid">
-                  <div className="user-stats-row"><span>Spelade matcher</span><strong>{stats.gamesPlayed}</strong></div>
-                  <div className="user-stats-row"><span>Avslutade matcher</span><strong>{stats.gamesFinished}</strong></div>
-                  <div className="user-stats-row"><span>Totalpoäng</span><strong>{stats.totalScore}</strong></div>
-                  <div className="user-stats-row"><span>Bästa poäng</span><strong>{stats.bestScore}</strong></div>
-                  <div className="user-stats-row"><span>Snittpoäng</span><strong>{stats.averageScore}</strong></div>
-                  <div className="user-stats-row"><span>Ord hittade</span><strong>{stats.totalWordsFound}</strong></div>
-                  <div className="user-stats-row"><span>Senast spelat</span><strong>{formatDateTime(stats.lastPlayedAt)}</strong></div>
+                  <div className="user-stats-row"><span>🎮 Spelade matcher</span><strong>{stats.gamesPlayed}</strong></div>
+                  <div className="user-stats-row"><span>✅ Avslutade matcher</span><strong>{stats.gamesFinished}</strong></div>
+
+                  <div className="user-stats-row"><span>🏆 Vinster</span><strong>{stats.wins}</strong></div>
+                  <div className="user-stats-row"><span>🤝 Oavgjorda</span><strong>{stats.draws}</strong></div>
+                  <div className="user-stats-row"><span>💔 Förluster</span><strong>{stats.losses}</strong></div>
+
+                  <div className="user-stats-row"><span>⭐ Totalpoäng</span><strong>{stats.totalScore}</strong></div>
+                  <div className="user-stats-row"><span>🥇 Bästa poäng</span><strong>{stats.bestScore}</strong></div>
+                  <div className="user-stats-row"><span>📈 Snittpoäng</span><strong>{stats.averageScore}</strong></div>
+                  <div className="user-stats-row"><span>🔤 Ord hittade</span><strong>{stats.totalWordsFound}</strong></div>
+                  <div className="user-stats-row"><span>🕒 Senast spelat</span><strong>{formatDateTime(stats.lastPlayedAt)}</strong></div>
                 </div>
               ) : (
                 <p>Ingen statistik ännu.</p>
