@@ -1,6 +1,7 @@
 /* Game Page Styles */
 .game-page {
-  height: 100vh;
+  min-height: 100vh;
+  height: 100dvh;
   background: #f8f9fa;
   display: flex;
   flex-direction: column;
