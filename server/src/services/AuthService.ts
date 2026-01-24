@@ -628,6 +628,13 @@ export class AuthService {
           id: decoded.userId,
           username: decoded.username
         };
+
+        // Best-effort: keep last_active updated even for optionally-authenticated routes.
+        // This prevents GuestCleanupService from deleting active guest users who are polling
+        // room state via GET endpoints.
+        void UserModel.updateLastActive(decoded.userId).catch(() => {
+          // ignore
+        });
       }
     }
 

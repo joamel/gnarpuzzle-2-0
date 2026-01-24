@@ -275,11 +275,26 @@
   border: 1px solid transparent;
   min-height: 28px;
   flex-shrink: 0;
+  position: relative;
+  overflow: visible;
 }
 
 .player-item:not(.empty) {
   background: #f8f9ff;
   border-color: #e6edff;
+}
+
+.player-item.kickable {
+  cursor: pointer;
+}
+
+.player-item.kickable:hover {
+  border-color: rgba(220, 38, 38, 0.22);
+}
+
+.player-item.kickable:focus-visible {
+  outline: 2px solid rgba(102, 126, 234, 0.55);
+  outline-offset: 2px;
 }
 
 .player-item.empty {
@@ -306,6 +321,13 @@
   min-width: auto;
 }
 
+.player-item.kickable .player-name {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: rgba(185, 28, 28, 0.45);
+  text-underline-offset: 2px;
+}
+
 .player-item.empty .player-status {
   display: none;
 }
@@ -315,6 +337,131 @@
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.player-kick-menu {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid #e6edff;
+  background: #f8f9ff;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.10);
+  z-index: 20;
+}
+
+.player-kick-menu-label {
+  display: block;
+  height: 28px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 28px;
+  color: #111;
+  margin-right: 6px;
+  user-select: none;
+  pointer-events: none;
+}
+
+.player-kick-menu-confirm,
+.player-kick-menu-cancel {
+  appearance: none;
+  width: 26px;
+  height: 28px;
+  max-width: 26px;
+  flex: 0 0 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  /* SVG icons handle the visuals */
+  font-size: 0;
+  font-weight: 900;
+  line-height: 1;
+  padding: 0;
+  min-height: 0;
+  min-width: 0;
+  margin: 0;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  color: #111;
+  font-family: inherit;
+  transition: background 0.12s ease;
+  box-sizing: border-box;
+}
+
+/* Prevent global button hover/active transforms from shifting these tiny controls */
+.player-kick-menu-confirm:hover,
+.player-kick-menu-cancel:hover,
+.player-kick-menu-confirm:active,
+.player-kick-menu-cancel:active {
+  transform: none;
+}
+
+/* Mobile global CSS sets `button { width: 100%; margin-bottom: 8px; }`.
+   Ensure these tiny controls stay compact. */
+@media (max-width: 480px) {
+  .player-kick-menu-confirm,
+  .player-kick-menu-cancel {
+    width: 26px;
+    max-width: 26px;
+    margin: 0;
+  }
+}
+
+.player-kick-menu-icon {
+  width: 12px;
+  height: 12px;
+  display: block;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  /* Optical centering: some mobile browsers render strokes a hair high */
+  transform: translateY(0.5px);
+}
+
+.player-kick-menu-confirm {
+  /* Intentionally neutral */
+}
+
+.player-kick-menu-confirm:hover {
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.player-kick-menu-cancel {
+  margin-left: 4px;
+}
+
+.player-kick-menu-cancel:hover {
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.kick-player-button {
+  appearance: none;
+  border: 1px solid rgba(220, 38, 38, 0.5);
+  background: rgba(220, 38, 38, 0.08);
+  color: #b91c1c;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.kick-player-button:hover {
+  background: rgba(220, 38, 38, 0.14);
+}
+
+.kick-player-button:active {
+  transform: translateY(0.5px);
 }
 
 .ready-checkbox {

@@ -2,6 +2,7 @@ import { Server as SocketServer, Socket } from 'socket.io';
 import { authLogger, gameLogger, logger, socketLogger } from '../utils/logger';
 import { GameStateService } from './GameStateService';
 import { AuthService } from './AuthService';
+import { UserModel } from '../models';
 
 // Types for Socket.IO events
 export interface RoomEventData {
@@ -175,6 +176,13 @@ export class SocketService {
       // all prior rooms to avoid receiving events for the old identity.
       if (previousUserData?.userId && previousUserData.userId !== userData.userId) {
         try {
+          // Best-effort: treat a successful socket authentication as activity.
+          // Keeps guest sessions from being collected while they're actively connected.
+          try {
+            await UserModel.updateLastActive(decoded.userId);
+          } catch {
+            // best-effort
+          }
           for (const roomName of socket.rooms) {
             if (roomName === socket.id || roomName === 'lobby') {
               continue;
@@ -310,10 +318,31 @@ export class SocketService {
       }
 
       // Add user to room_members table (if not already there)
+      // IMPORTANT: Only broadcast `room:member_joined` when membership actually changes.
+      // The REST join endpoint already broadcasts join events; this socket event is
+      // also used on reconnect to resync state and should not create duplicate join UX.
       const isMember = await RoomModel.isMember(room.id, userData.userId);
+      let addedToRoomMembers = false;
       if (!isMember) {
-        await RoomModel.addMember(room.id, userData.userId);
-        logger.info(`User ${userData.username} added to room_members for room ${roomCode}`);
+        const inserted = await RoomModel.addMember(room.id, userData.userId);
+        if (inserted) {
+          addedToRoomMembers = true;
+          logger.info(`User ${userData.username} added to room_members for room ${roomCode}`);
+        } else {
+          // Could be a race with the REST join (unique constraint), or a real DB failure.
+          // If membership still isn't present after the attempted insert, treat this as a failure.
+          const nowMember = await RoomModel.isMember(room.id, userData.userId);
+          if (!nowMember) {
+            socket.emit('error', { message: 'Failed to join room' });
+            socketLogger.warn('handleRoomJoin failed to ensure DB membership', {
+              roomCode,
+              roomId: room.id,
+              userId: userData.userId,
+              username: userData.username,
+            });
+            return;
+          }
+        }
       }
 
       // NOW get members (after adding the user)
@@ -326,32 +355,52 @@ export class SocketService {
       // Remove any stale ready entries for users no longer in the room.
       this.reconcileRoomReadyStatus(roomCode, members.map(m => String(m.id)));
 
-      // Notify others in the room
-      socket.to(`room:${roomCode}`).emit('room:member_joined', {
-        user: {
-          id: userData.userId,
-          username: userData.username
-        },
-        room: {
-          id: room.id,
-          code: room.code,
-          name: room.name,
-          members: members.map(m => ({
-            userId: String(m.id),
-            username: m.username,
-            role: m.id === room.created_by ? 'owner' : 'member'
-          }))
-        },
-        memberCount: members.length,
-        roomCode,
-        readyPlayers: Array.from(this.roomPlayerReadyStatus.get(roomCode) || []).map(String)
-      });
+      // Notify others in the room only when membership changes (true join, not reconnect)
+      if (addedToRoomMembers) {
+        socket.to(`room:${roomCode}`).emit('room:member_joined', {
+          user: {
+            id: userData.userId,
+            username: userData.username,
+          },
+          room: {
+            id: room.id,
+            code: room.code,
+            name: room.name,
+            members: members.map(m => ({
+              userId: String(m.id),
+              username: m.username,
+              role: m.id === room.created_by ? 'owner' : 'member',
+            })),
+          },
+          memberCount: members.length,
+          roomCode,
+          readyPlayers: Array.from(this.roomPlayerReadyStatus.get(roomCode) || []).map(String),
+        });
 
-      socketLogger.debug('Broadcasting room:member_joined to other players', {
-        newJoiner: userData.username,
-        roomCode,
-        readyPlayers: Array.from(this.roomPlayerReadyStatus.get(roomCode) || []).map(String),
-      });
+        socketLogger.debug('Broadcasting room:member_joined to other players', {
+          newJoiner: userData.username,
+          roomCode,
+          readyPlayers: Array.from(this.roomPlayerReadyStatus.get(roomCode) || []).map(String),
+        });
+      }
+
+      // Always emit an authoritative membership snapshot for resync purposes.
+      // This helps clients recover from missed events or reconnect timing.
+      try {
+        const payload = {
+          roomCode,
+          members: members.map(m => ({ id: m.id, username: m.username })),
+          createdBy: room.created_by,
+          memberCount: members.length,
+          readyPlayers: Array.from(this.roomPlayerReadyStatus.get(roomCode) || []).map(String),
+          reason: addedToRoomMembers ? 'joined_socket' : 'reconnect_socket',
+        };
+
+        this.io.to(`room:${roomCode}`).emit('room:members_updated', payload);
+        this.emitToUserId(room.created_by, 'room:members_updated', payload);
+      } catch {
+        // best-effort
+      }
 
       // Send room data to joining user
       socket.emit('room:joined', {
@@ -1100,6 +1149,32 @@ export class SocketService {
 
   public emitToUser(socketId: string, event: string, data: any): void {
     this.io.to(socketId).emit(event, data);
+  }
+
+  public emitToUserId(userId: number | string, event: string, data: any): void {
+    const userIdStr = String(userId);
+    for (const [socketId, userData] of this.connectedUsers.entries()) {
+      if (userData.userId?.toString() === userIdStr) {
+        this.io.to(socketId).emit(event, data);
+      }
+    }
+  }
+
+  public leaveRoomForUserId(userId: number | string, roomCode: string): void {
+    const userIdStr = String(userId);
+    const roomName = `room:${roomCode}`;
+
+    for (const [socketId, userData] of this.connectedUsers.entries()) {
+      if (userData.userId?.toString() === userIdStr) {
+        const socket = this.io.sockets.sockets.get(socketId);
+        if (socket) {
+          socket.leave(roomName);
+        }
+        if (userData.roomCode === roomCode) {
+          this.connectedUsers.set(socketId, { ...userData, roomCode: undefined });
+        }
+      }
+    }
   }
 
   public joinRoom(userId: string, roomCode: string): void {

@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useGame } from '../contexts/GameContext';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/apiService';
 import { socketService } from '../services/socketService';
+import { showToast } from '../utils/toast';
 import { useNavigate } from 'react-router-dom';
+import { normalizeRoomCode } from '../utils/roomCode';
 import RoomSettings from './RoomSettings';
 import PlayersList from './PlayersList';
 import TipsModal from './TipsModal';
@@ -24,6 +26,8 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   const { user: authUser } = useAuth();
   const { currentRoom, startGame, isLoading, error, leaveRoom } = useGame();
   const navigate = useNavigate();
+
+  const roomCode = normalizeRoomCode(currentRoom?.code);
   
   // Initialize player list
   const [playerList, setPlayerList] = useState<LobbyMember[]>([]);
@@ -34,6 +38,12 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   const [readyPlayers, setReadyPlayers] = useState<Set<string>>(new Set());
   const [isReady, setIsReady] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+
+  // Deduplicate join toasts (server may emit multiple join events)
+  const lastJoinToastRef = useRef<{ key: string; at: number } | null>(null);
+  const membershipResyncTimersRef = useRef<number[]>([]);
+  const hasInitializedMembersRef = useRef(false);
+  const knownMembersRef = useRef<Map<string, string>>(new Map());
 
   // authUser is direct User object {id, username} - NOT {user: {id, username}}
   const isOwner = currentRoom && authUser && String(currentRoom.createdBy).trim() === String(authUser.id).trim();
@@ -48,6 +58,8 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   const isStandardRoom = currentRoom && standardRoomNames.includes(currentRoom.name);
   
   const hasEnoughPlayers = playerList.length >= 2;
+
+  const canKickPlayers = Boolean(isActualOwner && currentRoom?.status === 'waiting');
   
   // Check if all non-owner players are ready - using readyPlayers state
   const nonOwnerPlayers = playerList.filter(p => p.role !== 'owner');
@@ -69,8 +81,8 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
 
   // Join the Socket.IO room when entering the lobby
   useEffect(() => {
-    if (currentRoom?.code) {
-      socketService.joinRoom(currentRoom.code);
+    if (roomCode) {
+      socketService.joinRoom(roomCode);
       
       // Listen for when WE join the room - get ready status from server
       const handleRoomJoined = (data: any) => {
@@ -92,7 +104,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
         roomCode: string;
         readyPlayers?: string[];
       }) => {
-        if (data.roomCode === currentRoom.code) {
+        if (normalizeRoomCode(data.roomCode) === roomCode) {
           if (data.readyPlayers && Array.isArray(data.readyPlayers)) {
             const ready = new Set<string>(data.readyPlayers.map(String));
             setReadyPlayers(ready);
@@ -141,8 +153,8 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
       }]);
       
       // Force refresh to get latest member data from server
-      if (currentRoom.code) {
-        apiService.getRoomByCode(currentRoom.code).then(freshData => {
+      if (roomCode) {
+        apiService.getRoomByCode(roomCode).then(freshData => {
           if (freshData?.room?.members && freshData.room.members.length > 0) {
             // Map server data to include role information
             const mappedMembers = freshData.room.members.map((member: any) => ({
@@ -170,10 +182,143 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
 
   // Listen for new members joining
   useEffect(() => {
-    if (!currentRoom?.code) return;
+    if (!roomCode) return;
+
+    const currentCreatedBy = (currentRoom as any)?.createdBy ?? (currentRoom as any)?.created_by;
+
+    let isDisposed = false;
+    let isSyncInFlight = false;
+    let hasPendingSync = false;
+
+    const applyMembers = (mappedMembers: LobbyMember[]) => {
+      if (isDisposed) return;
+
+      const prev = knownMembersRef.current;
+      const next = new Map<string, string>();
+      for (const m of mappedMembers) {
+        next.set(String(m.userId), String(m.username));
+      }
+
+      // Detect joins based on membership delta (robust even if socket events are missed)
+      if (hasInitializedMembersRef.current) {
+        for (const [userId, username] of Array.from(next.entries())) {
+          if (!prev.has(userId)) {
+            // Don't toast for ourselves
+            if (authUser?.id != null && String(authUser.id) === String(userId)) continue;
+
+            const key = `${roomCode}:${userId}`;
+            const now = Date.now();
+            const last = lastJoinToastRef.current;
+            if (!last || last.key !== key || now - last.at > 2000) {
+              lastJoinToastRef.current = { key, at: now };
+              showToast(`${username} gick med i rummet.`, 'info');
+            }
+          }
+        }
+      }
+
+      knownMembersRef.current = next;
+      hasInitializedMembersRef.current = true;
+      setPlayerList(mappedMembers);
+    };
+
+    const syncMembers = async () => {
+      try {
+        if (isDisposed || isSyncInFlight) {
+          if (isSyncInFlight) {
+            hasPendingSync = true;
+          }
+          return;
+        }
+        isSyncInFlight = true;
+
+        const freshData = await apiService.getRoomByCode(roomCode);
+
+        if (freshData?.room?.members) {
+          const mappedMembers = freshData.room.members.map((member: any) => ({
+            userId: String(member.id || member.userId),
+            username: member.username,
+            role: String(member.id || member.userId) === String(freshData.room.createdBy) ? 'owner' : 'member',
+            joinedAt: new Date().toISOString(),
+          }));
+          if (isDisposed) return;
+
+          // Never show an empty lobby list if we have local user/room context.
+          // This prevents brief API races from wiping the UI.
+          if (mappedMembers.length > 0) {
+            applyMembers(mappedMembers);
+          } else if (authUser) {
+            applyMembers([
+              {
+                userId: String(authUser.id),
+                username: authUser.username,
+                role:
+                  currentCreatedBy != null && String(currentCreatedBy).trim() === String(authUser.id).trim()
+                    ? 'owner'
+                    : 'member',
+                joinedAt: new Date().toISOString(),
+              },
+            ]);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to refresh after membership change:', err);
+      } finally {
+        isSyncInFlight = false;
+
+        // If multiple sync triggers fired while a request was in-flight, run one
+        // trailing sync to converge to the latest state.
+        if (!isDisposed && hasPendingSync) {
+          hasPendingSync = false;
+          window.setTimeout(() => {
+            void syncMembers();
+          }, 0);
+        }
+      }
+    };
+
+    // Socket events can be missed (mobile background/reconnect) and GETs can race.
+    // To make kick -> rejoin reliably visible, do a short burst of refetches.
+    const scheduleMembershipResync = () => {
+      // Clear any pending resync timers
+      membershipResyncTimersRef.current.forEach(id => window.clearTimeout(id));
+      membershipResyncTimersRef.current = [];
+
+      // Keep this light; snapshots should do most of the work now.
+      const delaysMs = [0, 1000, 2500];
+      for (const delay of delaysMs) {
+        const timerId = window.setTimeout(() => {
+          syncMembers();
+        }, delay);
+        membershipResyncTimersRef.current.push(timerId);
+      }
+    };
 
     const handleMemberJoined = (data: any) => {
       try {
+        const joinedUserId = data?.user?.id != null ? String(data.user.id) : null;
+        const joinedUsername = data?.user?.username != null ? String(data.user.username) : null;
+
+        // If server provided a room snapshot, apply it immediately (then still resync).
+        // This reduces reliance on API timing/caching when a join happens right after a kick.
+        const eventMembers = data?.room?.members;
+        const eventCreatedBy = data?.room?.createdBy ?? data?.room?.created_by;
+        if (Array.isArray(eventMembers)) {
+          const mappedMembers = eventMembers.map((member: any) => {
+            const id = member.id ?? member.userId ?? member.user_id;
+            const username = member.username ?? member.user?.username;
+            const role: LobbyMember['role'] =
+              String(id) === String(eventCreatedBy ?? currentCreatedBy) ? 'owner' : 'member';
+            return {
+              userId: String(id),
+              username: String(username ?? id),
+              role,
+              joinedAt: new Date().toISOString(),
+            };
+          });
+          applyMembers(mappedMembers);
+        }
+
         // If readyPlayers was sent in the event, use it directly
         if (data.readyPlayers && Array.isArray(data.readyPlayers)) {
           const ready = new Set<string>(data.readyPlayers.map(String));
@@ -184,16 +329,12 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
           }
         }
         
-         // Update playerList directly from socket event (instant)
-         if (data.room?.members && data.room.members.length > 0) {
-           const mappedMembers = data.room.members.map((member: any) => ({
-             userId: String(member.id || member.userId), // Handle both formats
-             username: member.username,
-             role: member.role || (String(member.id || member.userId) === String(data.room.createdBy) ? 'owner' : 'member'),
-             joinedAt: new Date().toISOString()
-           }));
-           setPlayerList(mappedMembers);
-         }
+        // Always sync from API to avoid payload-shape drift and missed updates
+        scheduleMembershipResync();
+        
+        // Toasts are handled via applyMembers() diffs to avoid duplicates
+        void joinedUserId;
+        void joinedUsername;
       } catch (error) {
         console.error('❌ Error handling member joined event:', error, data);
       }
@@ -201,22 +342,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
 
     const handleMemberLeft = () => {
       try {
-        // Refresh room data when someone leaves
-        if (currentRoom.code) {
-          apiService.getRoomByCode(currentRoom.code).then(freshData => {
-            if (freshData?.room?.members) {
-              const mappedMembers = freshData.room.members.map((member: any) => ({
-                userId: String(member.id || member.userId), // Handle both formats
-                username: member.username,
-                role: String(member.id || member.userId) === String(freshData.room.createdBy) ? 'owner' : 'member',
-                joinedAt: new Date().toISOString()
-              }));
-              setPlayerList(mappedMembers);
-            }
-          }).catch(err => {
-            console.error('Failed to refresh after member left:', err);
-          });
-        }
+        scheduleMembershipResync();
       } catch (error) {
         console.error('❌ Error handling member left event:', error);
       }
@@ -225,9 +351,131 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
     socketService.on('room:member_joined', handleMemberJoined);
     socketService.on('room:member_left', handleMemberLeft);
 
+    const handleMembersUpdated = (data: any) => {
+      try {
+        if (!data || normalizeRoomCode(data.roomCode) !== roomCode) return;
+
+        // If payload includes full members snapshot, apply immediately.
+        if (Array.isArray(data.members)) {
+          const createdBy = data.createdBy ?? currentCreatedBy;
+          const mappedMembers: LobbyMember[] = data.members.map((m: any) => {
+            const id = m.id ?? m.userId ?? m.user_id;
+            const username = m.username ?? m.user?.username;
+            const role: LobbyMember['role'] = String(id) === String(createdBy) ? 'owner' : 'member';
+            return {
+              userId: String(id),
+              username: String(username ?? id),
+              role,
+              joinedAt: new Date().toISOString(),
+            };
+          });
+          applyMembers(mappedMembers);
+        }
+
+        // Always resync from API shortly after, to keep everything consistent.
+        scheduleMembershipResync();
+      } catch (e) {
+        console.error('❌ Error handling room:members_updated', e, data);
+      }
+    };
+
+    socketService.on('room:members_updated', handleMembersUpdated);
+
+    // Conditional fallback polling: only run briefly around transitions where
+    // socket events/timers might be missed (reconnect, background/foreground).
+    let pollIntervalId: number | null = null;
+    let pollStopTimeoutId: number | null = null;
+
+    const stopPolling = () => {
+      if (pollIntervalId != null) {
+        window.clearInterval(pollIntervalId);
+        pollIntervalId = null;
+      }
+      if (pollStopTimeoutId != null) {
+        window.clearTimeout(pollStopTimeoutId);
+        pollStopTimeoutId = null;
+      }
+    };
+
+    const startPolling = (opts?: { intervalMs?: number; durationMs?: number }) => {
+      const intervalMs = opts?.intervalMs ?? 4000;
+      const durationMs = opts?.durationMs ?? 20000;
+
+      // Keep the interval if already running; just extend the stop timer.
+      if (pollIntervalId == null) {
+        pollIntervalId = window.setInterval(() => {
+          syncMembers();
+        }, intervalMs);
+      }
+
+      if (pollStopTimeoutId != null) {
+        window.clearTimeout(pollStopTimeoutId);
+      }
+      pollStopTimeoutId = window.setTimeout(() => {
+        stopPolling();
+      }, durationMs);
+    };
+
+    const handleSocketConnect = () => {
+      // After reconnect, run a short period of polling to converge quickly.
+      startPolling({ intervalMs: 3000, durationMs: 15000 });
+      void syncMembers();
+    };
+
+    const handleSocketDisconnect = () => {
+      // No point polling while disconnected.
+      stopPolling();
+    };
+
+    socketService.on('connect', handleSocketConnect);
+    socketService.on('disconnect', handleSocketDisconnect);
+
+    // Also sync once immediately on mount of this effect
+    syncMembers();
+
+    // When the tab regains focus/visibility, intervals/timeouts may have been throttled.
+    // Force an immediate resync so the lobby updates as soon as the user returns.
+    const handleVisibilityOrFocus = (event?: Event) => {
+      try {
+        // Only ignore the "hidden" transition. For focus/pageshow we always resync,
+        // because some browsers fire focus before visibilityState updates.
+        if (event?.type === 'visibilitychange' && document.visibilityState !== 'visible') {
+          return;
+        }
+
+        socketService.joinRoom(roomCode);
+
+        // Timers/websockets can be throttled in background tabs; a single sync is enough.
+        void syncMembers();
+
+        // Run short-lived polling after returning to the tab.
+        startPolling({ intervalMs: 4000, durationMs: 20000 });
+      } catch {
+        // ignore
+      }
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('pageshow', handleVisibilityOrFocus);
+
     return () => {
       socketService.off('room:member_joined', handleMemberJoined);
       socketService.off('room:member_left', handleMemberLeft);
+      socketService.off('room:members_updated', handleMembersUpdated);
+
+      socketService.off('connect', handleSocketConnect);
+      socketService.off('disconnect', handleSocketDisconnect);
+
+      isDisposed = true;
+      stopPolling();
+
+      membershipResyncTimersRef.current.forEach(id => window.clearTimeout(id));
+      membershipResyncTimersRef.current = [];
+
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('pageshow', handleVisibilityOrFocus);
     };
   }, [currentRoom?.code, authUser?.id]);
 
@@ -276,6 +524,23 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
     } catch (err) {
       console.error('Failed to save settings:', err);
       throw err;
+    }
+  };
+
+  const handleKickPlayer = async (userId: string, username: string, skipConfirm = false) => {
+    if (!currentRoom?.code) return;
+    if (!canKickPlayers) return;
+
+    if (!skipConfirm) {
+      const ok = window.confirm(`Kicka ${username} från rummet?`);
+      if (!ok) return;
+    }
+
+    try {
+      await apiService.kickMember(currentRoom.code, Number(userId));
+    } catch (err) {
+      console.error('Failed to kick player:', err);
+      alert(`Kunde inte kicka spelaren: ${err instanceof Error ? err.message : 'Okänt fel'}`);
     }
   };
 
@@ -404,6 +669,8 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
           isReady={isReady}
           maxPlayers={currentRoom.settings?.max_players || 6}
           onReadyChange={handleReadyChange}
+          canKick={canKickPlayers}
+          onKick={handleKickPlayer}
         />
 
         {error && (

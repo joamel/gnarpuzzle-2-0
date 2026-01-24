@@ -117,8 +117,22 @@ export interface SocketEvents {
   'room:left': (data: { room: any; user: any }) => void;
   'room:updated': (data: { room: any }) => void;
   'room:member_left': (data: { 
-    user: { id: number; username: string }; 
+    user: { id: number; username?: string }; 
     roomCode: string;
+    reason?: string;
+    kickedBy?: { id: number; username: string };
+  }) => void;
+  'room:members_updated': (data: {
+    roomCode: string;
+    members: Array<{ id: number; username: string }>;
+    createdBy: number;
+    memberCount: number;
+    readyPlayers?: string[];
+    reason?: string;
+  }) => void;
+  'room:kicked': (data: {
+    roomCode: string;
+    kickedBy?: { id: number; username: string };
   }) => void;
   'room:ownership_transferred': (data: { 
     roomCode: string; 

@@ -4,6 +4,7 @@ import { socketService } from '../services/socketService';
 import { apiService } from '../services/apiService';
 import { useAuth } from './AuthContext';
 import { logger } from '../utils/logger';
+import { showToast } from '../utils/toast';
 
 interface GameContextType {
   // Current game state
@@ -614,6 +615,43 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       }
     };
 
+    const handleRoomKicked = (data: any) => {
+      try {
+        const kickedRoomCode = data?.roomCode ? String(data.roomCode) : null;
+        if (!kickedRoomCode) return;
+
+        // If we are currently in a different room, ignore.
+        // If currentRoom is temporarily undefined/stale, still honor the kick.
+        if (currentRoom?.code && String(currentRoom.code) !== kickedRoomCode) return;
+
+        // Prevent reconnect attempts for this room
+        isIntentionallyLeavingRef.current = true;
+
+        // Leave socket room best-effort
+        socketService.leaveRoom(kickedRoomCode);
+
+        // Clear session marker
+        sessionStorage.removeItem(`room_joined_${kickedRoomCode}`);
+
+        // Clear local state (do NOT call API leave - server already removed us)
+        setCurrentRoom(null);
+        setCurrentGame(null);
+        setPlayers([]);
+        setGamePhase(null);
+        setGameTimer(null);
+        setSelectedLetter(null);
+        setLeaderboard(null);
+        setGameEndReason(null);
+
+        const kickerName = data?.kickedBy?.username ? String(data.kickedBy.username) : null;
+        const message = kickerName ? `Du blev kickad från rummet av ${kickerName}.` : 'Du blev kickad från rummet.';
+        setError(message);
+        showToast(message, 'error');
+      } catch (error) {
+        logger.room.error('Error handling room:kicked event', { error, data });
+      }
+    };
+
     const handleTurnSkipped = (data: any) => {
       try {
         // Update game state with new current turn
@@ -634,6 +672,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     socketService.on('game:started', handleGameStarted);
     socketService.on('game:player_left', handleGamePlayerLeft);
     socketService.on('room:member_left', handleRoomMemberLeft);
+    socketService.on('room:kicked', handleRoomKicked);
     socketService.on('room:ownership_transferred', handleOwnershipTransferred);
     socketService.on('room:updated', handleRoomUpdated);
     socketService.on('turn:skipped', handleTurnSkipped);
@@ -647,11 +686,12 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       socketService.off('game:started', handleGameStarted);
       socketService.off('game:player_left', handleGamePlayerLeft);
       socketService.off('room:member_left', handleRoomMemberLeft);
+      socketService.off('room:kicked', handleRoomKicked);
       socketService.off('room:ownership_transferred', handleOwnershipTransferred);
       socketService.off('room:updated', handleRoomUpdated);
       socketService.off('turn:skipped', handleTurnSkipped);
     };
-  }, [currentGame, user]);
+  }, [currentGame, user, currentRoom?.code]);
 
   // Handle browser refresh/close - warn user and leave room
   useEffect(() => {
@@ -790,8 +830,10 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   // Helper function to fetch room data
   const fetchRoomData = useCallback(async (roomCode: string) => {
     try {
-      const room = await apiService.getRoomByCode(roomCode);
-      return room;
+      const response: any = await apiService.getRoomByCode(roomCode);
+      // apiService.getRoomByCode returns the full API payload: { success, room, debug? }
+      // but GameContext consumers expect the actual Room object.
+      return response?.room ?? response;
     } catch (err) {
       console.error(`Failed to fetch room data for ${roomCode}:`, err);
       throw err;

@@ -1,6 +1,7 @@
 import { Game } from '../../../shared/types.js';
 import type { MyStatsResponse } from '../types/stats';
 import { logger } from '../utils/logger';
+import { normalizeRoomCode } from '../utils/roomCode';
 
 const API_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
 
@@ -42,6 +43,7 @@ class ApiService {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
+    const method = (options.method || 'GET').toUpperCase();
     
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -55,6 +57,9 @@ class ApiService {
     try {
       const response = await fetch(url, {
         ...options,
+        // Avoid stale room/member/game snapshots due to HTTP caching.
+        // Socket events can arrive out-of-order; the UI often refetches immediately after.
+        ...(method === 'GET' ? { cache: 'no-store' as const } : null),
         headers,
       });
 
@@ -119,6 +124,7 @@ class ApiService {
 
           const retryResponse = await fetch(url, {
             ...options,
+            ...(method === 'GET' ? { cache: 'no-store' as const } : null),
             headers: retryHeaders,
           });
 
@@ -226,11 +232,12 @@ class ApiService {
   }
 
   async getRoomByCode(code: string): Promise<any> {
-    return this.request<any>(`/api/rooms/${code}`);
+    const roomCode = normalizeRoomCode(code);
+    return this.request<any>(`/api/rooms/${roomCode}`);
   }
 
   async joinRoom(code: string, password?: string): Promise<any> {
-    const response = await this.request<{ success: boolean; message: string; room: any; error?: string }>(`/api/rooms/${code}/join`, { 
+    const response = await this.request<{ success: boolean; message: string; room: any; error?: string }>(`/api/rooms/${normalizeRoomCode(code)}/join`, { 
       method: 'POST',
       body: password ? JSON.stringify({ password }) : undefined
     });
@@ -239,9 +246,16 @@ class ApiService {
   }
 
   async leaveRoom(code: string, intentional: boolean = false): Promise<any> {
-    return this.request<any>(`/api/rooms/${code}/leave`, { 
+    return this.request<any>(`/api/rooms/${normalizeRoomCode(code)}/leave`, { 
       method: 'DELETE',
       body: JSON.stringify({ intentional })
+    });
+  }
+
+  async kickMember(code: string, userId: number): Promise<any> {
+    return this.request<any>(`/api/rooms/${normalizeRoomCode(code)}/kick`, {
+      method: 'POST',
+      body: JSON.stringify({ userId })
     });
   }
 

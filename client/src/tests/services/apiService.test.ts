@@ -279,6 +279,24 @@ describe('ApiService', () => {
         })
       );
     });
+
+    it('should kick room member', async () => {
+      const mockResponse = {
+        ok: true,
+        json: vi.fn().mockResolvedValue({ success: true })
+      };
+      mockFetch.mockResolvedValue(mockResponse);
+
+      await apiService.kickMember('ABC123', 42);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:3001/api/rooms/ABC123/kick',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ userId: 42 })
+        })
+      );
+    });
   });
 
   describe('Response Handling', () => {

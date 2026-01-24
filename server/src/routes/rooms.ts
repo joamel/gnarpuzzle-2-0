@@ -323,6 +323,31 @@ router.post('/:code/join', AuthService.authenticateToken, async (req, res) => {
       // Get current member list
       const members = await RoomModel.getRoomMembers(room.id);
 
+      // Best-effort: emit an authoritative membership snapshot so the owner UI can resync
+      // even if it previously missed a join/leave/kick event.
+      const socketService = getSocketService();
+      if (socketService) {
+        try {
+          socketService.ensureRoomSocketsForMembers(code, members.map((m: any) => String(m.id || m.userId)));
+          socketService.reconcileRoomReadyStatus(code, members.map((m: any) => String(m.id || m.userId)));
+          const readyPlayers = Array.from(socketService.getRoomReadyPlayers(code));
+
+          const payload = {
+            roomCode: code,
+            members: members.map(m => ({ id: m.id, username: m.username })),
+            createdBy: room.created_by,
+            memberCount: members.length,
+            readyPlayers,
+            reason: 'already_member'
+          };
+
+          socketService.emitToRoom(code, 'room:members_updated', payload);
+          (socketService as any).emitToUserId?.(room.created_by, 'room:members_updated', payload);
+        } catch {
+          // best-effort
+        }
+      }
+
       res.status(200).json({
         success: true,
         message: 'Already a member of this room',
@@ -535,6 +560,22 @@ router.post('/:code/join', AuthService.authenticateToken, async (req, res) => {
         roomCode: code,
         readyPlayers
       });
+
+      // Also emit an authoritative snapshot for resync (and send directly to owner).
+      try {
+        const payload = {
+          roomCode: code,
+          members: members.map(m => ({ id: m.id, username: m.username })),
+          createdBy: room.created_by,
+          memberCount: members.length,
+          readyPlayers,
+          reason: 'joined'
+        };
+        socketService.emitToRoom(code, 'room:members_updated', payload);
+        (socketService as any).emitToUserId?.(room.created_by, 'room:members_updated', payload);
+      } catch {
+        // best-effort
+      }
     }
 
     res.status(200).json({
@@ -654,6 +695,171 @@ router.delete('/:code/leave', AuthService.authenticateToken, async (req, res) =>
     logger.error('Leave room error:', error);
     res.status(500).json({
       error: 'Unable to leave room',
+      message: 'Internal server error'
+    });
+  }
+});
+
+/**
+ * POST /api/rooms/:code/kick
+ * Kick a member from a room (lobby-only)
+ * Requires authentication and room ownership
+ * Body: { userId: number }
+ */
+router.post('/:code/kick', AuthService.authenticateToken, async (req, res) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const { code } = req.params;
+    const { userId: rawUserId } = req.body || {};
+
+    const targetUserId = Number(rawUserId);
+    if (!Number.isFinite(targetUserId)) {
+      res.status(400).json({
+        error: 'Invalid userId',
+        message: 'userId must be a number'
+      });
+      return;
+    }
+
+    const room = await RoomModel.findByCode(code);
+    if (!room) {
+      res.status(404).json({
+        error: 'Room not found',
+        message: 'No room found with that code'
+      });
+      return;
+    }
+
+    // Owner-only
+    if (room.created_by !== authReq.user!.id) {
+      res.status(403).json({
+        error: 'Forbidden',
+        message: 'Only the room owner can kick members'
+      });
+      return;
+    }
+
+    // Lobby-only (not during game)
+    if (room.status !== 'waiting') {
+      res.status(400).json({
+        error: 'Game in progress',
+        message: 'Cannot kick members after the game has started'
+      });
+      return;
+    }
+
+    // Cannot kick self / owner
+    if (targetUserId === authReq.user!.id || targetUserId === room.created_by) {
+      res.status(400).json({
+        error: 'Invalid target',
+        message: 'You cannot kick the room owner'
+      });
+      return;
+    }
+
+    // Ensure target is actually a member
+    const isTargetMember = await RoomModel.isMember(room.id, targetUserId);
+    if (!isTargetMember) {
+      res.status(400).json({
+        error: 'Not in room',
+        message: 'Target user is not a member of this room'
+      });
+      return;
+    }
+
+    const success = await RoomModel.removeMember(room.id, targetUserId);
+    if (!success) {
+      res.status(500).json({
+        error: 'Kick failed',
+        message: 'Unable to remove user from the room'
+      });
+      return;
+    }
+
+    const socketService = getSocketService();
+    if (socketService) {
+      try {
+        // Best-effort: look up the kicked user's username for notifications
+        let targetUsername: string | undefined;
+        try {
+          const dbManager = await DatabaseManager.getInstance();
+          const db = dbManager.getDatabase();
+          const row = await db.get('SELECT username FROM users WHERE id = ?', targetUserId) as { username?: string } | undefined;
+          targetUsername = row?.username;
+        } catch {
+          // ignore
+        }
+
+        // Clear ready status
+        (socketService as any).roomPlayerReadyStatus?.get(code)?.delete(targetUserId);
+        const readyPlayers = Array.from((socketService as any).roomPlayerReadyStatus?.get(code) || []).map(String);
+
+        // Notify the kicked user
+        (socketService as any).emitToUserId?.(targetUserId, 'room:kicked', {
+          roomCode: code,
+          kickedBy: {
+            id: authReq.user!.id,
+            username: authReq.user!.username
+          }
+        });
+        (socketService as any).leaveRoomForUserId?.(targetUserId, code);
+
+        // Notify the room
+        (socketService as any).io?.to(`room:${code}`)?.emit('room:member_left', {
+          user: {
+            id: targetUserId,
+            username: targetUsername
+          },
+          roomCode: code,
+          reason: 'kicked',
+          kickedBy: {
+            id: authReq.user!.id,
+            username: authReq.user!.username
+          }
+        });
+
+        (socketService as any).io?.to(`room:${code}`)?.emit('player:ready_changed', {
+          userId: String(targetUserId),
+          isReady: false,
+          roomCode: code,
+          readyPlayers
+        });
+
+        // Emit authoritative membership snapshot (and ensure owner receives it even
+        // if their socket isn't currently joined to room:<code>).
+        try {
+          const members = await RoomModel.getRoomMembers(room.id);
+          (socketService as any).ensureRoomSocketsForMembers?.(code, members.map((m: any) => String(m.id || m.userId)));
+          (socketService as any).reconcileRoomReadyStatus?.(code, members.map((m: any) => String(m.id || m.userId)));
+          const readyPlayers2 = Array.from((socketService as any).getRoomReadyPlayers?.(code) || readyPlayers);
+
+          const payload = {
+            roomCode: code,
+            members: members.map(m => ({ id: m.id, username: m.username })),
+            createdBy: room.created_by,
+            memberCount: members.length,
+            readyPlayers: readyPlayers2,
+            reason: 'kicked'
+          };
+
+          (socketService as any).emitToRoom?.(code, 'room:members_updated', payload);
+          (socketService as any).emitToUserId?.(room.created_by, 'room:members_updated', payload);
+        } catch {
+          // best-effort
+        }
+      } catch (e) {
+        // best-effort
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Member kicked'
+    });
+  } catch (error) {
+    logger.error('Kick member error:', error);
+    res.status(500).json({
+      error: 'Unable to kick member',
       message: 'Internal server error'
     });
   }
