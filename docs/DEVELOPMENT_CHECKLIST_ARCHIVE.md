@@ -1,5 +1,10 @@
 # GnarPuzzle - Mobile-First Utvecklingschecklista
 
+> ⚠️ **Arkiverad fil**
+> 
+> Den här filen uppdateras inte längre. Aktiv checklista finns i:
+> - [docs/DEVELOPMENT_CHECKLIST.md](DEVELOPMENT_CHECKLIST.md)
+
 ## 🚀 Current Status: **Phase 8 Deployment & Production - COMPLETE** ✅ **v2.1.0 RELEASE**
 
 **✅ Completed**: Core multiplayer gameplay, UI polish, timer system, player ready status, performance optimization, render deployment configuration, **LIVE DEPLOYMENT**, all tests passing  
