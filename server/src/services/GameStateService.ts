@@ -621,7 +621,56 @@ export class GameStateService {
       WHERE g.id = ?
     `, gameId) as { settings: string };
 
-    return JSON.parse(room.settings) as RoomSettings;
+    const defaults: RoomSettings = {
+      grid_size: 5,
+      max_players: 6,
+      letter_timer: 10,
+      placement_timer: 15,
+      is_private: false,
+    };
+
+    const rawSettings = (room as any)?.settings;
+    if (typeof rawSettings !== 'string' || rawSettings.trim().length === 0) {
+      return defaults;
+    }
+
+    try {
+      const parsed = JSON.parse(rawSettings) as Partial<RoomSettings> | null;
+      if (!parsed || typeof parsed !== 'object') {
+        return defaults;
+      }
+
+      const merged: RoomSettings = {
+        ...defaults,
+        ...parsed,
+      };
+
+      // Coerce primitives defensively (DBs can store numbers as strings).
+      merged.grid_size = Number((merged as any).grid_size ?? defaults.grid_size);
+      merged.max_players = Number((merged as any).max_players ?? defaults.max_players);
+      merged.letter_timer = Number((merged as any).letter_timer ?? defaults.letter_timer);
+      merged.placement_timer = Number((merged as any).placement_timer ?? defaults.placement_timer);
+      merged.is_private = Boolean((merged as any).is_private ?? defaults.is_private);
+
+      // Optional password fields (keep as-is if provided).
+      if ((merged as any).require_password !== undefined) {
+        merged.require_password = Boolean((merged as any).require_password);
+      }
+
+      if (typeof (merged as any).password !== 'string') {
+        delete (merged as any).password;
+      }
+
+      // Sanity clamp
+      if (!Number.isFinite(merged.grid_size) || merged.grid_size <= 0) merged.grid_size = defaults.grid_size;
+      if (!Number.isFinite(merged.max_players) || merged.max_players <= 0) merged.max_players = defaults.max_players;
+      if (!Number.isFinite(merged.letter_timer) || merged.letter_timer <= 0) merged.letter_timer = defaults.letter_timer;
+      if (!Number.isFinite(merged.placement_timer) || merged.placement_timer <= 0) merged.placement_timer = defaults.placement_timer;
+
+      return merged;
+    } catch {
+      return defaults;
+    }
   }
 
   private async createPlayersFromRoom(gameId: number, roomId: number): Promise<void> {

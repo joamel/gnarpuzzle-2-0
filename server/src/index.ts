@@ -44,6 +44,19 @@ app.use(express.json({ limit: '1mb' })); // Mobile-friendly payload limit
 app.use(express.urlencoded({ extended: true }));
 app.use(limiter);
 
+function getDeployInfo() {
+  return {
+    version: process.env.npm_package_version || '2.0.0',
+    environment: process.env.NODE_ENV || 'development',
+    gitCommit:
+      process.env.RENDER_GIT_COMMIT ||
+      process.env.GIT_COMMIT ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      null,
+    serviceId: process.env.RENDER_SERVICE_ID || null,
+  };
+}
+
 // Request logging middleware
 app.use((req, _res, next) => {
   logger.info(`${req.method} ${req.path}`, {
@@ -59,8 +72,7 @@ app.get('/health', (_req, res) => {
   res.status(200).json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: process.env.npm_package_version || '2.0.0',
-    environment: process.env.NODE_ENV || 'development'
+    ...getDeployInfo(),
   });
 });
 
@@ -69,8 +81,7 @@ app.get('/api/health', (_req, res) => {
   res.status(200).json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: process.env.npm_package_version || '2.0.0',
-    environment: process.env.NODE_ENV || 'development'
+    ...getDeployInfo(),
   });
 });
 
