@@ -12,6 +12,7 @@ import './styles/home.css';
 import './styles/lobby.css';
 import './styles/game.css';
 import './styles/gamepage.css';
+import './styles/toast.css';
 
 // Lazy load pages for better performance
 const LoginPage = React.lazy(() => import('./pages/LoginPage'));
