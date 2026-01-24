@@ -143,7 +143,7 @@ export class PlayerModel {
     const db = dbManager.getDatabase();
     
     const result = await db.get(`
-      SELECT COUNT(*) as total, COUNT(CASE WHEN ready_to_start = 1 THEN 1 END) as ready
+      SELECT COUNT(*) as total, COUNT(CASE WHEN ready_to_start = TRUE THEN 1 END) as ready
       FROM players 
       WHERE game_id = ?
     `, gameId) as { total: number; ready: number };

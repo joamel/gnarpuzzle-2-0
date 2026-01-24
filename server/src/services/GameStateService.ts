@@ -650,7 +650,7 @@ export class GameStateService {
         0,
         JSON.stringify([]),
         JSON.stringify([]),
-        1, // true -> 1
+        true,
         JSON.stringify([]), // Will be initialized later
         null,
         0, // false -> 0
