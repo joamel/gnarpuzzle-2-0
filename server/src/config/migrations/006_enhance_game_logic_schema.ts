@@ -16,7 +16,7 @@ export const migration: Migration = {
     -- Enhance players table for enhanced game state
     ALTER TABLE players ADD COLUMN current_letter TEXT DEFAULT NULL;
     ALTER TABLE players ADD COLUMN grid_state TEXT DEFAULT '[]';
-    ALTER TABLE players ADD COLUMN placement_confirmed BOOLEAN DEFAULT 0;
+    ALTER TABLE players ADD COLUMN placement_confirmed INTEGER DEFAULT 0;
     ALTER TABLE players ADD COLUMN final_score INTEGER DEFAULT 0;
   `,
   down: `

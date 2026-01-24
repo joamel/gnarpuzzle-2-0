@@ -50,6 +50,8 @@ export interface Game {
 
 export type GamePhase = 'waiting' | 'letter_selection' | 'letter_placement' | 'finished';
 
+export type PlacementConfirmedState = 0 | 1 | 2;
+
 export interface Player {
   id: number;
   game_id: number;
@@ -63,7 +65,7 @@ export interface Player {
   // New game state fields
   current_letter: string | null;
   grid_state: GridCell[][];
-  placement_confirmed: boolean;
+  placement_confirmed: PlacementConfirmedState;
   final_score: number;
 }
 

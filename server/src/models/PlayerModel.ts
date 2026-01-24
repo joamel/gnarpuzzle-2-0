@@ -1,5 +1,5 @@
 import { DatabaseManager } from '../config/database';
-import { Player, PlayerWithUser } from './types';
+import { PlacementConfirmedState, Player, PlayerWithUser } from './types';
 
 export class PlayerModel {
   static async findById(id: number): Promise<Player | null> {
@@ -63,7 +63,7 @@ export class PlayerModel {
       // New game logic fields with defaults
       current_letter: row.current_letter || null,
       grid_state: row.grid_state ? JSON.parse(row.grid_state) : [],
-      placement_confirmed: row.placement_confirmed || false,
+      placement_confirmed: Number(row.placement_confirmed ?? 0) as PlacementConfirmedState,
       final_score: row.final_score || 0,
       user: {
         id: row.user_id,
@@ -191,7 +191,7 @@ export class PlayerModel {
       // New game logic fields with defaults  
       current_letter: row.current_letter || null,
       grid_state: row.grid_state ? JSON.parse(row.grid_state) : [],
-      placement_confirmed: row.placement_confirmed || false,
+      placement_confirmed: Number(row.placement_confirmed ?? 0) as PlacementConfirmedState,
       final_score: row.final_score || 0,
       user: {
         id: row.user_id,

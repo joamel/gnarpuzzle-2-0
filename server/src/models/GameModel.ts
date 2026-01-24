@@ -1,5 +1,5 @@
 import { DatabaseManager } from '../config/database';
-import { Game, GameWithPlayers } from './types';
+import { Game, GameWithPlayers, PlacementConfirmedState } from './types';
 
 export class GameModel {
   static async create(roomId: number): Promise<Game> {
@@ -101,7 +101,7 @@ export class GameModel {
       // New game logic fields with defaults
       current_letter: row.current_letter || null,
       grid_state: row.grid_state ? JSON.parse(row.grid_state) : [],
-      placement_confirmed: row.placement_confirmed || false,
+      placement_confirmed: Number(row.placement_confirmed ?? 0) as PlacementConfirmedState,
       final_score: row.final_score || 0,
       username: row.username,
       created_at: row.user_created_at,
