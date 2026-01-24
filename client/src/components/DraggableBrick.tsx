@@ -68,7 +68,7 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
   const filledClass = letter ? 'filled' : '';
   const draggingClass = isDragging ? 'dragging' : '';
   const pressingClass = isPressing ? 'pressing' : '';
-  const browsingClass = (mode === 'selection' && (isDragging || isHovered)) ? 'browsing' : '';
+  const browsingClass = (mode === 'selection' && isHovered) ? 'browsing' : '';
 
   // Setup non-passive touch events to allow preventDefault
   useEffect(() => {
@@ -470,7 +470,7 @@ const DraggableBrick: React.FC<DraggableBrickProps> = ({
         data-cell-key={dataCellKey}
         style={isDragging && mode === 'placement' ? { opacity: 0.5 } : {}}
       >
-        {shouldHideLetterInButton ? '' : letter}
+        {shouldHideLetterInButton ? '' : <span className="brick-letter">{letter}</span>}
       </button>
       
       {/* Dragging ghost element - only show for placement mode */}

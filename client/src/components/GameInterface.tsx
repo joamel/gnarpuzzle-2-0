@@ -158,7 +158,7 @@ const LetterSelector: React.FC<LetterSelectorProps> = ({
   ];
 
   return (
-    <div className={`letter-selector ${isDragActive ? 'drag-active' : ''}`}>
+    <div className={`letter-selector mode-${mode} ${isDragActive ? 'drag-active' : ''}`.trim()}>
       <div className="letters-grid">
         {rows.current.map((rowLetters, rowIndex) => (
           <div key={rowIndex} className="letters-row">

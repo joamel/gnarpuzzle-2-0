@@ -1,5 +1,7 @@
 /* Draggable Brick Styles */
-.brick.dragging {
+/* Only apply the "dragging" shrink/fade for placement mode (dragging to board).
+   In selection mode, dragging means "browsing" and should not affect siblings. */
+.brick.dragging[data-mode="placement"] {
   opacity: 0.5;
   transform: scale(0.9);
   transition: transform 0.1s ease;
@@ -57,18 +59,24 @@
 }
 
 /* Letter selector during drag mode */
-.letter-selector.drag-active .brick-button {
+/* Keep the "dim other letters" effect only for placement drag.
+   In selection browsing, only the hovered letter should scale. */
+.letter-selector.mode-placement.drag-active .brick-button {
   transform: scale(0.95);
   opacity: 0.7;
 }
 
-.letter-selector.drag-active .brick-button.dragging {
+.letter-selector.mode-placement.drag-active .brick-button.dragging {
   transform: scale(1.1);
   opacity: 1;
   animation: long-press-ready 0.5s ease infinite alternate;
 }
 
 /* Letter browsing states */
+.brick-letter {
+  display: inline-block;
+}
+
 .brick-button.pressing {
   transform: scale(0.98);
   background: linear-gradient(145deg, #e67e22 0%, #d35400 100%);
@@ -76,36 +84,52 @@
 }
 
 .brick-button.browsing {
-  background: linear-gradient(145deg, #fff3cd 0%, #ffeaa7 100%);
-  border: 2px solid #f39c12;
-  transform: scale(1.05);
-  animation: letter-browse-pulse 0.6s ease-in-out infinite alternate;
-  box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3);
+  /* Prefer size feedback over color swapping while sweeping */
+  background: #f4a261;
+  border-color: rgba(255, 255, 255, 0.28);
+  transform: scale(1.08);
+  position: relative;
+  z-index: 2;
+  will-change: transform;
+  transition: transform 0.07s ease, box-shadow 0.07s ease;
+  box-shadow:
+    0 10px 18px rgba(0, 0, 0, 0.32),
+    0 4px 10px rgba(0, 0, 0, 0.22),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.15),
+    inset 0 1px 2px rgba(255, 255, 255, 0.42);
 }
 
 .brick-button.pending {
-  background: linear-gradient(145deg, #4caf50 0%, #388e3c 100%);
-  border: 3px solid #2e7d32;
+  /* Selected-but-not-confirmed: keep base color, add a green accent */
+  background: #f4a261;
+  border-color: #2e7d32;
   color: white;
-  transform: scale(1.1);
-  box-shadow: 
-    0 6px 20px rgba(76, 175, 80, 0.5),
-    inset 0 1px 3px rgba(255, 255, 255, 0.3);
+  transform: scale(1.12);
+  position: relative;
+  z-index: 3;
+  box-shadow:
+    0 10px 18px rgba(0, 0, 0, 0.32),
+    0 0 0 2px rgba(46, 125, 50, 0.35),
+    0 8px 20px rgba(46, 125, 50, 0.28),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.15),
+    inset 0 1px 2px rgba(255, 255, 255, 0.35);
   font-weight: 900;
 }
 
-.brick-button.browsing.dragging {
-  animation: browse-drag-pulse 0.4s ease infinite;
+@media (pointer: coarse) {
+  .brick-button.browsing {
+    transform: scale(1.06);
+  }
 }
 
 @keyframes letter-browse-pulse {
   0% {
     box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3);
-    transform: scale(1.05);
+    transform: scale(1.14);
   }
   100% {
     box-shadow: 0 6px 16px rgba(243, 156, 18, 0.5);
-    transform: scale(1.08);
+    transform: scale(1.18);
   }
 }
 

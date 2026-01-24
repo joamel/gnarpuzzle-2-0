@@ -9,6 +9,7 @@ import UserMenu from '../components/UserMenu';
 import Logo from '@/assets/Logo';
 import { socketService } from '../services/socketService';
 import { logger } from '../utils/logger';
+import { normalizeRoomCode } from '../utils/roomCode';
 
 // Lazy load GameInterface for better performance
 const GameInterface = React.lazy(() => import('../components/GameInterface').then(module => ({ 
@@ -26,18 +27,19 @@ const GamePage: React.FC = () => {
   // Handle URL parameters for direct room join
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
-    const roomCode = urlParams.get('room');
+    const roomCodeRaw = urlParams.get('room');
+    const roomCode = normalizeRoomCode(roomCodeRaw);
     const password = urlParams.get('password');
     
     if (roomCode && !currentRoom) {
       // Auto-join room from shared link
-      logger.room.info('Auto-joining room from shared link', { roomCode });
+      logger.room.info('Auto-joining room from shared link', { roomCode, roomCodeRaw });
       joinRoom(roomCode, password || undefined).then(() => {
         logger.room.info('Successfully joined room from shared link', { roomCode });
         // Clear URL parameters after joining
         navigate('/game', { replace: true });
       }).catch((error) => {
-        logger.room.error('Failed to join room from shared link', { roomCode, error });
+        logger.room.error('Failed to join room from shared link', { roomCode, roomCodeRaw, error });
         alert(`Kunde inte gå med i rummet: ${error.message || 'Okänt fel'}`);
         navigate('/', { replace: true });
       });
