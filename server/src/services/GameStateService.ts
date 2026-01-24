@@ -60,8 +60,8 @@ export class GameStateService {
     const result = await db.run(`
       INSERT INTO games (
         room_id, state, current_phase, current_turn, turn_number, 
-        board_state, available_letters, letter_pool, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        board_state, available_letters, letter_pool
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `, 
       roomId, 
       'starting', 
