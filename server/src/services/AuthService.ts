@@ -505,11 +505,13 @@ export class AuthService {
       if (authReq.user) {
         await UserModel.updateLastActive(authReq.user.id);
 
+        const deleteGuestOnLogout = process.env.DELETE_GUEST_ON_LOGOUT === 'true';
+
         // If this is a guest/legacy account (no password hash), we try to clean it up.
         // IMPORTANT: users can own rooms. If a guest owns a room that still has members,
         // transfer ownership to the longest-tenured remaining member.
         const fullUser = await UserModel.findById(authReq.user.id);
-        if (fullUser && !fullUser.password_hash) {
+        if (fullUser && !fullUser.password_hash && deleteGuestOnLogout) {
           const dbManager = await DatabaseManager.getInstance();
           const db = dbManager.getDatabase();
 
