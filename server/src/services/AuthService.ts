@@ -596,10 +596,19 @@ export class AuthService {
     // Verify user still exists in database
     const user = await UserModel.findById(decoded.userId);
     if (!user) {
-      logger.warn(`Token references non-existent user: ${decoded.userId} (${decoded.username})`);
+      const debugId = `auth_missing_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      logger.warn(`Token references non-existent user: ${decoded.userId} (${decoded.username})`, {
+        debugId,
+        userId: decoded.userId,
+        username: decoded.username
+      });
+
+      const includeDetails = process.env.DEBUG_API_ERRORS === 'true';
       res.status(403).json({
         error: 'Invalid token',
-        message: 'User no longer exists. Please log in again.'
+        message: 'User no longer exists. Please log in again.',
+        debugId,
+        ...(includeDetails ? { decoded: { userId: decoded.userId, username: decoded.username } } : null)
       });
       return;
     }
