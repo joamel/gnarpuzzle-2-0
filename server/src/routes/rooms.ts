@@ -1154,10 +1154,15 @@ router.post('/:id/start', AuthService.authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    logger.error('Start game error:', error);
+    const debugId = `start_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    logger.error('Start game error:', { debugId, error });
+
+    const includeDetails = process.env.DEBUG_API_ERRORS === 'true';
     res.status(500).json({
       error: 'Unable to start game',
-      message: 'Internal server error'
+      message: 'Internal server error',
+      debugId,
+      ...(includeDetails ? { details: error instanceof Error ? error.message : String(error) } : null)
     });
   }
 });

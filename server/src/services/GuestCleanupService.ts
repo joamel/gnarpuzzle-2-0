@@ -65,15 +65,33 @@ export class GuestCleanupService {
       const dbManager = await DatabaseManager.getInstance();
       const db = dbManager.getDatabase();
 
-      const candidates = (await db.all(
+      const cutoffMs = Date.now() - this.INACTIVITY_MINUTES * 60 * 1000;
+
+      const parseLastActiveMs = (value: unknown): number | null => {
+        if (!value) return null;
+        if (value instanceof Date) return value.getTime();
+
+        const raw = String(value);
+        // SQLite CURRENT_TIMESTAMP => "YYYY-MM-DD HH:MM:SS" (UTC). Make it ISO.
+        const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T') + 'Z';
+        const ms = Date.parse(normalized);
+        return Number.isFinite(ms) ? ms : null;
+      };
+
+      const allGuests = (await db.all(
         `
-        SELECT id, username
+        SELECT id, username, last_active
         FROM users
         WHERE password_hash IS NULL
-          AND last_active < datetime('now', '-' || ? || ' minutes')
-        `,
-        this.INACTIVITY_MINUTES
-      )) as Array<{ id: number; username: string }>;
+        `
+      )) as Array<{ id: number; username: string; last_active: unknown }>;
+
+      const candidates = allGuests
+        .filter((u) => {
+          const lastActiveMs = parseLastActiveMs(u.last_active);
+          return typeof lastActiveMs === 'number' && lastActiveMs < cutoffMs;
+        })
+        .map((u) => ({ id: u.id, username: u.username }));
 
       if (!candidates.length) {
         return { cleanedUsers: 0, checkedUsers: 0 };
