@@ -109,6 +109,8 @@ const UserMenu: React.FC<UserMenuProps> = ({ className }) => {
 
   if (!user) return null;
 
+  const isGuest = !!user.isGuest;
+
   const handleLogout = async () => {
     setIsOpen(false);
     await logout();
@@ -117,6 +119,12 @@ const UserMenu: React.FC<UserMenuProps> = ({ className }) => {
 
   const handleChangeUsername = async () => {
     setIsOpen(false);
+
+    if (isGuest) {
+      window.alert('Du spelar som gäst. Skapa ett konto med lösenord för att kunna byta namn.');
+      return;
+    }
+
     const next = window.prompt('Välj nytt användarnamn (2–20 tecken):', user.username);
     if (!next) return;
 
@@ -154,6 +162,12 @@ const UserMenu: React.FC<UserMenuProps> = ({ className }) => {
 
   const handleOpenChangePassword = () => {
     setIsOpen(false);
+
+    if (isGuest) {
+      window.alert('Du spelar som gäst. Skapa ett konto med lösenord för att kunna byta lösenord.');
+      return;
+    }
+
     setPasswordError('');
     setCurrentPassword('');
     setNewPassword('');
@@ -230,14 +244,23 @@ const UserMenu: React.FC<UserMenuProps> = ({ className }) => {
       {isOpen && (
         <div className="header-user-menu-dropdown" role="menu">
           <div className="header-user-menu-username">{user.username}</div>
-          <button type="button" className="header-user-menu-item" onClick={handleChangeUsername}>
-            <span className="header-user-menu-icon" aria-hidden="true">✏️</span>
-            <span className="header-user-menu-label">Ändra användarnamn</span>
-          </button>
-          <button type="button" className="header-user-menu-item" onClick={handleOpenChangePassword}>
-            <span className="header-user-menu-icon" aria-hidden="true">🔒</span>
-            <span className="header-user-menu-label">Byt lösenord</span>
-          </button>
+          {!isGuest ? (
+            <>
+              <button type="button" className="header-user-menu-item" onClick={handleChangeUsername}>
+                <span className="header-user-menu-icon" aria-hidden="true">✏️</span>
+                <span className="header-user-menu-label">Ändra användarnamn</span>
+              </button>
+              <button type="button" className="header-user-menu-item" onClick={handleOpenChangePassword}>
+                <span className="header-user-menu-icon" aria-hidden="true">🔒</span>
+                <span className="header-user-menu-label">Byt lösenord</span>
+              </button>
+            </>
+          ) : (
+            <div className="header-user-menu-item" style={{ opacity: 0.85, cursor: 'default' }}>
+              <span className="header-user-menu-icon" aria-hidden="true">👤</span>
+              <span className="header-user-menu-label">Gästkonto (skapa konto för att ändra namn/lösenord)</span>
+            </div>
+          )}
           <button type="button" className="header-user-menu-item" onClick={handleOpenStats}>
             <span className="header-user-menu-icon" aria-hidden="true">📊</span>
             <span className="header-user-menu-label">Min statistik</span>

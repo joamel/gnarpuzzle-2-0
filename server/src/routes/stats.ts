@@ -21,6 +21,17 @@ type UserStats = {
   lastPlayedAt: string | null;
 };
 
+const toFiniteNumber = (value: unknown): number | null => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+};
+
 const safeParseJsonArray = (value: unknown): any[] => {
   if (Array.isArray(value)) return value;
   if (typeof value !== 'string') return [];
@@ -188,12 +199,11 @@ router.get('/me', AuthService.authenticateToken, async (req, res) => {
     let lastPlayedAt: string | null = null;
 
     for (const row of rows) {
-      gameIds.add(row.gameId);
+      const gameId = toFiniteNumber(row.gameId);
+      if (gameId !== null) gameIds.add(gameId);
       if (row.gameState === 'finished') gamesFinished += 1;
 
-      const score = Number.isFinite(row.finalScore) && row.finalScore > 0
-        ? row.finalScore
-        : row.score;
+      const score = toFiniteNumber(row.finalScore) ?? toFiniteNumber(row.score) ?? 0;
 
       totalScore += score;
       scoredGames += 1;
@@ -227,25 +237,30 @@ router.get('/me', AuthService.authenticateToken, async (req, res) => {
 
       const byGame = new Map<number, Array<{ userId: number; score: number; finalScore: number }>>();
       for (const p of allPlayers) {
-        const list = byGame.get(p.gameId) || [];
+        const gameId = toFiniteNumber(p.gameId);
+        const userId = toFiniteNumber(p.userId);
+        if (gameId === null || userId === null) continue;
+
+        const list = byGame.get(gameId) || [];
         list.push({
-          userId: p.userId,
-          score: p.score,
-          finalScore: p.finalScore
+          userId,
+          score: toFiniteNumber(p.score) ?? 0,
+          finalScore: toFiniteNumber(p.finalScore) ?? 0
         });
-        byGame.set(p.gameId, list);
+        byGame.set(gameId, list);
       }
 
       for (const [gameId, players] of byGame.entries()) {
         const normalized = players.map(p => {
-          const raw = Number.isFinite(p.finalScore) && p.finalScore > 0 ? p.finalScore : p.score;
+          const raw = toFiniteNumber(p.finalScore) ?? toFiniteNumber(p.score) ?? 0;
           return {
             userId: p.userId,
             score: Number.isFinite(raw) ? raw : 0
           };
         });
 
-        const me = normalized.find(p => p.userId === user.id);
+        const myUserId = toFiniteNumber(user.id) ?? user.id;
+        const me = normalized.find(p => p.userId === myUserId);
         if (!me) continue;
 
         const maxScore = normalized.reduce((m, p) => Math.max(m, p.score), 0);

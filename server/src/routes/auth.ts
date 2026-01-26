@@ -1,5 +1,6 @@
 import express from 'express';
 import { AuthService } from '../services/AuthService';
+import { UserModel } from '../models/UserModel';
 
 const router = express.Router();
 
@@ -59,11 +60,23 @@ router.get('/me', AuthService.authenticateToken, async (req, res) => {
     const authReq = req as any;
     const user = authReq.user;
 
+    const fullUser = await UserModel.findById(user.id);
+    if (!fullUser) {
+      res.status(401).json({
+        error: 'User not found',
+        message: 'User associated with token no longer exists. Please log in again.'
+      });
+      return;
+    }
+
     res.status(200).json({
       success: true,
       user: {
-        id: user.id,
-        username: user.username
+        id: fullUser.id,
+        username: fullUser.username,
+        created_at: fullUser.created_at,
+        last_active: fullUser.last_active,
+        isGuest: !fullUser.password_hash
       }
     });
   } catch (error) {

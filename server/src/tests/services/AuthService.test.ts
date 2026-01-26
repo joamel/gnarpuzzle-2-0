@@ -244,9 +244,12 @@ describe('AuthService', () => {
       expect(decoded).toBeNull();
     });
 
-    it('should delete guest user on logout (clean up temporary guests)', async () => {
+    it('should delete guest user on logout when configured (DELETE_GUEST_ON_LOGOUT=true)', async () => {
       const suffix = Math.random().toString(36).slice(2, 8);
       const username = `guest_${suffix}`;
+
+      const prev = process.env.DELETE_GUEST_ON_LOGOUT;
+      process.env.DELETE_GUEST_ON_LOGOUT = 'true';
 
       let createdUser: any = null;
       const guestRes = {
@@ -256,18 +259,23 @@ describe('AuthService', () => {
         })
       };
 
-      await AuthService.loginOrRegister({ body: { username } } as any, guestRes as any);
-      expect(guestRes.status).toHaveBeenCalledWith(200);
-      expect(createdUser).toBeTruthy();
+      try {
+        await AuthService.loginOrRegister({ body: { username } } as any, guestRes as any);
+        expect(guestRes.status).toHaveBeenCalledWith(200);
+        expect(createdUser).toBeTruthy();
 
-      const logoutRes = { status: vi.fn().mockReturnThis(), json: vi.fn() };
-      await AuthService.logout({ user: { id: createdUser.id, username: createdUser.username } } as any, logoutRes as any);
-      expect(logoutRes.status).toHaveBeenCalledWith(200);
+        const logoutRes = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+        await AuthService.logout({ user: { id: createdUser.id, username: createdUser.username } } as any, logoutRes as any);
+        expect(logoutRes.status).toHaveBeenCalledWith(200);
 
-      // User should now be deleted
-      const { UserModel } = await import('../../models');
-      const found = await UserModel.findById(createdUser.id);
-      expect(found).toBeNull();
+        // User should now be deleted
+        const { UserModel } = await import('../../models');
+        const found = await UserModel.findById(createdUser.id);
+        expect(found).toBeNull();
+      } finally {
+        if (typeof prev === 'string') process.env.DELETE_GUEST_ON_LOGOUT = prev;
+        else delete process.env.DELETE_GUEST_ON_LOGOUT;
+      }
     });
   });
 

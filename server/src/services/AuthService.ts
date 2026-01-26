@@ -117,7 +117,8 @@ export class AuthService {
         user: {
           id: user.id,
           username: user.username,
-          created_at: user.created_at
+          created_at: user.created_at,
+          isGuest: !user.password_hash
         },
         token,
         expiresIn: JWT_EXPIRES_IN
@@ -179,7 +180,8 @@ export class AuthService {
         user: {
           id: user.id,
           username: user.username,
-          created_at: user.created_at
+          created_at: user.created_at,
+          isGuest: !user.password_hash
         },
         token,
         expiresIn: JWT_EXPIRES_IN
@@ -240,7 +242,8 @@ export class AuthService {
         user: {
           id: user.id,
           username: user.username,
-          created_at: user.created_at
+          created_at: user.created_at,
+          isGuest: !user.password_hash
         },
         token,
         expiresIn: JWT_EXPIRES_IN
@@ -393,10 +396,29 @@ export class AuthService {
           user: {
             id: user.id,
             username: user.username,
-            created_at: user.created_at
+            created_at: user.created_at,
+            isGuest: !user.password_hash
           },
           token,
           expiresIn: JWT_EXPIRES_IN
+        });
+        return;
+      }
+
+      // Guests/legacy accounts (no password hash) cannot change username.
+      const fullUser = await UserModel.findById(currentUser.id);
+      if (!fullUser) {
+        res.status(404).json({
+          error: 'User not found',
+          message: 'User no longer exists'
+        });
+        return;
+      }
+
+      if (!fullUser.password_hash) {
+        res.status(403).json({
+          error: 'Guest account',
+          message: 'Guest accounts cannot change username'
         });
         return;
       }
@@ -425,7 +447,8 @@ export class AuthService {
         user: {
           id: updated.id,
           username: updated.username,
-          created_at: updated.created_at
+          created_at: updated.created_at,
+          isGuest: !updated.password_hash
         },
         token,
         expiresIn: JWT_EXPIRES_IN
@@ -481,7 +504,8 @@ export class AuthService {
         user: {
           id: user.id,
           username: user.username,
-          created_at: user.created_at
+          created_at: user.created_at,
+          isGuest: !user.password_hash
         },
         token: newToken,
         expiresIn: JWT_EXPIRES_IN
