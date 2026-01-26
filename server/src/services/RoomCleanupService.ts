@@ -8,6 +8,18 @@ export class RoomCleanupService {
   private readonly EMPTY_ROOM_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes for empty rooms
   private isRunning = false;
 
+  private coerceBoolean(value: unknown, defaultValue: boolean): boolean {
+    if (value === undefined || value === null) return defaultValue;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value !== 0;
+    if (typeof value === 'string') {
+      const v = value.trim().toLowerCase();
+      if (v === 'true' || v === '1' || v === 'yes') return true;
+      if (v === 'false' || v === '0' || v === 'no') return false;
+    }
+    return Boolean(value);
+  }
+
   /**
    * Start the room cleanup service
    */
@@ -127,9 +139,26 @@ export class RoomCleanupService {
         return false;
       }
 
-      // NEVER cleanup public rooms (they are kept permanently)
       const settings = typeof room.settings === 'string' ? JSON.parse(room.settings) : room.settings;
-      if (settings?.is_private === false) {
+
+      // Permanently keep certain rooms (e.g. seeded public rooms)
+      const isPersistent = this.coerceBoolean((settings as any)?.is_persistent, false);
+      if (isPersistent) {
+        logger.debug(`Persistent room ${room.code} is permanent - skipping cleanup`);
+        return false;
+      }
+
+      // NEVER cleanup public rooms.
+      // Be robust: some DBs/older records may store booleans as 0/1 or strings, or omit is_private entirely.
+      // If is_private is missing, treat the room as public unless it requires a password.
+      const requirePassword = this.coerceBoolean((settings as any)?.require_password, false);
+      const isPrivateRaw = (settings as any)?.is_private;
+      const isPrivate =
+        isPrivateRaw === undefined || isPrivateRaw === null
+          ? requirePassword
+          : this.coerceBoolean(isPrivateRaw, false);
+
+      if (!isPrivate) {
         logger.debug(`Public room ${room.code} is permanent - skipping cleanup`);
         return false;
       }

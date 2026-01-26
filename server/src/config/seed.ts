@@ -49,7 +49,8 @@ export async function seedDatabase(): Promise<void> {
             letter_timer: roomData.letter_timer,
             placement_timer: roomData.placement_timer,
             is_private: false,
-            require_password: false
+            require_password: false,
+            is_persistent: true
           });
 
           if (!existingRoom) {
@@ -98,8 +99,27 @@ export async function seedDatabase(): Promise<void> {
               continue;
             }
 
-            // Backfill settings if missing/invalid so cleanup treats it as permanent.
-            if (!existingRoom.settings) {
+            // Backfill/normalize settings so cleanup treats it as permanent.
+            // Some older DB rows may have settings but miss is_private, or store it as 0/1.
+            let needsBackfill = !existingRoom.settings;
+            if (!needsBackfill) {
+              try {
+                const parsed = typeof existingRoom.settings === 'string'
+                  ? JSON.parse(existingRoom.settings)
+                  : existingRoom.settings;
+
+                const isPrivate = (parsed as any)?.is_private;
+                const isPersistent = (parsed as any)?.is_persistent;
+                // We expect seeded rooms to be explicitly public + persistent.
+                if (isPrivate !== false || isPersistent !== true) {
+                  needsBackfill = true;
+                }
+              } catch {
+                needsBackfill = true;
+              }
+            }
+
+            if (needsBackfill) {
               await db.run(
                 `UPDATE rooms SET settings = ? WHERE id = ?`,
                 desiredSettings,
