@@ -8,12 +8,13 @@ export class GameStateService {
   private static instance: GameStateService;
   private socketService: SocketService;
   private wordValidationService: WordValidationService;
+  private wordInitPromise: Promise<void> | null = null;
   private activeTimers: Map<number, NodeJS.Timeout> = new Map();
 
   private constructor(socketService: SocketService) {
     this.socketService = socketService;
     this.wordValidationService = WordValidationService.getInstance();
-    this.initializeWordService();
+    this.wordInitPromise = this.initializeWordService();
   }
 
   public static getInstance(socketService: SocketService): GameStateService {
@@ -32,6 +33,20 @@ export class GameStateService {
       gameLogger.info('Word validation service initialized');
     } catch (error) {
       gameLogger.error('Failed to initialize word validation service', { error });
+    }
+  }
+
+  private async ensureWordServiceReady(): Promise<void> {
+    if (this.wordValidationService.isReady()) return;
+
+    if (!this.wordInitPromise) {
+      this.wordInitPromise = this.initializeWordService();
+    }
+
+    try {
+      await this.wordInitPromise;
+    } catch {
+      // initializeWordService already logs; keep game flow running.
     }
   }
 
@@ -874,6 +889,8 @@ export class GameStateService {
    * Calculate and update player score
    */
   async calculatePlayerScore(gameId: number, userId: number): Promise<GridScore | null> {
+    await this.ensureWordServiceReady();
+
     if (!this.wordValidationService.isReady()) {
       gameLogger.warn('Word validation service not ready - skipping score calculation', { gameId, playerId: userId });
       return null;
@@ -1123,26 +1140,40 @@ export class GameStateService {
       // Update room status back to waiting
       await db.run(`UPDATE rooms SET status = 'waiting' WHERE id = ?`, game.room_id);
       
-      // Get room code for socket broadcast
-      const room = await db.get(`SELECT code FROM rooms WHERE id = ?`, game.room_id) as { code: string } | undefined;
-      
-      let leaderboard: Array<{ userId: number; username: string; score: number; words: any[] }> = [];
+      // Get room code + board size for socket broadcast
+      const room = await db.get(
+        `SELECT id, code, board_size FROM rooms WHERE id = ?`,
+        game.room_id
+      ) as { id: number; code: string; board_size?: number } | undefined;
 
+      // Compute final scores for all players based on their current grids.
+      // Walkover rule: the player who leaves gets 0 points, even if their grid had words.
+      try {
+        await this.ensureWordServiceReady();
+      } catch {
+        // Best-effort; calculateAllPlayerScores will still update what it can.
+      }
+
+      const finalScores = await this.calculateAllPlayerScores(gameId);
+
+      // Enforce walkover-leaver = 0 points.
+      // (We still keep their player row for history/leaderboards and mark left_at above.)
+      await db.run(
+        `UPDATE players SET final_score = 0, words_found = ? WHERE game_id = ? AND user_id = ?`,
+        JSON.stringify([]),
+        gameId,
+        leavingUserId
+      );
+      finalScores[leavingUserId] = {
+        totalPoints: 0,
+        words: [],
+        completedRows: 0,
+        completedCols: 0
+      };
+
+      // Ensure at least 1 point for the remaining player in a pure walkover.
       if (remainingPlayers.length === 1) {
         const winnerUserId = remainingPlayers[0].user_id;
-
-        // Calculate score from current grid if possible; then ensure at least 1 point for walkover.
-        try {
-          await this.calculatePlayerScore(gameId, winnerUserId);
-        } catch (scoreErr) {
-          gameLogger.warn('Failed to calculate winner score for walkover', {
-            gameId,
-            winnerUserId,
-            error: (scoreErr as Error)?.message
-          });
-        }
-
-        const winnerUser = await db.get(`SELECT username FROM users WHERE id = ?`, winnerUserId) as { username?: string } | undefined;
         const winnerRow = await db.get(
           `SELECT final_score as finalScore, words_found as wordsFound FROM players WHERE game_id = ? AND user_id = ?`,
           gameId,
@@ -1168,21 +1199,32 @@ export class GameStateService {
             winnerUserId
           );
         }
-
-        leaderboard = [{
-          userId: winnerUserId,
-          username: winnerUser?.username || 'Vinnare',
-          score: winnerScore,
-          words: winnerWords
-        }];
       }
+
+      const players = await db.all(
+        `
+          SELECT p.user_id, u.username, p.final_score, p.grid_state, p.words_found
+          FROM players p
+          JOIN users u ON p.user_id = u.id
+          WHERE p.game_id = ?
+          ORDER BY p.final_score DESC
+        `,
+        gameId
+      );
 
       const gameEndedData = {
         gameId,
+        boardSize: room?.board_size || 5,
         reason: 'player_left',
         message: 'Spelet avslutades eftersom en spelare lämnade',
-        leaderboard,
-        finalScores: {}
+        leaderboard: players.map((p: any) => ({
+          userId: p.user_id,
+          username: p.username,
+          score: p.final_score,
+          words: JSON.parse(p.words_found || '[]'),
+          grid: JSON.parse(p.grid_state || '[]')
+        })),
+        finalScores
       };
       
       // Notify all players that game ended - send to BOTH game room and room room
