@@ -38,7 +38,8 @@ describe('Admin Routes - POST /api/admin/seed', () => {
       .set('X-Admin-Key', 'secret');
 
     expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
+    expect(res.body?.success).toBe(true);
+    expect(res.body?.message).toBe('Seed completed');
 
     const { seedDatabase } = await import('../../config/seed');
     expect(vi.mocked(seedDatabase)).toHaveBeenCalledTimes(1);
