@@ -1,7 +1,9 @@
 import express from 'express';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import { RoomModel } from '../models';
 import { DatabaseManager } from '../config/database';
+import { UserModel } from '../models/UserModel';
 
 export const adminRoutes = express.Router();
 
@@ -139,6 +141,77 @@ adminRoutes.get('/debug/user/:username/games', async (req, res) => {
         isGuest: !user.password_hash
       },
       games
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: 'Internal server error',
+      message: err instanceof Error ? err.message : String(err || '')
+    });
+  }
+});
+
+// POST /api/admin/users/:username/password
+// Sets/resets a user's password (admin-only). Useful to convert legacy accounts
+// into password-protected accounts without losing history/stats.
+adminRoutes.post('/users/:username/password', async (req, res) => {
+  if (!requireAdminKey(req, res)) return;
+
+  const username = String(req.params.username || '').trim();
+  const newPassword = typeof req.body?.newPassword === 'string' ? req.body.newPassword : '';
+
+  if (!username || username.length < 2 || username.length > 20) {
+    res.status(400).json({
+      error: 'Invalid username',
+      message: 'Username must be between 2 and 20 characters'
+    });
+    return;
+  }
+
+  // Validate username characters (alphanumeric + Swedish characters + underscore)
+  const usernameRegex = /^[a-zA-Z0-9_åäöÅÄÖ]+$/;
+  if (!usernameRegex.test(username)) {
+    res.status(400).json({
+      error: 'Invalid username',
+      message: 'Username can only contain letters, numbers, underscore and Swedish characters'
+    });
+    return;
+  }
+
+  if (!newPassword || newPassword.length < 8 || newPassword.length > 128) {
+    res.status(400).json({
+      error: 'Invalid password',
+      message: 'Password must be between 8 and 128 characters'
+    });
+    return;
+  }
+
+  try {
+    const user = await UserModel.findByUsername(username);
+    if (!user) {
+      res.status(404).json({
+        error: 'Not found',
+        message: 'User not found'
+      });
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const updated = await UserModel.setPasswordHash(user.id, passwordHash);
+    if (!updated) {
+      res.status(404).json({
+        error: 'Not found',
+        message: 'User not found'
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      user: {
+        id: updated.id,
+        username: updated.username,
+        isGuest: !updated.password_hash
+      }
     });
   } catch (err) {
     res.status(500).json({

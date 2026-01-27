@@ -78,14 +78,20 @@ const LoginPage: React.FC = () => {
   const handleGuestLogin = async () => {
     setError('');
 
-    const desired = username.trim() || makeGuestUsername();
+    // Guest login should not depend on what's typed in the login inputs.
+    // Always generate a fresh guest username.
+    const desired = makeGuestUsername();
     try {
+      // Show the generated name in the input so users understand who they are.
+      setUsername(desired);
       await loginAsGuest(desired);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err || '');
       const lower = msg.toLowerCase();
       if (lower.includes('password required') || lower.includes('protected')) {
-        setError('Det här användarnamnet är skyddat. Logga in med lösenord istället.');
+        // Should be extremely rare now since we always generate a guest username,
+        // but keep a helpful message.
+        setError('Det gick inte att logga in som gäst. Försök igen.');
         return;
       }
       if (lower.includes('invalid username')) {

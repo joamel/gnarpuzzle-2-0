@@ -91,7 +91,7 @@ describe('Authentication Flow', () => {
     });
   });
 
-  it('should allow user to login as guest with provided username', async () => {
+  it('should allow user to login as guest (generated username)', async () => {
     const { apiService } = await import('../../services/apiService');
 
     (apiService.guestLogin as any).mockResolvedValue({
@@ -101,14 +101,11 @@ describe('Authentication Flow', () => {
 
     renderWithAuth(<LoginPage />);
 
-    const usernameInput = screen.getByPlaceholderText(/namn|användarnamn/i);
-    fireEvent.change(usernameInput, { target: { value: 'gast_test' } });
-
     const guestButton = screen.getByRole('button', { name: /^logga in som gäst$/i });
     fireEvent.click(guestButton);
 
     await waitFor(() => {
-      expect(apiService.guestLogin).toHaveBeenCalledWith('gast_test');
+      expect(apiService.guestLogin).toHaveBeenCalledWith(expect.stringMatching(/^gast_[A-Z0-9]{4}$/));
     });
   });
 
@@ -128,6 +125,29 @@ describe('Authentication Flow', () => {
     await waitFor(() => {
       expect(apiService.guestLogin).toHaveBeenCalledWith(expect.stringMatching(/^gast_[A-Z0-9]{4}$/));
     });
+  });
+
+  it('should ignore typed username when logging in as guest', async () => {
+    const { apiService } = await import('../../services/apiService');
+
+    (apiService.guestLogin as any).mockResolvedValue({
+      token: 'mock-guest-token',
+      user: { id: 1, username: 'gast_test' }
+    });
+
+    renderWithAuth(<LoginPage />);
+
+    const usernameInput = screen.getByPlaceholderText(/namn|användarnamn/i);
+    fireEvent.change(usernameInput, { target: { value: 'Joakim' } });
+
+    const guestButton = screen.getByRole('button', { name: /^logga in som gäst$/i });
+    fireEvent.click(guestButton);
+
+    await waitFor(() => {
+      expect(apiService.guestLogin).toHaveBeenCalledTimes(1);
+    });
+
+    expect((apiService.guestLogin as any).mock.calls[0][0]).toMatch(/^gast_[A-Z0-9]{4}$/);
   });
 
   it('should validate username length on login', async () => {
