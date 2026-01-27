@@ -43,6 +43,37 @@ npm run install:all
 npm run dev
 ```
 
+## 🛠️ Drift / Återställning av standardrum
+
+De tre standardrummen (4×4/5×5/6×6) ska normalt vara **persistenta** och ska inte försvinna bara för att de är tomma.
+
+Om de ändå saknas (t.ex. efter databas-reset, manuell rensning, felaktig deploy/DB, eller om du vill “återskapa” dem i en ny miljö), kan du trigga seeding via ett admin-endpoint.
+
+**Viktigt:** Endpointen är **gömd** om `ADMIN_API_KEY` inte är satt (då får du 404).
+
+### 1) Sätt en admin-nyckel (production)
+
+Sätt env-var `ADMIN_API_KEY` i din server-miljö (t.ex. Render → Service → Environment). Detta gör du normalt **en gång**.
+
+### 2) Kör seed via Postman
+
+- Method: `POST`
+- URL: `https://<SERVER-URL>/api/admin/seed`
+- Header: `X-Admin-Key: <din ADMIN_API_KEY>`
+
+Svaret ska vara JSON och innehålla en sammanfattning av aktiva rum (inkl. standardrummen).
+
+### Behöver jag göra detta varje gång?
+
+Nej. Detta är tänkt som en **recovery-/ops-knapp** när standardrummen saknas. I normal drift ska standardrummen ligga kvar.
+
+### Vanlig fallgrop
+
+Se till att du använder **serverns** URL (API:t), inte frontendens URL. Ett snabbt test är:
+
+- `GET https://<SERVER-URL>/api/health` ska ge JSON
+- `GET https://<SERVER-URL>/api/rooms` ska ge JSON
+
 ## 📱 Features
 
 ### Core Gameplay
