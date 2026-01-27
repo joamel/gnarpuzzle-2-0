@@ -89,11 +89,19 @@ describe('GuestCleanupService', () => {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
 
+    const privateSettings = JSON.stringify({
+      grid_size: 5,
+      max_players: 6,
+      is_private: true,
+      require_password: true
+    });
+
     const roomInsert = await db.run(
-      'INSERT INTO rooms (code, name, created_by) VALUES (?, ?, ?)',
+      'INSERT INTO rooms (code, name, created_by, settings) VALUES (?, ?, ?, ?)',
       roomCode,
       `Solo ${suffix}`,
-      guestUser.id
+      guestUser.id,
+      privateSettings
     );
     const roomId = roomInsert.lastInsertRowid as number;
 
@@ -115,5 +123,64 @@ describe('GuestCleanupService', () => {
 
     const room = await db.get('SELECT * FROM rooms WHERE id = ?', roomId);
     expect(room).toBeNull();
+  });
+
+  it('should not delete persistent rooms when guest owner is cleaned (transfer to system user)', async () => {
+    const suffix = Math.random().toString(36).slice(2, 8);
+    const guestUsername = `guest_persist_${suffix}`;
+    const roomCode = `P${suffix}`.slice(0, 6).toUpperCase();
+
+    let guestUser: any = null;
+    const guestRes = {
+      status: (_code: number) => guestRes,
+      json: (payload: any) => {
+        guestUser = payload.user;
+      }
+    };
+    await AuthService.loginOrRegister({ body: { username: guestUsername } } as any, guestRes as any);
+    expect(typeof guestUser?.id).toBe('number');
+
+    const dbManager = await DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+
+    const settings = JSON.stringify({
+      grid_size: 5,
+      max_players: 6,
+      is_private: false,
+      require_password: false,
+      is_persistent: true
+    });
+
+    const roomInsert = await db.run(
+      'INSERT INTO rooms (code, name, created_by, settings) VALUES (?, ?, ?, ?)',
+      roomCode,
+      `Persistent ${suffix}`,
+      guestUser.id,
+      settings
+    );
+    const roomId = roomInsert.lastInsertRowid as number;
+
+    // Guest is the only member (or none) - this should NOT delete the room due to persistence.
+    await db.run('INSERT INTO room_members (room_id, user_id) VALUES (?, ?)', roomId, guestUser.id);
+
+    await db.run(
+      "UPDATE users SET last_active = datetime('now', '-120 minutes') WHERE id = ?",
+      guestUser.id
+    );
+
+    const service = new GuestCleanupService({ inactivityMinutes: 60, cleanupIntervalMs: 999999 });
+    const result = await service.runOnce();
+
+    expect(result.cleanedUsers).toBeGreaterThanOrEqual(1);
+
+    const deletedGuest = await UserModel.findById(guestUser.id);
+    expect(deletedGuest).toBeNull();
+
+    const room = await db.get('SELECT id, created_by, settings FROM rooms WHERE id = ?', roomId);
+    expect(room).toBeTruthy();
+
+    const systemUser = await UserModel.findByUsername('gnar_system');
+    expect(systemUser).toBeTruthy();
+    expect(room.created_by).toBe(systemUser!.id);
   });
 });

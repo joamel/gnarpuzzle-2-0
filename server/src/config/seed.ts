@@ -1,5 +1,7 @@
 import { UserModel, RoomModel } from '../models';
 import { DatabaseManager } from './database';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 export async function seedDatabase(): Promise<void> {
   console.log('🌱 Seeding database with test data...');
@@ -23,8 +25,24 @@ export async function seedDatabase(): Promise<void> {
       }
     }
 
-    // Create standard public rooms (4x4, 5x5, 6x6) WITHOUT auto-joining the creator
-    const adminUser = await UserModel.findByUsername('GnarMaster');
+    // Create standard public rooms (4x4, 5x5, 6x6) WITHOUT auto-joining the creator.
+    // Use a stable system user as owner so GuestCleanupService won't delete these rooms.
+    const SYSTEM_USERNAME = 'gnar_system';
+    let adminUser = await UserModel.findByUsername(SYSTEM_USERNAME);
+    if (!adminUser) {
+      const randomPassword = crypto.randomBytes(24).toString('hex');
+      const passwordHash = await bcrypt.hash(randomPassword, 10);
+      adminUser = await UserModel.createWithPassword(SYSTEM_USERNAME, passwordHash);
+      console.log(`✅ Created system seed user: ${SYSTEM_USERNAME}`);
+    } else if (!(adminUser as any).password_hash) {
+      // If a legacy user exists with this name, upgrade it so it isn't treated as a guest.
+      const randomPassword = crypto.randomBytes(24).toString('hex');
+      const passwordHash = await bcrypt.hash(randomPassword, 10);
+      await UserModel.setPasswordHash(adminUser.id, passwordHash);
+      adminUser = await UserModel.findById(adminUser.id);
+      console.log(`🛠️ Upgraded system seed user to password-protected: ${SYSTEM_USERNAME}`);
+    }
+
     if (adminUser) {
       const standardRooms = [
         { name: 'Snabbspel 4×4', board_size: 4, max_players: 4, letter_timer: 15, placement_timer: 20 },

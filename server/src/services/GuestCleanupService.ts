@@ -1,6 +1,8 @@
 import { DatabaseManager } from '../config/database';
 import { logger } from '../utils/logger';
 import { UserModel } from '../models';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 export class GuestCleanupService {
   private cleanupInterval: NodeJS.Timeout | null = null;
@@ -103,11 +105,62 @@ export class GuestCleanupService {
         try {
           await db.run('BEGIN');
 
+          const ensureSystemUserId = async (): Promise<number> => {
+            const SYSTEM_USERNAME = 'gnar_system';
+            const existing = await UserModel.findByUsername(SYSTEM_USERNAME);
+            if (existing && (existing as any).password_hash) return existing.id;
+
+            const randomPassword = crypto.randomBytes(24).toString('hex');
+            const passwordHash = await bcrypt.hash(randomPassword, 10);
+
+            if (!existing) {
+              const created = await UserModel.createWithPassword(SYSTEM_USERNAME, passwordHash);
+              return created.id;
+            }
+
+            await UserModel.setPasswordHash(existing.id, passwordHash);
+            return existing.id;
+          };
+
+          const coerceBoolean = (value: unknown, defaultValue: boolean): boolean => {
+            if (value === undefined || value === null) return defaultValue;
+            if (typeof value === 'boolean') return value;
+            if (typeof value === 'number') return value !== 0;
+            if (typeof value === 'string') {
+              const v = value.trim().toLowerCase();
+              if (v === 'true' || v === '1' || v === 'yes') return true;
+              if (v === 'false' || v === '0' || v === 'no') return false;
+            }
+            return Boolean(value);
+          };
+
+          const shouldPreserveRoom = (settingsRaw: unknown): boolean => {
+            if (!settingsRaw) return false;
+            let settings: any = settingsRaw;
+            try {
+              if (typeof settingsRaw === 'string') settings = JSON.parse(settingsRaw);
+            } catch {
+              return false;
+            }
+
+            if (coerceBoolean(settings?.is_persistent, false)) return true;
+
+            const requirePassword = coerceBoolean(settings?.require_password, false);
+            const isPrivateRaw = settings?.is_private;
+            const isPrivate =
+              isPrivateRaw === undefined || isPrivateRaw === null
+                ? requirePassword
+                : coerceBoolean(isPrivateRaw, false);
+
+            // Preserve public rooms
+            return !isPrivate;
+          };
+
           // Transfer or delete rooms owned by this guest, so we don't accidentally delete active rooms.
           const ownedRooms = (await db.all(
-            'SELECT id FROM rooms WHERE created_by = ?',
+            'SELECT id, settings FROM rooms WHERE created_by = ?',
             user.id
-          )) as Array<{ id: number }>;
+          )) as Array<{ id: number; settings: unknown }>;
 
           for (const room of ownedRooms) {
             const nextOwner = (await db.get(
@@ -121,6 +174,14 @@ export class GuestCleanupService {
               room.id,
               user.id
             )) as { user_id: number } | null;
+
+            const preserve = shouldPreserveRoom(room.settings);
+            if (preserve) {
+              const systemUserId = await ensureSystemUserId();
+              const newOwnerId = nextOwner?.user_id ?? systemUserId;
+              await db.run('UPDATE rooms SET created_by = ? WHERE id = ?', newOwnerId, room.id);
+              continue;
+            }
 
             if (nextOwner?.user_id) {
               await db.run('UPDATE rooms SET created_by = ? WHERE id = ?', nextOwner.user_id, room.id);
