@@ -256,11 +256,14 @@ const GameInterface: React.FC = () => {
   useEffect(() => {
     // Only trigger if we're leaving letter_placement phase (not entering it)
     if (previousGamePhaseRef.current === 'letter_placement' && gamePhase !== 'letter_placement' && temporaryPlacement) {
-      logger.game.warn('Phase changed away from letter_placement - emergency saving placement', {
+      // This can happen in normal gameplay (server advanced the phase) and/or due to
+      // client-side timing/race conditions. Trying to submit after the phase already
+      // changed will just fail and spam warnings, so we only clear local UI state.
+      logger.game.debug('Phase changed away from letter_placement - clearing pending placement', {
         gamePhase,
         temporaryPlacement,
       });
-      submitPlacement();
+      setTemporaryPlacement(null);
     }
     previousGamePhaseRef.current = gamePhase;
   }, [gamePhase, temporaryPlacement]);
@@ -268,7 +271,7 @@ const GameInterface: React.FC = () => {
   // Auto-submit when timeout is imminent
   useEffect(() => {
     if (gamePhase === 'letter_placement' && gameTimer && gameTimer.remainingSeconds <= 1 && temporaryPlacement) {
-      logger.game.warn('1 second left - auto-submitting placement', {
+      logger.game.debug('1 second left - auto-submitting placement', {
         remainingSeconds: gameTimer.remainingSeconds,
         temporaryPlacement,
       });
@@ -290,6 +293,12 @@ const GameInterface: React.FC = () => {
   const submitPlacement = async () => {
     if (!temporaryPlacement) {
       logger.game.debug('No temporary placement to submit');
+      return;
+    }
+
+    if (gamePhase !== 'letter_placement') {
+      logger.game.debug('Skipping submitPlacement - wrong phase', { gamePhase });
+      setTemporaryPlacement(null);
       return;
     }
     

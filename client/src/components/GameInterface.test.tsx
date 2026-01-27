@@ -104,7 +104,7 @@ describe('GameInterface Letter Placement Logic', () => {
     console.log('✅ Timer-based auto-submit test completed');
   });
 
-  test('auto-submits placement when phase changes away from letter_placement', async () => {
+  test('does not auto-submit placement when phase changes away from letter_placement', async () => {
     // Set up state with temporary placement
     mockUseGame.gamePhase = 'letter_placement';
     mockUseGame.selectedLetter = 'F';
@@ -120,14 +120,12 @@ describe('GameInterface Letter Placement Logic', () => {
     // Change phase away from letter_placement (simulating timeout)
     mockUseGame.gamePhase = 'letter_selection';
     rerender(<GameInterface />);
-    
-    // Wait for useEffect to trigger emergency save
-    await waitFor(() => {
-      expect(mockUseGame.placeLetter).toHaveBeenCalled();
-      expect(mockUseGame.confirmPlacement).toHaveBeenCalled();
-    }, { timeout: 2000 });
-    
-    console.log('✅ Phase change emergency save test completed');
+
+    // Allow effects to run; submitting after phase change is intentionally avoided.
+    await new Promise((r) => setTimeout(r, 25));
+
+    expect(mockUseGame.placeLetter).not.toHaveBeenCalled();
+    expect(mockUseGame.confirmPlacement).not.toHaveBeenCalled();
   });
 
   test('submitPlacement calls correct APIs with temporary placement position', async () => {
