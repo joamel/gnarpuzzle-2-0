@@ -16,6 +16,7 @@
     "start:server": "npm run start --workspace=server",
     "start:client": "npm run dev --workspace=client",
     "start": "concurrently \"npm run start:server\" \"npm run start:client\"",
+    "kill": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\kill-ports.ps1",
     "build:server": "npm run build --workspace=server",
     "build:client": "npm run build --workspace=client",
     "test": "npm run test:server && npm run test:client",
