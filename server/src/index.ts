@@ -24,7 +24,7 @@ const corsOptions = {
     : (process.env.CORS_ORIGIN || 'http://localhost:5173'),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Key'],
 };
 
 // Mobile-optimized rate limiting - disabled globally to allow multiple users and polling
@@ -90,11 +90,13 @@ import { authRoutes } from './routes/auth';
 import { roomRoutes } from './routes/rooms';
 import { gameRoutes } from './routes/games';
 import statsRoutes from './routes/stats';
+import { adminRoutes } from './routes/admin';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
