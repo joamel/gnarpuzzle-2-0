@@ -21,6 +21,12 @@ type UserStats = {
   lastPlayedAt: string | null;
 };
 
+type LeaderboardEntry = UserStats & {
+  rank: number;
+  userId: number;
+  username: string;
+};
+
 const toFiniteNumber = (value: unknown): number | null => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
   if (typeof value === 'string') {
@@ -136,6 +142,198 @@ router.get('/summary', async (req, res) => {
     res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to get game statistics'
+    });
+  }
+});
+
+/**
+ * GET /api/stats/leaderboard
+ * Top 10 leaderboard (public)
+ */
+router.get('/leaderboard', async (_req, res) => {
+  try {
+    const dbManager = await DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+
+    // 1) Find top users by total score across completed games.
+    const topUsers = await db.all(
+      `
+        SELECT
+          p.user_id as "userId",
+          u.username as "username",
+          COUNT(DISTINCT p.game_id) as "gamesPlayed",
+          SUM(COALESCE(p.final_score, p.score, 0)) as "totalScore",
+          MAX(COALESCE(p.final_score, p.score, 0)) as "bestScore",
+          AVG(COALESCE(p.final_score, p.score, 0)) as "averageScore",
+          MAX(COALESCE(g.finished_at, g.created_at)) as "lastPlayedAt"
+        FROM players p
+        JOIN users u ON u.id = p.user_id
+        JOIN games g ON g.id = p.game_id
+        WHERE (
+          g.state = 'finished'
+          OR g.finished_at IS NOT NULL
+          OR g.current_phase = 'finished'
+        )
+          AND g.state != 'abandoned'
+        GROUP BY p.user_id, u.username
+        ORDER BY "totalScore" DESC, "bestScore" DESC, "gamesPlayed" DESC
+        LIMIT 10
+      `
+    ) as Array<{
+      userId: number;
+      username: string;
+      gamesPlayed: number;
+      totalScore: number;
+      bestScore: number;
+      averageScore: number;
+      lastPlayedAt: string | null;
+    }>;
+
+    const topUserIds = topUsers
+      .map(r => toFiniteNumber(r.userId))
+      .filter((v): v is number => v !== null);
+
+    if (topUserIds.length === 0) {
+      res.status(200).json({
+        success: true,
+        updatedAt: new Date().toISOString(),
+        leaderboard: []
+      });
+      return;
+    }
+
+    const userPlaceholders = topUserIds.map(() => '?').join(',');
+
+    // 2) Compute W/D/L for those users via window functions (DB-agnostic between SQLite/Postgres).
+    const wdlRows = await db.all(
+      `
+        WITH ps AS (
+          SELECT
+            p.user_id as "userId",
+            p.game_id as "gameId",
+            COALESCE(p.final_score, p.score, 0) as "score"
+          FROM players p
+          JOIN games g ON g.id = p.game_id
+          WHERE (
+            g.state = 'finished'
+            OR g.finished_at IS NOT NULL
+            OR g.current_phase = 'finished'
+          )
+            AND g.state != 'abandoned'
+        ),
+        ranked AS (
+          SELECT
+            "userId",
+            "gameId",
+            "score",
+            MAX("score") OVER (PARTITION BY "gameId") as "maxScore"
+          FROM ps
+        ),
+        with_counts AS (
+          SELECT
+            "userId",
+            "gameId",
+            "score",
+            "maxScore",
+            SUM(CASE WHEN "score" = "maxScore" THEN 1 ELSE 0 END) OVER (PARTITION BY "gameId") as "maxCount"
+          FROM ranked
+        )
+        SELECT
+          "userId" as "userId",
+          SUM(CASE WHEN "score" = "maxScore" AND "maxCount" = 1 THEN 1 ELSE 0 END) as "wins",
+          SUM(CASE WHEN "score" = "maxScore" AND "maxCount" > 1 THEN 1 ELSE 0 END) as "draws",
+          SUM(CASE WHEN "score" < "maxScore" THEN 1 ELSE 0 END) as "losses"
+        FROM with_counts
+        WHERE "userId" IN (${userPlaceholders})
+        GROUP BY "userId"
+      `,
+      ...topUserIds
+    ) as Array<{ userId: number; wins: number; draws: number; losses: number }>;
+
+    const wdlByUser = new Map<number, { wins: number; draws: number; losses: number }>();
+    for (const row of wdlRows) {
+      const userId = toFiniteNumber((row as any).userId);
+      if (userId === null) continue;
+      wdlByUser.set(userId, {
+        wins: toFiniteNumber((row as any).wins) ?? 0,
+        draws: toFiniteNumber((row as any).draws) ?? 0,
+        losses: toFiniteNumber((row as any).losses) ?? 0
+      });
+    }
+
+    // 3) Count words found for those users (parse JSON arrays in code).
+    const wordRows = await db.all(
+      `
+        SELECT
+          p.user_id as "userId",
+          p.words_found as "wordsFound"
+        FROM players p
+        JOIN games g ON g.id = p.game_id
+        WHERE p.user_id IN (${userPlaceholders})
+          AND (
+            g.state = 'finished'
+            OR g.finished_at IS NOT NULL
+            OR g.current_phase = 'finished'
+          )
+          AND g.state != 'abandoned'
+      `,
+      ...topUserIds
+    ) as Array<{ userId: number; wordsFound: string | null }>;
+
+    const wordsByUser = new Map<number, number>();
+    for (const row of wordRows) {
+      const userId = toFiniteNumber((row as any).userId);
+      if (userId === null) continue;
+      const words = safeParseJsonArray((row as any).wordsFound);
+      const next = (wordsByUser.get(userId) || 0) + words.length;
+      wordsByUser.set(userId, next);
+    }
+
+    const leaderboard: LeaderboardEntry[] = topUsers.map((u, index) => {
+      const userId = toFiniteNumber((u as any).userId) ?? 0;
+      const wdl = wdlByUser.get(userId) || { wins: 0, draws: 0, losses: 0 };
+
+      const gamesPlayed = toFiniteNumber((u as any).gamesPlayed) ?? 0;
+      const totalScore = toFiniteNumber((u as any).totalScore) ?? 0;
+      const bestScore = toFiniteNumber((u as any).bestScore) ?? 0;
+      const avgRaw = toFiniteNumber((u as any).averageScore) ?? 0;
+      const averageScore = gamesPlayed > 0 ? Math.round(avgRaw * 10) / 10 : 0;
+
+      return {
+        rank: index + 1,
+        userId,
+        username: String((u as any).username || ''),
+        gamesPlayed,
+        gamesFinished: gamesPlayed,
+        wins: wdl.wins,
+        draws: wdl.draws,
+        losses: wdl.losses,
+        totalScore,
+        bestScore,
+        averageScore,
+        totalWordsFound: wordsByUser.get(userId) || 0,
+        lastPlayedAt: (u as any).lastPlayedAt ? String((u as any).lastPlayedAt) : null
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      updatedAt: new Date().toISOString(),
+      leaderboard
+    });
+  } catch (error) {
+    const debugId = `leaderboard_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    statsLogger.error('Error getting leaderboard', {
+      debugId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+
+    const includeDetails = process.env.DEBUG_API_ERRORS === 'true';
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to get leaderboard',
+      debugId,
+      ...(includeDetails ? { details: error instanceof Error ? error.message : String(error) } : null)
     });
   }
 });

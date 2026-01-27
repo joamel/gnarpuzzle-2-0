@@ -1,5 +1,5 @@
 import { Game } from '../../../shared/types.js';
-import type { MyStatsResponse } from '../types/stats';
+import type { LeaderboardResponse, MyStatsResponse } from '../types/stats';
 import { logger } from '../utils/logger';
 import { normalizeRoomCode } from '../utils/roomCode';
 
@@ -331,6 +331,10 @@ class ApiService {
 
   async getMyStats(): Promise<MyStatsResponse> {
     return this.request<MyStatsResponse>('/api/stats/me');
+  }
+
+  async getLeaderboard(): Promise<LeaderboardResponse> {
+    return this.request<LeaderboardResponse>('/api/stats/leaderboard');
   }
 }
 

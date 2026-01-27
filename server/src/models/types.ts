@@ -62,6 +62,7 @@ export interface Player {
   words_found: string[]; // JSON array
   ready_to_start: boolean;
   joined_at: string;
+  left_at?: string | null;
   // New game state fields
   current_letter: string | null;
   grid_state: GridCell[][];

@@ -205,6 +205,34 @@ describe('RoomModel', () => {
     });
   });
 
+  describe('removeMember', () => {
+    it('only deletes ongoing games when a room becomes empty (keeps finished game history for stats)', async () => {
+      // 1) remove member succeeds
+      mockDb.run.mockResolvedValueOnce({ changes: 1 });
+
+      // 2) memberCount becomes 0 (room is empty)
+      mockDb.get.mockResolvedValueOnce({ count: 0 });
+
+      // 3) cleanup queries + status reset
+      mockDb.run
+        .mockResolvedValueOnce({ changes: 0 }) // delete players in ongoing games
+        .mockResolvedValueOnce({ changes: 0 }) // delete ongoing games
+        .mockResolvedValueOnce({ changes: 1 }); // update room status
+
+      const result = await RoomModel.removeMember(1, 123);
+      expect(result).toBe(true);
+
+      const runSqls = mockDb.run.mock.calls.map((c: any[]) => String(c[0] || ''));
+      // Should NOT delete all games for the room.
+      expect(runSqls.some((sql: string) => sql.includes('DELETE FROM games WHERE room_id = ?'))).toBe(false);
+
+      // Should delete only games that are not finished/abandoned and not ended via phase/finished_at.
+      expect(runSqls.some((sql: string) => sql.includes("state NOT IN ('finished', 'abandoned')"))).toBe(true);
+      expect(runSqls.some((sql: string) => sql.includes('finished_at IS NULL'))).toBe(true);
+      expect(runSqls.some((sql: string) => sql.includes("current_phase IS NULL OR current_phase != 'finished'"))).toBe(true);
+    });
+  });
+
   describe('findByCode', () => {
     it('should find room by code with members', async () => {
       const mockRoom = {

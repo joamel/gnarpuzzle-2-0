@@ -188,13 +188,30 @@ export class RoomModel {
       
       if (memberCount === 0) {
         roomLogger.info('Room is now empty, cleaning up', { roomId });
-        
-        // Delete any ongoing games for this room
+
+        // Delete any ongoing games for this room.
+        // IMPORTANT: Do NOT delete finished/ended games, since stats are computed from game/player history.
         try {
-          await db.run('DELETE FROM players WHERE game_id IN (SELECT id FROM games WHERE room_id = ?)', roomId);
-          const gameDeleteResult = await db.run('DELETE FROM games WHERE room_id = ?', roomId);
+          const deleteOngoingGamesWhere = `
+            room_id = ?
+            AND (
+              (state IS NULL OR state NOT IN ('finished', 'abandoned'))
+              AND finished_at IS NULL
+              AND (current_phase IS NULL OR current_phase != 'finished')
+            )
+          `;
+
+          await db.run(
+            `DELETE FROM players WHERE game_id IN (SELECT id FROM games WHERE ${deleteOngoingGamesWhere})`,
+            roomId
+          );
+
+          const gameDeleteResult = await db.run(
+            `DELETE FROM games WHERE ${deleteOngoingGamesWhere}`,
+            roomId
+          );
           if (gameDeleteResult.changes > 0) {
-            roomLogger.info('Cleaned up games for empty room', { roomId, deletedGames: gameDeleteResult.changes });
+            roomLogger.info('Cleaned up ongoing games for empty room', { roomId, deletedGames: gameDeleteResult.changes });
           }
         } catch (error) {
           roomLogger.warn('Failed to clean up games for empty room', {

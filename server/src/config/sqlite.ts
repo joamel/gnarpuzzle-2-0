@@ -125,10 +125,18 @@ export class SQLiteDatabase implements DatabaseInterface {
   async resetPlayingRooms(): Promise<void> {
     try {
       dbLogger.debug('Resetting playing rooms to waiting (development)');
-      
-      // Delete all games and players first  
-      this.db.exec('DELETE FROM players');
-      this.db.exec('DELETE FROM games');
+
+      // Clear ongoing game state, but preserve finished/abandoned history (stats are computed from it).
+      const deleteOngoingGamesWhere = `
+        (state IS NULL OR state NOT IN ('finished', 'abandoned'))
+        AND finished_at IS NULL
+        AND (current_phase IS NULL OR current_phase != 'finished')
+      `;
+
+      this.db.exec(
+        `DELETE FROM players WHERE game_id IN (SELECT id FROM games WHERE ${deleteOngoingGamesWhere})`
+      );
+      this.db.exec(`DELETE FROM games WHERE ${deleteOngoingGamesWhere}`);
       
       // Reset all rooms to waiting status
       const result = this.db.prepare('UPDATE rooms SET status = ? WHERE status = ?').run('waiting', 'playing');

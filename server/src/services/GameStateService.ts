@@ -393,11 +393,11 @@ export class GameStateService {
     // Check if all players confirmed
     const confirmedCount = await db.get(`
       SELECT COUNT(*) as count FROM players 
-      WHERE game_id = ? AND placement_confirmed = 1
+      WHERE game_id = ? AND placement_confirmed = 1 AND left_at IS NULL
     `, gameId) as { count: number };
 
     const totalPlayers = await db.get(`
-      SELECT COUNT(*) as count FROM players WHERE game_id = ?
+      SELECT COUNT(*) as count FROM players WHERE game_id = ? AND left_at IS NULL
     `, gameId) as { count: number };
 
     gameLogger.debug('Placement confirmation status', {
@@ -473,7 +473,7 @@ export class GameStateService {
     const players = await db.all(`
       SELECT p.user_id, p.position 
       FROM players p 
-      WHERE p.game_id = ? 
+      WHERE p.game_id = ? AND p.left_at IS NULL
       ORDER BY p.position ASC
     `, gameId) as { user_id: number; position: number }[];
 
@@ -524,7 +524,7 @@ export class GameStateService {
     const players = await db.all(`
       SELECT p.user_id, p.position 
       FROM players p 
-      WHERE p.game_id = ? 
+      WHERE p.game_id = ? AND p.left_at IS NULL
       ORDER BY p.position ASC
     `, gameId) as { user_id: number; position: number }[];
 
@@ -572,7 +572,7 @@ export class GameStateService {
 
     const unconfirmedPlayers = await db.all(`
       SELECT * FROM players 
-      WHERE game_id = ? AND placement_confirmed = 0
+      WHERE game_id = ? AND placement_confirmed = 0 AND left_at IS NULL
     `, gameId) as Player[];
 
     // Process all auto-placements FIRST before marking any as confirmed
@@ -836,7 +836,7 @@ export class GameStateService {
     const db = dbManager.getDatabase();
     
     const players = await db.all(`
-      SELECT user_id, grid_state FROM players WHERE game_id = ?
+      SELECT user_id, grid_state FROM players WHERE game_id = ? AND left_at IS NULL
     `, gameId) as { user_id: number; grid_state: string }[];
 
     gameLogger.debug('isGameFinished check', { gameId, players: players.length });
@@ -1062,10 +1062,27 @@ export class GameStateService {
         gameId,
         leavingUserId
       });
-      
-      // Remove player from the game
-      await db.run(`DELETE FROM players WHERE game_id = ? AND user_id = ?`, gameId, leavingUserId);
-      gameLogger.debug('Removed player from game', { gameId, leavingUserId });
+
+      // IMPORTANT: Do not delete the player row.
+      // We want walkover/leaver games to still count towards stats/leaderboards.
+      await db.run(
+        `
+          UPDATE players
+          SET left_at = CURRENT_TIMESTAMP,
+              current_letter = NULL,
+              placement_confirmed = 1,
+              final_score = CASE
+                WHEN COALESCE(final_score, 0) > 0 THEN final_score
+                WHEN COALESCE(score, 0) > 0 THEN score
+                ELSE 0
+              END
+          WHERE game_id = ? AND user_id = ?
+        `,
+        gameId,
+        leavingUserId
+      );
+
+      gameLogger.debug('Marked player as left game (kept history)', { gameId, leavingUserId });
     } else {
       gameLogger.debug('Player disconnected from game - awaiting grace period', {
         gameId,
@@ -1078,7 +1095,7 @@ export class GameStateService {
 
     // Get remaining players
     const remainingPlayers = await db.all(`
-      SELECT user_id, position FROM players WHERE game_id = ?
+      SELECT user_id, position FROM players WHERE game_id = ? AND left_at IS NULL
     `, gameId) as { user_id: number; position: number }[];
     
     gameLogger.info('Player left during game - checking remaining players', { 

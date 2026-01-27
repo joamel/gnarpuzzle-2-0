@@ -151,8 +151,17 @@ export class PostgresDatabase implements DatabaseInterface {
   }
 
   async resetPlayingRooms(): Promise<void> {
-    await this.exec('DELETE FROM players;');
-    await this.exec('DELETE FROM games;');
+    // Clear ongoing game state, but preserve finished/abandoned history (stats are computed from it).
+    const deleteOngoingGamesWhere = `
+      (state IS NULL OR state NOT IN ('finished', 'abandoned'))
+      AND finished_at IS NULL
+      AND (current_phase IS NULL OR current_phase != 'finished')
+    `;
+
+    await this.exec(
+      `DELETE FROM players WHERE game_id IN (SELECT id FROM games WHERE ${deleteOngoingGamesWhere});`
+    );
+    await this.exec(`DELETE FROM games WHERE ${deleteOngoingGamesWhere};`);
     await this.run("UPDATE rooms SET status = 'waiting' WHERE status = 'playing'");
   }
 }
