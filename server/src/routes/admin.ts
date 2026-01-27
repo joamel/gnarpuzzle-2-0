@@ -1,6 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import { RoomModel } from '../models';
+import { DatabaseManager } from '../config/database';
 
 export const adminRoutes = express.Router();
 
@@ -11,7 +12,7 @@ const timingSafeEquals = (a: string, b: string): boolean => {
   return crypto.timingSafeEqual(aBuf, bBuf);
 };
 
-adminRoutes.post('/seed', async (req, res) => {
+const requireAdminKey = (req: express.Request, res: express.Response): boolean => {
   const expectedKey = process.env.ADMIN_API_KEY;
 
   // If not configured, hide the endpoint.
@@ -20,7 +21,7 @@ adminRoutes.post('/seed', async (req, res) => {
       error: 'Not found',
       message: 'Route not found'
     });
-    return;
+    return false;
   }
 
   const providedKey = req.get('X-Admin-Key') || '';
@@ -29,8 +30,14 @@ adminRoutes.post('/seed', async (req, res) => {
       error: 'Forbidden',
       message: 'Invalid admin key'
     });
-    return;
+    return false;
   }
+
+  return true;
+};
+
+adminRoutes.post('/seed', async (req, res) => {
+  if (!requireAdminKey(req, res)) return;
 
   try {
     const { seedDatabase } = await import('../config/seed');
@@ -58,6 +65,84 @@ adminRoutes.post('/seed', async (req, res) => {
   } catch (err) {
     res.status(500).json({
       error: 'Seed failed',
+      message: err instanceof Error ? err.message : String(err || '')
+    });
+  }
+});
+
+// GET /api/admin/debug/user/:username/games
+// Helps diagnose missing stats in production.
+adminRoutes.get('/debug/user/:username/games', async (req, res) => {
+  if (!requireAdminKey(req, res)) return;
+
+  const username = String(req.params.username || '').trim();
+  if (!username) {
+    res.status(400).json({
+      error: 'Bad request',
+      message: 'Username is required'
+    });
+    return;
+  }
+
+  try {
+    const dbManager = await DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+
+    const user = await db.get(
+      `SELECT id, username, created_at, password_hash FROM users WHERE LOWER(username) = LOWER(?) LIMIT 1`,
+      username
+    ) as { id: number; username: string; created_at: string; password_hash: string | null } | undefined;
+
+    if (!user?.id) {
+      res.status(404).json({
+        error: 'Not found',
+        message: 'User not found'
+      });
+      return;
+    }
+
+    const games = await db.all(
+      `
+        SELECT
+          g.id as gameId,
+          g.room_id as roomId,
+          g.state as state,
+          g.current_phase as currentPhase,
+          g.created_at as createdAt,
+          g.finished_at as finishedAt,
+          p.final_score as finalScore,
+          p.words_found as wordsFound
+        FROM players p
+        JOIN games g ON g.id = p.game_id
+        WHERE p.user_id = ?
+        ORDER BY COALESCE(g.finished_at, g.created_at) DESC
+        LIMIT 10
+      `,
+      user.id
+    ) as Array<{
+      gameId: number;
+      roomId: number;
+      state: string;
+      currentPhase: string | null;
+      createdAt: string;
+      finishedAt: string | null;
+      finalScore: number;
+      wordsFound: string;
+    }>;
+
+    res.status(200).json({
+      success: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        created_at: user.created_at,
+        isGuest: !user.password_hash
+      },
+      games
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: 'Internal server error',
       message: err instanceof Error ? err.message : String(err || '')
     });
   }

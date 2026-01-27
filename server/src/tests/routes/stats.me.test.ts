@@ -29,8 +29,8 @@ describe('Stats Routes - GET /api/stats/me', () => {
 
   it('counts wins when DB returns ids/scores as strings (Postgres-safe)', async () => {
     const dbAll = vi.fn(async (sql: string) => {
-      // First query: per-user rows for finished/abandoned games
-      if (sql.includes('FROM players p') && sql.includes("g.state IN ('finished', 'abandoned')")) {
+      // First query: per-user rows for finished/abandoned games (or clearly ended via phase/finished_at)
+      if (sql.includes('FROM players p') && sql.includes("g.state IN ('finished', 'abandoned')") && sql.includes('g.finished_at IS NOT NULL')) {
         return [
           {
             gameId: '1',
@@ -38,6 +38,7 @@ describe('Stats Routes - GET /api/stats/me', () => {
             finalScore: '10',
             wordsFound: '[]',
             gameState: 'finished',
+            gamePhase: 'finished',
             createdAt: '2026-01-01T00:00:00.000Z',
             finishedAt: '2026-01-01T00:10:00.000Z'
           }
@@ -83,7 +84,7 @@ describe('Stats Routes - GET /api/stats/me', () => {
 
   it('counts draws when multiple players share max score', async () => {
     const dbAll = vi.fn(async (sql: string) => {
-      if (sql.includes('FROM players p') && sql.includes("g.state IN ('finished', 'abandoned')")) {
+      if (sql.includes('FROM players p') && sql.includes("g.state IN ('finished', 'abandoned')") && sql.includes('g.finished_at IS NOT NULL')) {
         return [
           {
             gameId: '2',
@@ -91,6 +92,7 @@ describe('Stats Routes - GET /api/stats/me', () => {
             finalScore: '10',
             wordsFound: '[]',
             gameState: 'finished',
+            gamePhase: 'finished',
             createdAt: '2026-01-02T00:00:00.000Z',
             finishedAt: '2026-01-02T00:10:00.000Z'
           }

@@ -188,6 +188,20 @@
   justify-content: space-between;
 }
 
+/* The last row has fewer letters (29 => 10/10/9). Keep button sizing the same,
+   but center the row and let it take a bit less horizontal space. */
+.letters-row.letters-row--bottom {
+  /* 9 tiles vs 10 tiles: keep tiles same size as other rows,
+     but constrain the row width and center it. */
+  /* Use percentage so it stays narrower on small screens too
+     (min(px, 100%) becomes 100% on mobile, which makes bottom keys larger). */
+  width: 90%;
+  max-width: 520px;
+  align-self: center;
+  justify-content: space-between;
+  margin-top: -2px;
+}
+
 /* Full-width rows; 10/10/9 letters are rendered in component */
 .letter-selector .letters-row .brick.brick-button {
   flex: 1 1 0;

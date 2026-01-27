@@ -163,17 +163,22 @@ router.get('/me', AuthService.authenticateToken, async (req, res) => {
     const rows = await db.all(
       `
         SELECT
-          p.game_id as gameId,
-          p.score as score,
-          p.final_score as finalScore,
-          p.words_found as wordsFound,
-          g.state as gameState,
-          g.created_at as createdAt,
-          g.finished_at as finishedAt
+          p.game_id as "gameId",
+          p.score as "score",
+          p.final_score as "finalScore",
+          p.words_found as "wordsFound",
+          g.state as "gameState",
+          g.current_phase as "gamePhase",
+          g.created_at as "createdAt",
+          g.finished_at as "finishedAt"
         FROM players p
         JOIN games g ON g.id = p.game_id
         WHERE p.user_id = ?
-          AND g.state IN ('finished', 'abandoned')
+          AND (
+            g.state IN ('finished', 'abandoned')
+            OR g.finished_at IS NOT NULL
+            OR g.current_phase = 'finished'
+          )
         ORDER BY COALESCE(g.finished_at, g.created_at) DESC
       `,
       user.id
@@ -182,7 +187,8 @@ router.get('/me', AuthService.authenticateToken, async (req, res) => {
       score: number;
       finalScore: number;
       wordsFound: string;
-      gameState: 'finished' | 'abandoned';
+      gameState: string;
+      gamePhase: string | null;
       createdAt: string;
       finishedAt: string | null;
     }>;
@@ -201,7 +207,13 @@ router.get('/me', AuthService.authenticateToken, async (req, res) => {
     for (const row of rows) {
       const gameId = toFiniteNumber(row.gameId);
       if (gameId !== null) gameIds.add(gameId);
-      if (row.gameState === 'finished') gamesFinished += 1;
+      if (row.gameState === 'finished' || row.gamePhase === 'finished' || !!row.finishedAt) {
+        // Keep compatibility with older/edge cases where state wasn't updated
+        // but the game is clearly over.
+        if (row.gameState !== 'abandoned') {
+          gamesFinished += 1;
+        }
+      }
 
       const score = toFiniteNumber(row.finalScore) ?? toFiniteNumber(row.score) ?? 0;
 
@@ -223,7 +235,11 @@ router.get('/me', AuthService.authenticateToken, async (req, res) => {
 
       const allPlayers = await db.all(
         `
-          SELECT game_id as gameId, user_id as userId, score as score, final_score as finalScore
+          SELECT
+            game_id as "gameId",
+            user_id as "userId",
+            score as "score",
+            final_score as "finalScore"
           FROM players
           WHERE game_id IN (${placeholders})
         `,
@@ -297,12 +313,18 @@ router.get('/me', AuthService.authenticateToken, async (req, res) => {
       stats
     });
   } catch (error) {
+    const debugId = `stats_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     statsLogger.error('Error getting personal stats', {
+      debugId,
       error: error instanceof Error ? error.message : String(error)
     });
+
+    const includeDetails = process.env.DEBUG_API_ERRORS === 'true';
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to get personal statistics'
+      message: 'Failed to get personal statistics',
+      debugId,
+      ...(includeDetails ? { details: error instanceof Error ? error.message : String(error) } : null)
     });
   }
 });

@@ -160,8 +160,13 @@ const LetterSelector: React.FC<LetterSelectorProps> = ({
   return (
     <div className={`letter-selector mode-${mode} ${isDragActive ? 'drag-active' : ''}`.trim()}>
       <div className="letters-grid">
-        {rows.current.map((rowLetters, rowIndex) => (
-          <div key={rowIndex} className="letters-row">
+        {rows.current.map((rowLetters, rowIndex) => {
+          const isBottomRow = rowIndex === rows.current.length - 1;
+          return (
+          <div
+            key={rowIndex}
+            className={`letters-row ${isBottomRow ? 'letters-row--bottom' : ''}`.trim()}
+          >
             {rowLetters.map(letter => {
               const isPending = pendingLetter === letter;
               const isBrowsing = browsingLetter === letter;
@@ -192,7 +197,8 @@ const LetterSelector: React.FC<LetterSelectorProps> = ({
               );
             })}
           </div>
-        ))}
+          );
+        })}
       </div>
       <div className="drag-instructions">
         <small>

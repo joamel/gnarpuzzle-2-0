@@ -699,7 +699,7 @@ export class GameStateService {
         0,
         JSON.stringify([]),
         JSON.stringify([]),
-        true,
+        1, // SQLite stores booleans as INTEGER 1/0; better-sqlite3 can't bind JS booleans
         JSON.stringify([]), // Will be initialized later
         null,
         0, // false -> 0

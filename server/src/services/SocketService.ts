@@ -906,7 +906,9 @@ export class SocketService {
                   // User still disconnected after grace period - remove from game
                   const { GameStateService } = await import('./GameStateService');
                   const gameStateService = GameStateService.getInstance(this);
-                  await gameStateService.handlePlayerLeft(activeGame.id, userId);
+                  // After the grace period, we treat this as a forced removal.
+                  // `handlePlayerLeft` only performs removal + walkover completion when `intentional=true`.
+                  await gameStateService.handlePlayerLeft(activeGame.id, userId, true);
                   
                   // Also remove from room
                   const removed = await RoomModel.removeMember(roomId, userId);
