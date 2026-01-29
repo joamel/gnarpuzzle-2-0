@@ -587,7 +587,7 @@ export class GameStateService {
 
     const unconfirmedPlayers = await db.all(`
       SELECT * FROM players 
-      WHERE game_id = ? AND placement_confirmed = 0 AND left_at IS NULL
+      WHERE game_id = ? AND placement_confirmed IN (0, 2) AND left_at IS NULL
     `, gameId) as Player[];
 
     // Process all auto-placements FIRST before marking any as confirmed
