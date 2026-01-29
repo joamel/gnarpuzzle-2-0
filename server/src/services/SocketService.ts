@@ -451,6 +451,7 @@ export class SocketService {
             
             // Map players with complete game data
             const mappedPlayers = playersData.map((p: any) => {
+              const gridSize = (room as any)?.board_size || 5;
               let parsedGrid;
               try {
                 if (typeof p.grid_state === 'string') {
@@ -458,8 +459,8 @@ export class SocketService {
                 } else if (p.grid_state && Array.isArray(p.grid_state)) {
                   parsedGrid = p.grid_state;
                 } else {
-                  parsedGrid = Array(5).fill(null).map((_, y) => 
-                    Array(5).fill(null).map((_, x) => ({
+                  parsedGrid = Array(gridSize).fill(null).map((_, y) => 
+                    Array(gridSize).fill(null).map((_, x) => ({
                       letter: null,
                       x: x,
                       y: y
@@ -467,8 +468,8 @@ export class SocketService {
                   );
                 }
               } catch (parseError) {
-                parsedGrid = Array(5).fill(null).map((_, y) => 
-                  Array(5).fill(null).map((_, x) => ({
+                parsedGrid = Array(gridSize).fill(null).map((_, y) => 
+                  Array(gridSize).fill(null).map((_, x) => ({
                     letter: null,
                     x: x,
                     y: y

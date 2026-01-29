@@ -364,6 +364,15 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       if (data.players && Array.isArray(data.players) && data.players.length > 0) {
         logger.game.debug('Setting players from game:started event', { count: data.players.length });
         setPlayers(data.players);
+
+        // If we're reconnecting during placement, make sure selectedLetter is set immediately
+        // so the board isn't disabled while we fetch the full game state.
+        if (user && data.phase === 'letter_placement') {
+          const me = data.players.find((p: any) => Number(p.userId) === Number(user.id));
+          if (me?.currentLetter) {
+            setSelectedLetter(me.currentLetter);
+          }
+        }
       }
       
       // Update room status to playing

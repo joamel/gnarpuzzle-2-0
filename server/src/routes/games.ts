@@ -329,7 +329,14 @@ router.post('/:id/place-letter', AuthService.authenticateToken, async (req, res)
     });
 
   } catch (error) {
-    logger.error('Place letter error:', error);
+    logger.error('Place letter error', {
+      gameId: req.params.id,
+      userId: (req as any)?.user?.id,
+      x: (req as any)?.body?.x,
+      y: (req as any)?.body?.y,
+      message: error instanceof Error ? error.message : String(error),
+      error,
+    });
     const message = error instanceof Error ? error.message : 'Failed to place letter';
     res.status(400).json({
       error: 'Unable to place letter',

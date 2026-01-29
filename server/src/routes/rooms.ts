@@ -876,6 +876,11 @@ router.put('/:id/settings', AuthService.authenticateToken, async (req, res) => {
     const roomId = parseInt(req.params.id);
     const { max_players, grid_size, letter_timer, placement_timer } = req.body;
 
+    const maxPlayers = max_players !== undefined ? Number(max_players) : undefined;
+    const gridSize = grid_size !== undefined ? Number(grid_size) : undefined;
+    const letterTimer = letter_timer !== undefined ? Number(letter_timer) : undefined;
+    const placementTimer = placement_timer !== undefined ? Number(placement_timer) : undefined;
+
     if (!roomId || isNaN(roomId)) {
       res.status(400).json({
         error: 'Invalid room ID',
@@ -911,8 +916,40 @@ router.put('/:id/settings', AuthService.authenticateToken, async (req, res) => {
       return;
     }
 
-    // Validate settings
-    if (max_players !== undefined && (max_players < 2 || max_players > 6)) {
+    // Validate settings (accept numeric strings from clients)
+    if (maxPlayers !== undefined && !Number.isFinite(maxPlayers)) {
+      res.status(400).json({
+        error: 'Invalid max_players',
+        message: 'Max players must be a number'
+      });
+      return;
+    }
+
+    if (gridSize !== undefined && !Number.isFinite(gridSize)) {
+      res.status(400).json({
+        error: 'Invalid grid_size',
+        message: 'Grid size must be a number'
+      });
+      return;
+    }
+
+    if (letterTimer !== undefined && !Number.isFinite(letterTimer)) {
+      res.status(400).json({
+        error: 'Invalid letter_timer',
+        message: 'Letter timer must be a number'
+      });
+      return;
+    }
+
+    if (placementTimer !== undefined && !Number.isFinite(placementTimer)) {
+      res.status(400).json({
+        error: 'Invalid placement_timer',
+        message: 'Placement timer must be a number'
+      });
+      return;
+    }
+
+    if (maxPlayers !== undefined && (maxPlayers < 2 || maxPlayers > 6)) {
       res.status(400).json({
         error: 'Invalid max_players',
         message: 'Max players must be between 2 and 6'
@@ -920,7 +957,7 @@ router.put('/:id/settings', AuthService.authenticateToken, async (req, res) => {
       return;
     }
 
-    if (grid_size !== undefined && ![4, 5, 6].includes(grid_size)) {
+    if (gridSize !== undefined && ![4, 5, 6].includes(gridSize)) {
       res.status(400).json({
         error: 'Invalid grid_size',
         message: 'Grid size must be 4, 5, or 6'
@@ -928,7 +965,7 @@ router.put('/:id/settings', AuthService.authenticateToken, async (req, res) => {
       return;
     }
 
-    if (letter_timer !== undefined && (letter_timer < 5 || letter_timer > 60)) {
+    if (letterTimer !== undefined && (letterTimer < 5 || letterTimer > 60)) {
       res.status(400).json({
         error: 'Invalid letter_timer',
         message: 'Letter timer must be between 5 and 60 seconds'
@@ -936,7 +973,7 @@ router.put('/:id/settings', AuthService.authenticateToken, async (req, res) => {
       return;
     }
 
-    if (placement_timer !== undefined && (placement_timer < 10 || placement_timer > 60)) {
+    if (placementTimer !== undefined && (placementTimer < 10 || placementTimer > 60)) {
       res.status(400).json({
         error: 'Invalid placement_timer',
         message: 'Placement timer must be between 10 and 60 seconds'
@@ -947,10 +984,10 @@ router.put('/:id/settings', AuthService.authenticateToken, async (req, res) => {
     // Update settings
     const updatedSettings = {
       ...room.settings,
-      ...(max_players !== undefined && { max_players }),
-      ...(grid_size !== undefined && { grid_size }),
-      ...(letter_timer !== undefined && { letter_timer }),
-      ...(placement_timer !== undefined && { placement_timer })
+      ...(maxPlayers !== undefined && { max_players: maxPlayers }),
+      ...(gridSize !== undefined && { grid_size: gridSize }),
+      ...(letterTimer !== undefined && { letter_timer: letterTimer }),
+      ...(placementTimer !== undefined && { placement_timer: placementTimer })
     };
 
     const db = (await DatabaseManager.getInstance()).getDatabase();
@@ -960,8 +997,8 @@ router.put('/:id/settings', AuthService.authenticateToken, async (req, res) => {
       'UPDATE rooms SET settings = ?, board_size = ?, max_players = ? WHERE id = ?',
       [
         JSON.stringify(updatedSettings), 
-        grid_size || room.board_size,
-        max_players || room.max_players,
+        gridSize ?? room.board_size,
+        maxPlayers ?? room.max_players,
         roomId
       ]
     );
