@@ -200,6 +200,9 @@ export interface SocketEvents {
     newCurrentTurn?: number;
   }) => void;
 
+  // Time sync
+  'time:pong': (data: { clientTime: number; serverTime: number }) => void;
+
   // System events
   'error': (error: { message: string; code?: string }) => void;
 }

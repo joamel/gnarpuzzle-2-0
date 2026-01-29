@@ -83,6 +83,14 @@ export class SocketService {
         this.handleAuthentication(socket, data);
       });
 
+      // Clock sync for consistent timers across clients
+      socket.on('time:ping', (data: { clientTime: number }) => {
+        socket.emit('time:pong', {
+          clientTime: data?.clientTime,
+          serverTime: Date.now(),
+        });
+      });
+
       // Room events
       socket.on('room:join', (data: { roomCode: string }) => {
         this.handleRoomJoin(socket, data);
@@ -498,6 +506,7 @@ export class SocketService {
               phase: activeGame.current_phase || 'letter_selection',
               currentTurn: activeGame.current_turn,
               timer_end: activeGame.phase_timer_end,
+              server_time: Date.now(),
               players: mappedPlayers
             });
 

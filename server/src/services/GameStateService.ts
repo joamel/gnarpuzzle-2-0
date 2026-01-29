@@ -122,7 +122,8 @@ export class GameStateService {
     }
 
     const settings = await this.getGameSettings(gameId);
-    const phaseEndTime = Date.now() + (settings.letter_timer * 1000);
+    const serverTime = Date.now();
+    const phaseEndTime = serverTime + (settings.letter_timer * 1000);
 
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
@@ -141,6 +142,7 @@ export class GameStateService {
       gameId,
       phase: 'letter_selection',
       timer_end: phaseEndTime,
+      server_time: serverTime,
       current_turn: updatedGame?.current_turn || game.current_turn
     };
     
@@ -226,8 +228,8 @@ export class GameStateService {
     }
     
     const settings = await this.getGameSettings(gameId);
-    
-    const phaseEndTime = Date.now() + (settings.placement_timer * 1000);
+    const serverTime = Date.now();
+    const phaseEndTime = serverTime + (settings.placement_timer * 1000);
 
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
@@ -254,6 +256,7 @@ export class GameStateService {
       gameId,
       phase: 'letter_placement',
       timer_end: phaseEndTime,
+      server_time: serverTime,
       current_turn: updatedGame?.current_turn,
       current_letter: updatedGame?.current_letter
     };

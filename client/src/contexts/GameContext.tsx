@@ -132,6 +132,24 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   }, [currentRoom]);
 
   const currentPlayer = players.find(p => p.userId === user?.id) || null;
+
+  // Server time offset (serverTime - clientTime) used to keep countdowns consistent across clients.
+  // Stored as ref to avoid unnecessary re-renders.
+  const serverTimeOffsetMsRef = useRef<number>(0);
+
+  const getSyncedNowMs = () => Date.now() + serverTimeOffsetMsRef.current;
+
+  const updateServerTimeOffsetFromEvent = (serverTime: unknown) => {
+    const serverMs = Number(serverTime);
+    if (Number.isFinite(serverMs) && serverMs > 0) {
+      serverTimeOffsetMsRef.current = serverMs - Date.now();
+    }
+  };
+
+  const computeRemainingSeconds = (endTimeMs: number) => {
+    const remaining = Math.ceil((endTimeMs - getSyncedNowMs()) / 1000);
+    return Math.max(0, remaining);
+  };
   
   // Enhanced turn calculation with better debugging
   const currentTurnUserId = currentGame?.currentTurn ? Number(currentGame.currentTurn) : 0;
@@ -149,8 +167,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     if (!gameTimer?.endTime) return;
 
     const interval = setInterval(() => {
-      const now = Date.now();
-      const remainingSeconds = Math.max(0, Math.ceil((gameTimer.endTime - now) / 1000));
+      const remainingSeconds = computeRemainingSeconds(gameTimer.endTime);
       const isWarning = remainingSeconds <= 5;
 
       setGameTimer(prev => prev ? { ...prev, remainingSeconds, isWarning } : null);
@@ -158,7 +175,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       if (remainingSeconds === 0) {
         clearInterval(interval);
       }
-    }, 1000);
+    }, 250);
 
     return () => clearInterval(interval);
   }, [gameTimer?.endTime]);
@@ -179,7 +196,25 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       socket.onAny(debugLogAllEvents);
     }
 
+    const syncClock = () => {
+      socketService.emit('time:ping', { clientTime: Date.now() });
+    };
+
+    const handleTimePong = (data: any) => {
+      const receivedAt = Date.now();
+      const clientTime = Number(data?.clientTime);
+      const serverTime = Number(data?.serverTime);
+      if (!Number.isFinite(clientTime) || !Number.isFinite(serverTime)) return;
+
+      // Estimate one-way latency as RTT/2 and adjust server time accordingly.
+      const rttMs = receivedAt - clientTime;
+      const estimatedServerAtReceive = serverTime + rttMs / 2;
+      serverTimeOffsetMsRef.current = estimatedServerAtReceive - receivedAt;
+    };
+
     const handleGamePhaseChanged = async (data: any) => {
+
+      updateServerTimeOffsetFromEvent(data?.server_time);
 
       setGamePhase(data.phase);
       
@@ -211,8 +246,8 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       }
       
       // Only set timer if we have a valid timer_end value
-      if (data.timer_end && data.timer_end > Date.now()) {
-        const remainingSeconds = Math.ceil((data.timer_end - Date.now()) / 1000);
+      if (data.timer_end && data.timer_end > getSyncedNowMs()) {
+        const remainingSeconds = computeRemainingSeconds(data.timer_end);
         setGameTimer({
           endTime: data.timer_end,
           remainingSeconds: remainingSeconds,
@@ -341,6 +376,8 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     };
 
     const handleGameStarted = (data: any) => {
+
+      updateServerTimeOffsetFromEvent(data?.server_time);
       
       // Join the game socket room for receiving game events
       // Join game socket room
@@ -387,7 +424,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       if (data.timer_end) {
         setGameTimer({
           endTime: data.timer_end,
-          remainingSeconds: Math.ceil((data.timer_end - Date.now()) / 1000),
+          remainingSeconds: computeRemainingSeconds(data.timer_end),
           isWarning: false,
         });
       }
@@ -674,6 +711,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     };
 
     // Register socket events
+    socketService.on('time:pong', handleTimePong);
     socketService.on('game:phase_changed', handleGamePhaseChanged);
     socketService.on('letter:selected', handleLetterSelected);
     socketService.on('letter:placed', handleLetterPlaced);
@@ -686,8 +724,14 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     socketService.on('room:updated', handleRoomUpdated);
     socketService.on('turn:skipped', handleTurnSkipped);
 
+    // Kick off an initial sync and keep it fresh.
+    syncClock();
+    const clockInterval = window.setInterval(syncClock, 30000);
+
     return () => {
+      window.clearInterval(clockInterval);
       socketService.getSocket()?.offAny(debugLogAllEvents);
+      socketService.off('time:pong', handleTimePong);
       socketService.off('game:phase_changed', handleGamePhaseChanged);
       socketService.off('letter:selected', handleLetterSelected);
       socketService.off('letter:placed', handleLetterPlaced);
