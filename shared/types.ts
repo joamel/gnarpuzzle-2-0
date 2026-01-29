@@ -149,6 +149,14 @@ export interface SocketEvents {
     readyPlayers?: string[];
   }) => void;
 
+  // Stats events
+  'stats:online': (data: {
+    total: number;
+    authenticated: number;
+    anonymous: number;
+    updatedAt: string;
+  }) => void;
+
   // Game events
   'game:started': (data: {
     gameId: number;

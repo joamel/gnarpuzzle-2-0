@@ -74,8 +74,8 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
   // Handle ready status change
   const handleReadyChange = (newReadyStatus: boolean) => {
     setIsReady(newReadyStatus);
-    if (currentRoom?.code) {
-      socketService.setPlayerReady(currentRoom.code, newReadyStatus);
+    if (roomCode) {
+      socketService.setPlayerReady(roomCode, newReadyStatus);
     }
   };
 

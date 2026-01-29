@@ -24,18 +24,38 @@ export class RoomModel {
     
     const finalSettings = { ...defaultSettings, ...data.settings };
     
-    const result = await db.run(`
-      INSERT INTO rooms (code, name, created_by, max_players, board_size, turn_duration, settings) 
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, 
-      code,
-      data.name,
-      data.created_by,
-      finalSettings.max_players,
-      finalSettings.grid_size,
-      finalSettings.placement_timer,
-      JSON.stringify(finalSettings)
-    );
+    // `last_active_at` exists in newer DBs; set it on insert when possible.
+    // Keep a safe fallback for older DBs that haven't run migration 011 yet.
+    let result: { lastInsertRowid: number; changes: number };
+    try {
+      result = await db.run(
+        `
+          INSERT INTO rooms (code, name, created_by, max_players, board_size, turn_duration, settings, last_active_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        `,
+        code,
+        data.name,
+        data.created_by,
+        finalSettings.max_players,
+        finalSettings.grid_size,
+        finalSettings.placement_timer,
+        JSON.stringify(finalSettings)
+      );
+    } catch {
+      result = await db.run(
+        `
+          INSERT INTO rooms (code, name, created_by, max_players, board_size, turn_duration, settings)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        code,
+        data.name,
+        data.created_by,
+        finalSettings.max_players,
+        finalSettings.grid_size,
+        finalSettings.placement_timer,
+        JSON.stringify(finalSettings)
+      );
+    }
     
     const room = await this.findById(result.lastInsertRowid as number) as Room;
     

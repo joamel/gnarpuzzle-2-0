@@ -4,7 +4,7 @@ export const migration: Migration = {
   version: 11,
   name: 'add_room_last_active_at',
   up: `
-    ALTER TABLE rooms ADD COLUMN last_active_at DATETIME DEFAULT CURRENT_TIMESTAMP;
+    ALTER TABLE rooms ADD COLUMN last_active_at DATETIME;
 
     UPDATE rooms
     SET last_active_at = COALESCE(last_active_at, created_at)

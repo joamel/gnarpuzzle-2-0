@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../services/apiService';
+import { socketService } from '../services/socketService';
 
 interface OnlineStatsProps {
   className?: string;
@@ -29,11 +30,40 @@ const OnlineStats: React.FC<OnlineStatsProps> = ({ className = '' }) => {
 
   useEffect(() => {
     fetchStats();
+
+    // Prefer realtime updates when available
+    const handleOnlineStats = (data: any) => {
+      if (!data) return;
+      const total = Number(data.total);
+      const authenticated = Number(data.authenticated);
+      const anonymous = Number(data.anonymous);
+      if (![total, authenticated, anonymous].every(Number.isFinite)) return;
+      setStats({ total, authenticated, anonymous });
+      setIsLoading(false);
+    };
+
+    socketService.on('stats:online', handleOnlineStats as any);
     
     // Update stats every 30 seconds
     const interval = setInterval(fetchStats, 30000);
+
+    // Also refresh when the tab becomes active again (helps after sleep/backgrounding)
+    const handleFocus = () => fetchStats();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchStats();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      socketService.off('stats:online', handleOnlineStats as any);
+    };
   }, []);
 
   if (isLoading || !stats) {

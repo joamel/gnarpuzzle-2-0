@@ -62,6 +62,24 @@ export class SocketService {
     this.setupSocketHandlers();
   }
 
+  private normalizeRoomCode(input: unknown): string {
+    if (typeof input !== 'string') return '';
+    return input.trim().toUpperCase();
+  }
+
+  private emitOnlineStats(): void {
+    const connectedUsers = this.connectedUsers || new Map();
+    const total = connectedUsers.size;
+    const authenticated = Array.from(connectedUsers.values()).filter(u => u.userId).length;
+    const anonymous = Math.max(0, total - authenticated);
+    this.io.emit('stats:online', {
+      total,
+      authenticated,
+      anonymous,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
   private setupSocketHandlers(): void {
     this.io.on('connection', async (socket: Socket) => {
       logger.info(`Client connected: ${socket.id}`, {
@@ -70,13 +88,16 @@ export class SocketService {
         timestamp: new Date().toISOString()
       });
 
+      // Track socket immediately so online counts are accurate even if
+      // authentication fails (stale token, malformed token, etc).
+      // We'll upgrade this entry to authenticated user data after successful auth.
+      this.connectedUsers.set(socket.id, {});
+      this.emitOnlineStats();
+
       // Auto-authenticate using token from auth
       const token = socket.handshake.auth.token;
       if (token) {
         await this.handleAuthentication(socket, { token });
-      } else {
-        // Initialize anonymous user data
-        this.connectedUsers.set(socket.id, {});
       }
 
       // Authentication
@@ -165,6 +186,9 @@ export class SocketService {
       // Validate JWT token
       const decoded = AuthService.verifyToken(data.token);
       if (!decoded) {
+        // Keep socket tracked as anonymous so online counters don't drop.
+        this.connectedUsers.set(socket.id, previousUserData?.userId ? {} : (previousUserData ?? {}));
+        this.emitOnlineStats();
         socket.emit('authentication_error', {
           error: 'Invalid token'
         });
@@ -227,6 +251,7 @@ export class SocketService {
       }
 
       this.connectedUsers.set(socket.id, userData);
+      this.emitOnlineStats();
 
       // If this user had a disconnect timer (they're reconnecting), cancel it
       const disconnectTimer = this.disconnectTimers.get(userData.userId);
@@ -296,7 +321,7 @@ export class SocketService {
   }
 
   private async handleRoomJoin(socket: Socket, data: { roomCode: string }): Promise<void> {
-    const { roomCode } = data;
+    const roomCode = this.normalizeRoomCode(data.roomCode);
     const userData = this.connectedUsers.get(socket.id);
 
     socketLogger.debug('handleRoomJoin called', {
@@ -545,7 +570,7 @@ export class SocketService {
   }
 
   private async handleRoomLeave(socket: Socket, data: { roomCode: string }): Promise<void> {
-    const { roomCode } = data;
+    const roomCode = this.normalizeRoomCode(data.roomCode);
     const userData = this.connectedUsers.get(socket.id);
 
     if (!userData?.userId) {
@@ -598,7 +623,8 @@ export class SocketService {
   }
 
   private async handlePlayerSetReady(socket: Socket, data: { roomCode: string; isReady: boolean }): Promise<void> {
-    const { roomCode, isReady } = data;
+    const roomCode = this.normalizeRoomCode(data.roomCode);
+    const { isReady } = data;
     const userData = this.connectedUsers.get(socket.id);
 
     if (!userData?.userId) {
@@ -1155,6 +1181,7 @@ export class SocketService {
     }
 
     this.connectedUsers.delete(socket.id);
+    this.emitOnlineStats();
   }
 
   private handleMobileHeartbeat(socket: Socket): void {

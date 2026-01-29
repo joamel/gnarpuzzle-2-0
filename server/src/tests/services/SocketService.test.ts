@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import { SocketService } from '../../services/SocketService';
 import { Server as SocketServer } from 'socket.io';
+import { AuthService } from '../../services/AuthService';
 
 vi.mock('../../models', () => {
   const findByCode = vi.fn();
@@ -192,6 +193,53 @@ describe('SocketService', () => {
             expect.objectContaining({ userId: 1, username: 'tester' })
           ])
         })
+      );
+    });
+  });
+
+  describe('online tracking', () => {
+    it('tracks socket as anonymous when handshake token is invalid', async () => {
+      const verifySpy = vi.spyOn(AuthService, 'verifyToken').mockReturnValue(null);
+
+      const connectionHandler = mockIo.on.mock.calls.find((c: any[]) => c[0] === 'connection')?.[1];
+      expect(typeof connectionHandler).toBe('function');
+
+      const socket: any = {
+        id: 'socket-invalid-token',
+        handshake: { auth: { token: 'bad-token' } },
+        on: vi.fn(),
+        emit: vi.fn(),
+        join: vi.fn(),
+        leave: vi.fn(),
+        to: vi.fn().mockReturnThis(),
+        rooms: new Set(['socket-invalid-token']),
+      };
+
+      await connectionHandler(socket);
+
+      const connectedUsers = (socketService as any).connectedUsers as Map<string, any>;
+      expect(connectedUsers.has(socket.id)).toBe(true);
+      expect(connectedUsers.get(socket.id)).toEqual({});
+      expect(socket.emit).toHaveBeenCalledWith('authentication_error', expect.any(Object));
+
+      verifySpy.mockRestore();
+    });
+  });
+
+  describe('ready status normalization', () => {
+    it('normalizes roomCode for ready broadcasts (case-insensitive)', async () => {
+      const socket: any = {
+        id: 'socket-ready-1',
+      };
+
+      (socketService as any).connectedUsers.set(socket.id, { userId: 1, username: 'tester' });
+      await (socketService as any).handlePlayerSetReady(socket, { roomCode: 'test01', isReady: true });
+
+      // Server should broadcast to the normalized room name
+      expect(mockIo.to).toHaveBeenCalledWith('room:TEST01');
+      expect(mockIo.emit).toHaveBeenCalledWith(
+        'player:ready_changed',
+        expect.objectContaining({ roomCode: 'TEST01', userId: '1', isReady: true })
       );
     });
   });

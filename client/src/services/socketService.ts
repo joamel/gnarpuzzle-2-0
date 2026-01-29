@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import { SocketEvents } from '../../../shared/types';
 import { logger } from '../utils/logger';
+import { normalizeRoomCode } from '../utils/roomCode';
 
 class SocketService {
   private socket: Socket | null = null;
@@ -169,30 +170,32 @@ class SocketService {
 
   // Join a room for real-time updates
   joinRoom(roomCode: string): void {
-    this.activeRoomCodes.add(roomCode);
+    const normalizedRoomCode = normalizeRoomCode(roomCode);
+    this.activeRoomCodes.add(normalizedRoomCode);
     if (!this.socket?.connected) {
       logger.socket.debug('Socket not connected yet, queueing room join', { roomCode });
       // Queue the join to be processed when socket connects
-      if (!this.pendingRoomJoins.includes(roomCode)) {
-        this.pendingRoomJoins.push(roomCode);
+      if (!this.pendingRoomJoins.includes(normalizedRoomCode)) {
+        this.pendingRoomJoins.push(normalizedRoomCode);
         logger.socket.debug('Room join queued', { pendingRoomJoins: this.pendingRoomJoins });
       }
       return;
     }
-    logger.socket.debug('Joining Socket.IO room', { roomCode });
-    this.socket.emit('room:join', { roomCode });
-    logger.socket.debug('room:join event emitted to socket', { roomCode });
+    logger.socket.debug('Joining Socket.IO room', { roomCode: normalizedRoomCode });
+    this.socket.emit('room:join', { roomCode: normalizedRoomCode });
+    logger.socket.debug('room:join event emitted to socket', { roomCode: normalizedRoomCode });
   }
 
   // Leave a room
   leaveRoom(roomCode: string): void {
-    this.activeRoomCodes.delete(roomCode);
+    const normalizedRoomCode = normalizeRoomCode(roomCode);
+    this.activeRoomCodes.delete(normalizedRoomCode);
     if (!this.socket?.connected) {
       logger.socket.debug('Socket not connected, cannot leave room', { roomCode });
       return;
     }
-    logger.socket.debug('Leaving Socket.IO room', { roomCode });
-    this.socket.emit('room:leave', { roomCode });
+    logger.socket.debug('Leaving Socket.IO room', { roomCode: normalizedRoomCode });
+    this.socket.emit('room:leave', { roomCode: normalizedRoomCode });
   }
 
   // Join a game for real-time updates
@@ -207,13 +210,14 @@ class SocketService {
 
   // Set player ready status
   setPlayerReady(roomCode: string, isReady: boolean): void {
+    const normalizedRoomCode = normalizeRoomCode(roomCode);
     if (!this.socket?.connected) {
-      logger.socket.debug('Socket not connected, queueing ready status', { roomCode, isReady });
-      this.pendingReadyStatusByRoom.set(roomCode, isReady);
+      logger.socket.debug('Socket not connected, queueing ready status', { roomCode: normalizedRoomCode, isReady });
+      this.pendingReadyStatusByRoom.set(normalizedRoomCode, isReady);
       return;
     }
-    logger.socket.debug('Setting ready status', { roomCode, isReady });
-    this.socket.emit('player:set_ready', { roomCode, isReady });
+    logger.socket.debug('Setting ready status', { roomCode: normalizedRoomCode, isReady });
+    this.socket.emit('player:set_ready', { roomCode: normalizedRoomCode, isReady });
   }
 
   on<K extends keyof SocketEvents>(event: K, listener: SocketEvents[K]): void {
