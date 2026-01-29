@@ -17,7 +17,7 @@ describe('GameStateService - placement timeout', () => {
     const dbAll = vi.fn(async (sql: string) => {
       if (
         sql.includes('SELECT * FROM players') &&
-        sql.includes('placement_confirmed IN (0, 2)')
+        sql.includes('placement_confirmed IN (0, 2, 3)')
       ) {
         return [
           {

@@ -312,6 +312,12 @@ export class GameStateService {
       placementConfirmed: player.placement_confirmed,
     });
 
+    // If the player already confirmed this placement, ignore further placement attempts.
+    if (Number(player.placement_confirmed) === 1) {
+      gameLogger.warn('placeLetter failed: already confirmed', { gameId, playerId });
+      throw new Error('Placement already confirmed');
+    }
+
     // Update player's grid
     let gridState: GridCell[][];
     try {
@@ -341,7 +347,8 @@ export class GameStateService {
       gameLogger.debug('Saving updated grid_state to database', { gameId, playerId });
       await db.run(`
         UPDATE players 
-        SET grid_state = ?
+        SET grid_state = ?,
+            placement_confirmed = CASE WHEN placement_confirmed = 1 THEN 1 ELSE 3 END
         WHERE game_id = ? AND user_id = ?
       `, JSON.stringify(gridState), gameId, playerId);
 
@@ -389,10 +396,36 @@ export class GameStateService {
     const dbManager = await DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
 
+    const game = await this.getGameById(gameId);
+    if (!game || game.current_phase !== 'letter_placement') {
+      gameLogger.warn('confirmPlacement failed: not in letter_placement phase', {
+        gameId,
+        playerId,
+        phase: game?.current_phase,
+      });
+      throw new Error('Not in placement phase');
+    }
+
+    const player = await db.get(`
+      SELECT placement_confirmed, current_letter FROM players WHERE game_id = ? AND user_id = ?
+    `, gameId, playerId) as { placement_confirmed: number; current_letter: string | null } | null;
+
+    // Require an actual placement to exist before confirming.
+    // placement_confirmed=3 means "placed but not confirmed".
+    if (!player || Number(player.placement_confirmed) !== 3) {
+      gameLogger.warn('confirmPlacement failed: no placement recorded', {
+        gameId,
+        playerId,
+        placementConfirmed: player?.placement_confirmed,
+        hasCurrentLetter: !!player?.current_letter,
+      });
+      throw new Error('No placed letter to confirm');
+    }
+
     await db.run(`
       UPDATE players 
       SET placement_confirmed = 1
-      WHERE game_id = ? AND user_id = ? AND placement_confirmed IN (0, 2)
+      WHERE game_id = ? AND user_id = ? AND placement_confirmed = 3
     `, gameId, playerId);
 
     gameLogger.debug('Player confirmed placement', { gameId, playerId });
@@ -587,12 +620,18 @@ export class GameStateService {
 
     const unconfirmedPlayers = await db.all(`
       SELECT * FROM players 
-      WHERE game_id = ? AND placement_confirmed IN (0, 2) AND left_at IS NULL
+      WHERE game_id = ? AND placement_confirmed IN (0, 2, 3) AND left_at IS NULL
     `, gameId) as Player[];
 
     // Process all auto-placements FIRST before marking any as confirmed
     // This prevents race conditions where advanceToNextTurn runs before all updates complete
     for (const player of unconfirmedPlayers) {
+      const placementConfirmed = Number(player.placement_confirmed);
+      // If the player already placed (3), do not auto-place again.
+      if (placementConfirmed === 3) {
+        continue;
+      }
+
       if (player.current_letter) {
         await this.autoPlaceLetter(gameId, player.user_id, player.current_letter);
       }
@@ -817,7 +856,8 @@ export class GameStateService {
       
       await db.run(`
         UPDATE players 
-        SET grid_state = ? 
+        SET grid_state = ?,
+            placement_confirmed = CASE WHEN placement_confirmed = 1 THEN 1 ELSE 3 END
         WHERE game_id = ? AND user_id = ?
       `, JSON.stringify(gridState), gameId, playerId);
 
