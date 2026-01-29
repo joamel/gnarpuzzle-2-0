@@ -874,7 +874,10 @@ router.put('/:id/settings', AuthService.authenticateToken, async (req, res) => {
   try {
     const authReq = req as AuthenticatedRequest;
     const roomId = parseInt(req.params.id);
-    const { max_players, grid_size, letter_timer, placement_timer } = req.body;
+    const { name, max_players, grid_size, letter_timer, placement_timer } = req.body;
+
+    const rawName = typeof name === 'string' ? name : undefined;
+    const roomName = rawName != null ? rawName.trim() : undefined;
 
     const maxPlayers = max_players !== undefined ? Number(max_players) : undefined;
     const gridSize = grid_size !== undefined ? Number(grid_size) : undefined;
@@ -914,6 +917,24 @@ router.put('/:id/settings', AuthService.authenticateToken, async (req, res) => {
         message: 'Cannot change settings after game has started'
       });
       return;
+    }
+
+    if (roomName !== undefined) {
+      if (!roomName) {
+        res.status(400).json({
+          error: 'Invalid name',
+          message: 'Room name cannot be empty'
+        });
+        return;
+      }
+
+      if (roomName.length > 40) {
+        res.status(400).json({
+          error: 'Invalid name',
+          message: 'Room name cannot be longer than 40 characters'
+        });
+        return;
+      }
     }
 
     // Validate settings (accept numeric strings from clients)
@@ -994,11 +1015,12 @@ router.put('/:id/settings', AuthService.authenticateToken, async (req, res) => {
     
     // Update both the settings JSON and the top-level columns for API compatibility
     await db.run(
-      'UPDATE rooms SET settings = ?, board_size = ?, max_players = ? WHERE id = ?',
+      'UPDATE rooms SET settings = ?, board_size = ?, max_players = ?, name = ? WHERE id = ?',
       [
         JSON.stringify(updatedSettings), 
         gridSize ?? room.board_size,
         maxPlayers ?? room.max_players,
+        roomName ?? room.name,
         roomId
       ]
     );

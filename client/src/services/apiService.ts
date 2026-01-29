@@ -259,7 +259,16 @@ class ApiService {
     });
   }
 
-  async updateRoomSettings(roomId: number, settings: { max_players?: number; grid_size?: number; letter_timer?: number; placement_timer?: number }): Promise<any> {
+  async updateRoomSettings(
+    roomId: number,
+    settings: {
+      name?: string;
+      max_players?: number;
+      grid_size?: number;
+      letter_timer?: number;
+      placement_timer?: number;
+    }
+  ): Promise<any> {
     return this.request<any>(`/api/rooms/${roomId}/settings`, {
       method: 'PUT',
       body: JSON.stringify(settings)

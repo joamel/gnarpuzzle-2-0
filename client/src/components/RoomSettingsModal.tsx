@@ -4,6 +4,7 @@ interface RoomSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (settings: RoomSettingsData) => Promise<void>;
+  currentName: string;
   currentSettings: {
     max_players: number;
     grid_size: number;
@@ -13,6 +14,7 @@ interface RoomSettingsModalProps {
 }
 
 export interface RoomSettingsData {
+  name: string;
   max_players: number;
   grid_size: number;
   letter_timer: number;
@@ -23,8 +25,10 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
   isOpen,
   onClose,
   onSave,
+  currentName,
   currentSettings
 }) => {
+  const [roomName, setRoomName] = useState(currentName);
   const [maxPlayers, setMaxPlayers] = useState(currentSettings.max_players);
   const [gridSize, setGridSize] = useState(currentSettings.grid_size);
   const [letterTimer, setLetterTimer] = useState(currentSettings.letter_timer);
@@ -34,13 +38,14 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      setRoomName(currentName);
       setMaxPlayers(currentSettings.max_players);
       setGridSize(currentSettings.grid_size);
       setLetterTimer(currentSettings.letter_timer);
       setPlacementTimer(currentSettings.placement_timer);
       setError('');
     }
-  }, [isOpen, currentSettings]);
+  }, [isOpen, currentSettings, currentName]);
 
   const handleSave = async () => {
     if (isSaving) return;
@@ -50,6 +55,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
 
     try {
       await onSave({
+        name: roomName,
         max_players: maxPlayers,
         grid_size: gridSize,
         letter_timer: letterTimer,
@@ -82,6 +88,20 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
         </div>
 
         <div>
+          <div className="form-group" style={{ marginBottom: '16px' }}>
+            <label className="form-label">Rumnamn</label>
+            <input
+              type="text"
+              value={roomName}
+              onChange={(e) => setRoomName(e.target.value)}
+              disabled={isSaving}
+              maxLength={40}
+              className="form-input"
+              placeholder="Skriv ett namn..."
+            />
+            <small style={{ opacity: 0.8 }}>Max 40 tecken</small>
+          </div>
+
           <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px'}}>
             <div className="form-group">
               <label className="form-label">Max spelare: {maxPlayers}</label>

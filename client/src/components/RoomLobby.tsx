@@ -740,6 +740,7 @@ const RoomLobby: React.FC<RoomLobbyProps> = ({ onStartGame }) => {
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
         onSave={handleSaveSettings}
+        currentName={currentRoom.name}
         currentSettings={{
           max_players: currentRoom.settings?.max_players || 4,
           grid_size: currentRoom.settings?.grid_size || 5,
