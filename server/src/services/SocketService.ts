@@ -54,6 +54,7 @@ export class SocketService {
   // Grace period for disconnects - give users time to reconnect before removing from game
   private disconnectTimers: Map<number, NodeJS.Timeout> = new Map(); // userId -> timeout
   private readonly DISCONNECT_GRACE_PERIOD_MS = 90 * 1000; // 90 seconds (1.5 minutes)
+  private readonly DISCONNECT_GRACE_PERIOD_NO_GAME_MS = 10 * 60 * 1000; // 10 minutes
   
   constructor(io: SocketServer) {
     this.io = io;
@@ -931,7 +932,7 @@ export class SocketService {
                 
                 // Cleanup timer
                 this.disconnectTimers.delete(userId);
-              }, this.DISCONNECT_GRACE_PERIOD_MS);
+              }, this.DISCONNECT_GRACE_PERIOD_NO_GAME_MS);
               
               this.disconnectTimers.set(userId, timer);
               
@@ -952,7 +953,7 @@ export class SocketService {
               // Apply a grace period here too; browser refreshes and brief network hiccups
               // should not orphan rooms or transfer ownership unexpectedly.
               logger.info(
-                `Player ${userData.username} (${userId}) disconnected from room ${userData.roomCode} (no active game) - starting ${this.DISCONNECT_GRACE_PERIOD_MS / 1000} s grace period`
+                `Player ${userData.username} (${userId}) disconnected from room ${userData.roomCode} (no active game) - starting ${this.DISCONNECT_GRACE_PERIOD_NO_GAME_MS / 1000} s grace period`
               );
 
               const existingTimer = this.disconnectTimers.get(userId);
@@ -1013,7 +1014,7 @@ export class SocketService {
                 service: 'gnarpuzzle-server',
                 socketId: socket.id,
                 userId: userData.userId,
-                gracePeriodSeconds: this.DISCONNECT_GRACE_PERIOD_MS / 1000,
+                gracePeriodSeconds: this.DISCONNECT_GRACE_PERIOD_NO_GAME_MS / 1000,
               });
 
               return;
@@ -1021,6 +1022,60 @@ export class SocketService {
           }
         } catch (error) {
           logger.error('Error checking for active game during disconnect:', error);
+
+          // Safe fallback: avoid immediately removing a user from a room if we
+          // couldn't determine whether an active game exists (DB hiccup, etc).
+          // This prevents invisible/missing members after refreshes.
+          try {
+            const existingTimer = this.disconnectTimers.get(userId);
+            if (existingTimer) {
+              clearTimeout(existingTimer);
+            }
+
+            const timer = setTimeout(async () => {
+              try {
+                const stillDisconnected = !Array.from(this.connectedUsers.values()).some(u => u.userId === userId);
+                if (!stillDisconnected) {
+                  this.disconnectTimers.delete(userId);
+                  return;
+                }
+
+                const RoomModel = (await import('../models/RoomModel')).RoomModel;
+                const room = await RoomModel.findByCode(userData.roomCode!);
+                if (!room?.id) {
+                  this.disconnectTimers.delete(userId);
+                  return;
+                }
+
+                const removed = await RoomModel.removeMember(room.id as number, userId);
+                if (removed) {
+                  try {
+                    const readySet = this.roomPlayerReadyStatus.get(userData.roomCode!);
+                    readySet?.delete(userId);
+                  } catch {
+                    // best-effort
+                  }
+
+                  await this.notifyRoomOfMemberLeaving(userData.roomCode!, userId, userData.username!, room.created_by === userId);
+                }
+              } catch (removeErr) {
+                logger.error('Fallback disconnect cleanup failed', {
+                  service: 'gnarpuzzle-server',
+                  roomCode: userData.roomCode,
+                  userId,
+                  error: (removeErr as Error).message,
+                });
+              } finally {
+                this.disconnectTimers.delete(userId);
+              }
+            }, this.DISCONNECT_GRACE_PERIOD_NO_GAME_MS);
+
+            this.disconnectTimers.set(userId, timer);
+            this.connectedUsers.delete(socket.id);
+            return;
+          } catch {
+            // If even fallback fails, allow legacy cleanup below.
+          }
         }
       }
       
