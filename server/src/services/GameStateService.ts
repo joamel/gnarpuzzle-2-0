@@ -804,6 +804,20 @@ export class GameStateService {
       return;
     }
 
+    // Safety guard: if the player already placed (but hasn't confirmed yet),
+    // never override their manual placement with an auto-placement.
+    // This can happen if handlePlacementTimeout fetched a stale player row
+    // (e.g. placement_confirmed=2) right before placeLetter updated it to 3.
+    const placementConfirmed = Number(player.placement_confirmed);
+    if (placementConfirmed === 3 || placementConfirmed === 1) {
+      gameLogger.debug('autoPlaceLetter skipped: placement already exists or confirmed', {
+        gameId,
+        playerId,
+        placementConfirmed,
+      });
+      return;
+    }
+
     gameLogger.debug('autoPlaceLetter processing player', {
       gameId,
       playerId,
