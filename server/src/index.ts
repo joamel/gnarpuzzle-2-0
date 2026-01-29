@@ -58,12 +58,43 @@ function getDeployInfo() {
 }
 
 // Request logging middleware
-app.use((req, _res, next) => {
-  logger.info(`${req.method} ${req.path}`, {
-    ip: req.ip,
-    userAgent: req.get('User-Agent'),
-    timestamp: new Date().toISOString()
+// Keep prod logs actionable: log non-GET requests and any 4xx/5xx responses.
+// Opt-in to logging successful GETs via LOG_HTTP_GET=true.
+app.use((req, res, next) => {
+  const startMs = Date.now();
+
+  res.on('finish', () => {
+    const durationMs = Date.now() - startMs;
+    const status = res.statusCode;
+    const method = req.method;
+    const path = (req as any).originalUrl || req.path;
+
+    // Never spam health checks.
+    if (path === '/health' || path === '/api/health') {
+      return;
+    }
+
+    const logGets = String(process.env.LOG_HTTP_GET || '').toLowerCase() === 'true';
+    const isSuccessfulGet = method === 'GET' && status < 400;
+    if (isSuccessfulGet && !logGets) {
+      return;
+    }
+
+    const level: 'info' | 'warn' | 'error' = status >= 500 ? 'error' : status >= 400 ? 'warn' : 'info';
+    const meta: Record<string, unknown> = {
+      ip: req.ip,
+      status,
+      durationMs,
+    };
+
+    // Only include UA when it actually helps triage.
+    if (status >= 400) {
+      meta.userAgent = req.get('User-Agent');
+    }
+
+    logger[level](`${method} ${path}`, meta);
   });
+
   next();
 });
 
