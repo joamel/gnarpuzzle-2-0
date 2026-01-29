@@ -122,6 +122,15 @@ export class RoomModel {
         INSERT INTO room_members (room_id, user_id) 
         VALUES (?, ?)
       `, roomId, userId);
+
+      // Mark recent activity for cleanup logic.
+      if (result.changes > 0) {
+        try {
+          await db.run(`UPDATE rooms SET last_active_at = CURRENT_TIMESTAMP WHERE id = ?`, roomId);
+        } catch {
+          // best-effort (older DB before migration)
+        }
+      }
       
       return result.changes > 0;
     } catch (error: any) {
@@ -181,6 +190,13 @@ export class RoomModel {
     
     if (result.changes > 0) {
       roomLogger.debug('Successfully removed user from room', { roomId, userId });
+
+      // Mark recent activity for cleanup logic.
+      try {
+        await db.run(`UPDATE rooms SET last_active_at = CURRENT_TIMESTAMP WHERE id = ?`, roomId);
+      } catch {
+        // best-effort (older DB before migration)
+      }
       
       // Check if room is now empty and reset status to waiting if needed
       const memberCount = await this.getMemberCount(roomId);
@@ -371,7 +387,7 @@ export class RoomModel {
     return await db.all(`
       SELECT r.* FROM rooms r
       WHERE r.status != 'deleted' 
-      AND r.created_at < ?
+      AND COALESCE(r.last_active_at, r.created_at) < ?
       ORDER BY r.created_at ASC
     `, cutoffTime) as Room[];
   }

@@ -1015,7 +1015,7 @@ router.put('/:id/settings', AuthService.authenticateToken, async (req, res) => {
     
     // Update both the settings JSON and the top-level columns for API compatibility
     await db.run(
-      'UPDATE rooms SET settings = ?, board_size = ?, max_players = ?, name = ? WHERE id = ?',
+      'UPDATE rooms SET settings = ?, board_size = ?, max_players = ?, name = ?, last_active_at = CURRENT_TIMESTAMP WHERE id = ?',
       [
         JSON.stringify(updatedSettings), 
         gridSize ?? room.board_size,

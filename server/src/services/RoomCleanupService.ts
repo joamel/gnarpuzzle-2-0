@@ -4,9 +4,16 @@ import { RoomModel } from '../models';
 export class RoomCleanupService {
   private cleanupInterval: NodeJS.Timeout | null = null;
   private readonly CLEANUP_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes (more frequent for empty rooms)
-  private readonly ROOM_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes for inactive rooms
-  private readonly EMPTY_ROOM_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes for empty rooms
+  private readonly ROOM_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes for inactive rooms (used for pre-filtering)
+  private readonly EMPTY_ROOM_TIMEOUT_MS =
+    (Number(process.env.ROOM_EMPTY_CLEANUP_MINUTES ?? 60) || 60) * 60 * 1000; // default: 60 minutes
   private isRunning = false;
+
+  private readonly STANDARD_ROOM_NAMES = new Set([
+    'Snabbspel 4×4',
+    'Klassiskt 5×5',
+    'Utmaning 6×6',
+  ]);
 
   private coerceBoolean(value: unknown, defaultValue: boolean): boolean {
     if (value === undefined || value === null) return defaultValue;
@@ -132,14 +139,20 @@ export class RoomCleanupService {
    */
   private async shouldCleanupRoom(room: any): Promise<boolean> {
     try {
-      // If the room predates the settings column (NULL settings), be conservative:
-      // don't auto-delete it. These include seeded standard rooms in some upgraded DBs.
+      // If the room predates the settings column (NULL settings), fall back to name-based
+      // protection for the seeded standard rooms.
       if (!room.settings) {
-        logger.debug(`Room ${room.code} has no settings - skipping cleanup`);
-        return false;
+        if (this.STANDARD_ROOM_NAMES.has(String(room.name ?? ''))) {
+          logger.debug(`Room ${room.code} looks like a seeded standard room - skipping cleanup`);
+          return false;
+        }
+        // Without settings we can't detect persistence flags; treat it as normal.
+        // Only delete if it's empty and truly inactive.
       }
 
-      const settings = typeof room.settings === 'string' ? JSON.parse(room.settings) : room.settings;
+      const settings = room.settings
+        ? (typeof room.settings === 'string' ? JSON.parse(room.settings) : room.settings)
+        : null;
 
       // Permanently keep certain rooms (e.g. seeded public rooms)
       const isPersistent = this.coerceBoolean((settings as any)?.is_persistent, false);
@@ -148,49 +161,23 @@ export class RoomCleanupService {
         return false;
       }
 
-      // NEVER cleanup public rooms.
-      // Be robust: some DBs/older records may store booleans as 0/1 or strings, or omit is_private entirely.
-      // If is_private is missing, treat the room as public unless it requires a password.
-      const requirePassword = this.coerceBoolean((settings as any)?.require_password, false);
-      const isPrivateRaw = (settings as any)?.is_private;
-      const isPrivate =
-        isPrivateRaw === undefined || isPrivateRaw === null
-          ? requirePassword
-          : this.coerceBoolean(isPrivateRaw, false);
-
-      if (!isPrivate) {
-        logger.debug(`Public room ${room.code} is permanent - skipping cleanup`);
-        return false;
-      }
-
-      // Check if room is empty (no members) - delete faster
+      // Only clean up empty rooms for now. We don't have reliable, server-authoritative
+      // connection tracking in RoomModel.getConnectedMemberCount yet.
       const memberCount = await RoomModel.getMemberCount(room.id);
-      if (memberCount === 0) {
-        const createdAt = new Date(room.created_at);
-        const now = new Date();
-        const timeSinceCreation = now.getTime() - createdAt.getTime();
-        
-        // Delete empty rooms after 5 minutes instead of 10
-        if (timeSinceCreation > this.EMPTY_ROOM_TIMEOUT_MS) {
-          logger.debug(`Empty room ${room.code} ready for cleanup (${Math.round(timeSinceCreation / 60000)} minutes old)`);
-          return true;
-        }
+      if (memberCount !== 0) {
         return false;
       }
 
-      // Check if room has been inactive for too long (for rooms with members)
-      const createdAt = new Date(room.created_at);
+      const lastActive = room.last_active_at ?? room.created_at;
+      const lastActiveAt = lastActive ? new Date(lastActive) : new Date(room.created_at);
       const now = new Date();
-      const timeSinceCreation = now.getTime() - createdAt.getTime();
-      
-      if (timeSinceCreation > this.ROOM_TIMEOUT_MS) {
-        logger.debug(`Room ${room.code} inactive for ${Math.round(timeSinceCreation / 60000)} minutes`);
-        
-        // Check if all members are disconnected
-        const connectedMembers = await RoomModel.getConnectedMemberCount(room.id);
-        if (connectedMembers === 0) {
-          return true;
-        }
+      const inactiveMs = now.getTime() - lastActiveAt.getTime();
+
+      if (inactiveMs > this.EMPTY_ROOM_TIMEOUT_MS) {
+        logger.debug(
+          `Empty room ${room.code} ready for cleanup (${Math.round(inactiveMs / 60000)} minutes since last activity)`
+        );
+        return true;
       }
 
       return false;

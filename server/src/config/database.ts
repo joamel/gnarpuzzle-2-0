@@ -18,6 +18,7 @@ import m007 from './migrations/007_add_password_hash_to_users';
 import m008 from './migrations/008_case_insensitive_usernames';
 import m009 from './migrations/009_fix_phase_timer_end_bigint';
 import m010 from './migrations/010_add_left_at_to_players';
+import m011 from './migrations/011_add_room_last_active_at';
 
 // For now, we'll use a simple in-memory mock for development
 interface MockDatabase extends DatabaseInterface {
@@ -274,6 +275,7 @@ export class DatabaseManager {
       migrationRunner.registerMigration(m008);
       migrationRunner.registerMigration(m009);
       migrationRunner.registerMigration(m010);
+      migrationRunner.registerMigration(m011);
       
       // Run all pending migrations
       await migrationRunner.runPendingMigrations();
@@ -322,6 +324,7 @@ export class DatabaseManager {
       migrationRunner.registerMigration(m008);
       migrationRunner.registerMigration(m009);
       migrationRunner.registerMigration(m010);
+      migrationRunner.registerMigration(m011);
       
       // Run all pending migrations
       await migrationRunner.runPendingMigrations();
