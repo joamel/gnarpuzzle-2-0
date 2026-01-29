@@ -948,21 +948,74 @@ export class SocketService {
               
               return;
             } else {
-              // No active game (or game already finished) - remove immediately
-              logger.info(`Player ${userData.username} (${userId}) disconnected from room ${userData.roomCode} (no active game) - removing immediately`);
-              
-              const removed = await RoomModel.removeMember(roomId, userId);
-              if (removed) {
-                await this.notifyRoomOfMemberLeaving(userData.roomCode, userId, userData.username!, room.created_by === userId);
+              // No active game (or game already finished).
+              // Apply a grace period here too; browser refreshes and brief network hiccups
+              // should not orphan rooms or transfer ownership unexpectedly.
+              logger.info(
+                `Player ${userData.username} (${userId}) disconnected from room ${userData.roomCode} (no active game) - starting ${this.DISCONNECT_GRACE_PERIOD_MS / 1000} s grace period`
+              );
+
+              const existingTimer = this.disconnectTimers.get(userId);
+              if (existingTimer) {
+                clearTimeout(existingTimer);
               }
 
-              // We've handled removal + notifications; don't fall through to legacy cleanup.
+              const timer = setTimeout(async () => {
+                logger.info(
+                  `Grace period expired for player ${userData.username} (${userId}) - removing from room ${userData.roomCode}`
+                );
+
+                const stillDisconnected = !Array.from(this.connectedUsers.values()).some(u => u.userId === userId);
+
+                if (stillDisconnected) {
+                  try {
+                    // Remove from room
+                    const removed = await RoomModel.removeMember(roomId, userId);
+                    if (removed) {
+                      // Remove any ready entry once we truly remove the member
+                      try {
+                        const readySet = this.roomPlayerReadyStatus.get(userData.roomCode!);
+                        readySet?.delete(userId);
+                      } catch {
+                        // best-effort
+                      }
+
+                      await this.notifyRoomOfMemberLeaving(
+                        userData.roomCode!,
+                        userId,
+                        userData.username!,
+                        room.created_by === userId
+                      );
+                    }
+                  } catch (removeErr) {
+                    logger.error('Failed to remove disconnected user after grace period (no active game)', {
+                      service: 'gnarpuzzle-server',
+                      roomCode: userData.roomCode,
+                      userId,
+                      error: (removeErr as Error).message,
+                    });
+                  }
+                } else {
+                  logger.info(
+                    `Player ${userData.username} (${userId}) reconnected within grace period - not removing from room`
+                  );
+                }
+
+                this.disconnectTimers.delete(userId);
+              }, this.DISCONNECT_GRACE_PERIOD_MS);
+
+              this.disconnectTimers.set(userId, timer);
+
+              // Do not remove membership immediately; just forget this socket.
               this.connectedUsers.delete(socket.id);
-              logger.info(`Client disconnected (removed immediately): ${userData.username}`, {
+
+              logger.info(`Client disconnected (grace period active - no active game): ${userData.username}`, {
                 service: 'gnarpuzzle-server',
                 socketId: socket.id,
-                userId: userData.userId
+                userId: userData.userId,
+                gracePeriodSeconds: this.DISCONNECT_GRACE_PERIOD_MS / 1000,
               });
+
               return;
             }
           }
